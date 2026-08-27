@@ -11,6 +11,7 @@ import {
   formatHz,
   protocolDna,
   type NoiseColor,
+  type ParamDescriptor,
   type StimulationEngine,
 } from '@frequencylab/dsp-core';
 import { Screen, ScreenHeader, SectionHeader } from '../../src/design/components/Screen';
@@ -21,6 +22,7 @@ import { HardwareButton } from '../../src/design/components/HardwareButton';
 import { PrecisionValueDisplay } from '../../src/design/components/PrecisionValueDisplay';
 import { Oscilloscope, SpectrumAnalyzer } from '../../src/design/components/Visualizers';
 import { NumericEntrySheet } from '../../src/design/components/NumericEntrySheet';
+import { ParameterControl } from '../../src/design/components/ParameterControl';
 import { DnaChip } from '../../src/design/components/Badges';
 import { Label, Text } from '../../src/design/components/Text';
 import { BANDS, bandForFrequency, colors, layout, space } from '../../src/design/tokens';
@@ -184,20 +186,14 @@ export default function ExploreScreen() {
       <SectionHeader label="Layers" />
       <InstrumentPanel tone="flat" bare>
         <View style={styles.sliderPanel}>
-          <MiniEncoderRow
-            label="Intensity"
+          <ParameterControl
+            descriptor={INTENSITY_PARAM}
             value={recipe.intensity}
-            min={0}
-            max={1}
-            format={(value) => `${Math.round(value * 100)}%`}
             onChange={(value) => apply({ intensity: value })}
           />
-          <MiniEncoderRow
-            label="Noise level"
+          <ParameterControl
+            descriptor={NOISE_LEVEL_PARAM}
             value={recipe.noiseLevel}
-            min={0}
-            max={0.4}
-            format={(value) => `${Math.round(value * 100)}%`}
             onChange={(value) => apply({ noiseLevel: value })}
           />
           <View style={styles.inlineRow}>
@@ -215,16 +211,18 @@ export default function ExploreScreen() {
               onChange={(value) => apply({ noiseColor: value as NoiseColor })}
             />
           </View>
-          <MiniEncoderRow
-            label="Stereo movement"
+          <ParameterControl
+            descriptor={MOTION_DEPTH_PARAM}
             value={recipe.motionDepth}
-            min={0}
-            max={1}
-            format={(value) =>
-              value === 0 ? 'Off' : `${Math.round(value * 100)}% @ ${recipe.motionRateHz.toFixed(2)} Hz`
-            }
             onChange={(value) => apply({ motionDepth: value })}
           />
+          {recipe.motionDepth > 0 ? (
+            <ParameterControl
+              descriptor={MOTION_RATE_PARAM}
+              value={recipe.motionRateHz}
+              onChange={(value) => apply({ motionRateHz: value })}
+            />
+          ) : null}
           {recipe.engine === 'binaural' ? (
             <View style={styles.inlineRow}>
               <Label>Calculation</Label>
@@ -339,56 +337,60 @@ const ENGINE_NOTE: Record<StimulationEngine, string> = {
   isochronic: 'One tone switched on and off at the beat rate. Works on any output.',
 };
 
-/** A compact horizontal control for the secondary layer parameters. */
-function MiniEncoderRow({
-  label,
-  value,
-  min,
-  max,
-  format,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  format: (value: number) => string;
-  onChange: (value: number) => void;
-}) {
-  const steps = 20;
-  const index = Math.round(((value - min) / (max - min)) * steps);
-  return (
-    <View style={styles.miniRow}>
-      <View style={styles.miniHeader}>
-        <Label>{label}</Label>
-        <Text variant="readoutSm" tone="secondary">
-          {format(value)}
-        </Text>
-      </View>
-      <View
-        style={styles.miniTrack}
-        accessible
-        accessibilityRole="adjustable"
-        accessibilityLabel={label}
-        accessibilityValue={{ min: 0, max: steps, now: index, text: format(value) }}
-        accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-        onAccessibilityAction={(event) => {
-          const delta = event.nativeEvent.actionName === 'increment' ? 1 : -1;
-          const next = Math.min(steps, Math.max(0, index + delta));
-          onChange(min + (next / steps) * (max - min));
-        }}
-      >
-        {Array.from({ length: steps + 1 }, (_, tick) => (
-          <View
-            key={tick}
-            onTouchStart={() => onChange(min + (tick / steps) * (max - min))}
-            style={[styles.miniTick, tick <= index ? styles.miniTickOn : null]}
-          />
-        ))}
-      </View>
-    </View>
-  );
-}
+/**
+ * Explorer's secondary controls are described as real parameter descriptors, so
+ * they get the same drag model, numeric entry and accessibility actions as
+ * every control in Lab Mode rather than a bespoke simplified version.
+ */
+const INTENSITY_PARAM: ParamDescriptor = {
+  key: 'intensity',
+  label: 'Intensity',
+  unit: 'percent',
+  min: 0,
+  max: 1,
+  default: 0.45,
+  precision: 2,
+  taper: 'linear',
+  automatable: false,
+  help: 'Level of the tone before the master chain.',
+};
+
+const NOISE_LEVEL_PARAM: ParamDescriptor = {
+  key: 'noiseLevel',
+  label: 'Noise level',
+  unit: 'percent',
+  min: 0,
+  max: 0.4,
+  default: 0.1,
+  precision: 2,
+  taper: 'linear',
+  automatable: false,
+};
+
+const MOTION_DEPTH_PARAM: ParamDescriptor = {
+  key: 'motionDepth',
+  label: 'Stereo movement',
+  unit: 'percent',
+  min: 0,
+  max: 1,
+  default: 0,
+  precision: 2,
+  taper: 'linear',
+  automatable: false,
+  help: 'How far the sound travels across the stereo field.',
+};
+
+const MOTION_RATE_PARAM: ParamDescriptor = {
+  key: 'motionRate',
+  label: 'Movement rate',
+  unit: 'hz',
+  min: 0.05,
+  max: 4,
+  default: 0.5,
+  precision: 2,
+  taper: 'log',
+  automatable: false,
+};
 
 const styles = StyleSheet.create({
   encoderStage: { alignItems: 'center', paddingVertical: space.md },
@@ -401,16 +403,6 @@ const styles = StyleSheet.create({
     gap: space.md,
   },
   inlineSegment: { flex: 1, maxWidth: 240 },
-  miniRow: { gap: space.sm },
-  miniHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  miniTrack: { flexDirection: 'row', gap: 3, height: 28, alignItems: 'center' },
-  miniTick: {
-    flex: 1,
-    height: 18,
-    borderRadius: 1,
-    backgroundColor: colors.surfaceRecessed,
-  },
-  miniTickOn: { backgroundColor: colors.signal, opacity: 0.8 },
   scopes: { padding: space.lg, gap: space.md },
   actions: { flexDirection: 'row', gap: space.sm },
   actionButton: { flex: 1 },
