@@ -104,6 +104,21 @@ npx expo export --platform ios
 npx expo export --platform android
 ```
 
+### Web preview
+
+The app also builds to the browser via react-native-web, which is how it can be
+hosted on a static platform like Vercel. This is a **visual/UX preview only**:
+the real-time audio backend needs a native module, so on web the app runs on the
+silent fallback backend and says so in an on-screen banner. The DSP, protocol
+clock and visualisers still run — you can watch a beat sweep and see the
+oscilloscope — there is simply no sound. Use a native dev build to hear it.
+
+```bash
+cd apps/mobile
+npm run build:web     # static export into apps/mobile/dist
+npm run deploy:web    # export, then `vercel deploy --prod` the static output
+```
+
 ### Working on the DSP
 
 Metro resolves `@frequencylab/dsp-core` straight from TypeScript source, so
