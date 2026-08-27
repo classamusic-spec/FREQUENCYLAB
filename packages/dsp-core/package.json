@@ -9,10 +9,14 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "react-native": "./src/index.ts",
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -23,5 +27,6 @@
     "typescript": "^5.9.3",
     "vitest": "^4.1.11"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "react-native": "./src/index.ts"
 }

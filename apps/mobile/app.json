@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "Frequency Lab",
+    "slug": "frequency-lab",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "frequencylab",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "backgroundColor": "#08090B",
+    "splash": {
+      "backgroundColor": "#08090B",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.frequencylab.app",
+      "requireFullScreen": false,
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"],
+        "NSHealthShareUsageDescription": "FREQUENCY LAB can read heart rate and heart-rate variability around a session so you can see how your body responded. This is optional and the app works fully without it.",
+        "NSHealthUpdateUsageDescription": "FREQUENCY LAB can record completed sessions as mindful minutes. This is optional.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.frequencylab.app",
+      "edgeToEdgeEnabled": true,
+      "permissions": ["android.permission.FOREGROUND_SERVICE", "android.permission.WAKE_LOCK"],
+      "adaptiveIcon": {
+        "backgroundColor": "#08090B"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#08090B",
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "react-native-audio-api",
+        {
+          "iosBackgroundMode": true,
+          "iosForegroundService": true,
+          "androidForegroundService": true,
+          "androidPermissions": ["FOREGROUND_SERVICE", "WAKE_LOCK"]
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
