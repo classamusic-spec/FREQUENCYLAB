@@ -73,7 +73,7 @@ export default function BuilderScreen() {
 
   const automatableTargets = useMemo(() => {
     if (!stage) return [];
-    const targets: Array<{ address: string; label: string; min: number; max: number; current: number }> = [];
+    const targets: { address: string; label: string; min: number; max: number; current: number }[] = [];
     for (const node of stage.graph.nodes) {
       const descriptor = getDescriptor(node.kind);
       for (const param of descriptor.params) {

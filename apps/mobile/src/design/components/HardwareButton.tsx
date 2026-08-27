@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { useCallback } from 'react';
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -59,25 +58,21 @@ export function HardwareButton({
     opacity: 1 - pressed.value * 0.12,
   }));
 
-  const handlePressIn = useCallback(() => {
-    pressed.value = withTiming(1, {
-      duration: motion.instant,
-      easing: Easing.out(Easing.quad),
-    });
-  }, [pressed]);
+  // Plain functions rather than callbacks: they write to a Reanimated shared
+  // value, which must not be captured as a hook dependency.
+  const handlePressIn = () => {
+    pressed.value = withTiming(1, { duration: motion.instant, easing: Easing.out(Easing.quad) });
+  };
 
-  const handlePressOut = useCallback(() => {
-    pressed.value = withTiming(0, {
-      duration: motion.quick,
-      easing: Easing.out(Easing.quad),
-    });
-  }, [pressed]);
+  const handlePressOut = () => {
+    pressed.value = withTiming(0, { duration: motion.quick, easing: Easing.out(Easing.quad) });
+  };
 
-  const handlePress = useCallback(() => {
+  const handlePress = () => {
     if (inactive) return;
     haptics.engage();
     onPress?.();
-  }, [inactive, onPress]);
+  };
 
   return (
     <Pressable

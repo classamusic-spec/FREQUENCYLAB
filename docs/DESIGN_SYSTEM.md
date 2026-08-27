@@ -89,12 +89,20 @@ Six events, and no others: `detent`, `boundary` (a band edge or snap point),
 
 `FrequencyEncoder` resolves gestures in this order:
 
-1. vertical drag changes the value;
-2. horizontal distance from the start scales sensitivity, so sliding away from
-   the knob mid-gesture gives fine adjustment **without a mode**;
+1. a drag that begins **on the ring** tracks the finger's angle, so the knob
+   turns under the finger the way a physical encoder does. Movement is applied
+   as a delta, not an absolute position, so grabbing the ring anywhere
+   continues from the current value rather than snapping to the finger;
+2. a drag that begins **on the cap** moves vertically, and horizontal distance
+   from the start scales sensitivity — sliding away from the knob gives fine
+   adjustment **without a mode**;
 3. tap opens numeric entry — which is also the accessible path;
 4. long press resets to the default;
 5. an optional lock disables the whole control.
+
+The gesture callbacks are worklets on the UI thread; which mode is active is
+carried in a Reanimated shared value, and the value changes themselves are
+dispatched back to JavaScript so the store stays the single source of truth.
 
 The knob is drawn as a bezel, a 41-tick engraved scale with every fifth tick
 longer, a recessed track, an illuminated arc, a turned cap of two concentric

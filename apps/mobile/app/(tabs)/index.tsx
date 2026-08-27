@@ -13,7 +13,7 @@ import { InstrumentPanel } from '../../src/design/components/InstrumentPanel';
 import { HardwareButton } from '../../src/design/components/HardwareButton';
 import { ExperimentCard, InsightCard, ProtocolCard } from '../../src/design/components/Cards';
 import { Label, Text } from '../../src/design/components/Text';
-import { colors, layout, radius, space } from '../../src/design/tokens';
+import { colors, layout, space } from '../../src/design/tokens';
 import { useProtocolLibrary, summarise } from '../../src/state/library';
 import { useHistory } from '../../src/state/history';
 import { useExperiments } from '../../src/state/experiments';

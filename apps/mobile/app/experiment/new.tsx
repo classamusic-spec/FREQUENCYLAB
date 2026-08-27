@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BUILT_IN_METRICS, formatClock, type MetricKey } from '@frequencylab/dsp-core';
 import { Screen, ScreenHeader, SectionHeader } from '../../src/design/components/Screen';
@@ -11,7 +11,6 @@ import { colors, radius, space } from '../../src/design/tokens';
 import * as haptics from '../../src/design/haptics';
 import { useExperiments } from '../../src/state/experiments';
 import { useProtocolLibrary, summarise } from '../../src/state/library';
-import { Pressable } from 'react-native';
 
 /**
  * Creating an experiment (§17).
@@ -20,6 +19,11 @@ import { Pressable } from 'react-native';
  * for: the same ambient environment without the parameter under test, so a
  * difference cannot be attributed to "having listened to something".
  */
+/** Ids are generated outside the component so nothing impure runs in render. */
+function newExperimentId(): string {
+  return `experiment-${Date.now().toString(36)}`;
+}
+
 export default function NewExperimentScreen() {
   const router = useRouter();
   const protocols = useProtocolLibrary((state) => state.protocols);
@@ -38,7 +42,7 @@ export default function NewExperimentScreen() {
   const start = async () => {
     if (!ready) return;
     const experiment = await create({
-      id: `experiment-${Date.now().toString(36)}`,
+      id: newExperimentId(),
       name: `${nameOf(protocolA)} vs ${nameOf(protocolB)}`,
       protocolA: protocolA!,
       protocolB: protocolB!,
@@ -164,7 +168,7 @@ function ProtocolPicker({
   protocols: ReturnType<typeof summarise>[];
   selected: string | null;
   onSelect: (id: string) => void;
-  excluded?: Array<string | null>;
+  excluded?: (string | null)[];
 }) {
   return (
     <View style={styles.pickerList}>

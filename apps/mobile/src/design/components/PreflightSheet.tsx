@@ -20,7 +20,7 @@ export function PreflightSheet() {
   const checks = useSessionStart((state) => state.checks);
   const route = useSessionStart((state) => state.route);
   const confirm = useSessionStart((state) => state.confirm);
-  const useMonaural = useSessionStart((state) => state.useMonauralInstead);
+  const startMonaural = useSessionStart((state) => state.useMonauralInstead);
   const cancel = useSessionStart((state) => state.cancel);
 
   if (!pending) return null;
@@ -53,7 +53,7 @@ export function PreflightSheet() {
               label="Use monaural"
               style={styles.action}
               accessibilityHint="Rebuilds this protocol with the monaural engine, which works without headphones."
-              onPress={() => void useMonaural()}
+              onPress={() => void startMonaural()}
             />
           ) : null}
           <HardwareButton label="Cancel" variant="ghost" style={styles.action} onPress={cancel} />

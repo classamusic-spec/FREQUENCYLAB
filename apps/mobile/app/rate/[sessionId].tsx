@@ -11,7 +11,7 @@ import { Screen, ScreenHeader, SectionHeader } from '../../src/design/components
 import { InstrumentPanel, PanelRow } from '../../src/design/components/InstrumentPanel';
 import { HardwareButton } from '../../src/design/components/HardwareButton';
 import { DnaChip } from '../../src/design/components/Badges';
-import { Label, Text } from '../../src/design/components/Text';
+import { Text } from '../../src/design/components/Text';
 import { colors, radius, space } from '../../src/design/tokens';
 import * as haptics from '../../src/design/haptics';
 import { useHistory } from '../../src/state/history';

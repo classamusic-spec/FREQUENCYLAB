@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -54,16 +54,28 @@ export function AutomationLaneView({
   const [selected, setSelected] = useState(0);
   const range = useMemo(() => laneRange(lane, graph), [graph, lane]);
 
-  const toX = (timeSec: number) => (stageDurationSec === 0 ? 0 : (timeSec / stageDurationSec) * width);
-  const toY = (value: number) =>
-    height - 8 - ((value - range.min) / Math.max(1e-9, range.max - range.min)) * (height - 16);
-  const fromX = (x: number) => clamp((x / Math.max(1, width)) * stageDurationSec, 0, stageDurationSec);
-  const fromY = (y: number) =>
-    clamp(
-      range.min + ((height - 8 - y) / Math.max(1, height - 16)) * (range.max - range.min),
-      range.min,
-      range.max,
-    );
+  const toX = useCallback(
+    (timeSec: number) => (stageDurationSec === 0 ? 0 : (timeSec / stageDurationSec) * width),
+    [stageDurationSec, width],
+  );
+  const toY = useCallback(
+    (value: number) =>
+      height - 8 - ((value - range.min) / Math.max(1e-9, range.max - range.min)) * (height - 16),
+    [height, range.max, range.min],
+  );
+  const fromX = useCallback(
+    (x: number) => clamp((x / Math.max(1, width)) * stageDurationSec, 0, stageDurationSec),
+    [stageDurationSec, width],
+  );
+  const fromY = useCallback(
+    (y: number) =>
+      clamp(
+        range.min + ((height - 8 - y) / Math.max(1, height - 16)) * (range.max - range.min),
+        range.min,
+        range.max,
+      ),
+    [height, range.max, range.min],
+  );
 
   const path = useMemo(() => {
     if (width === 0 || lane.points.length === 0) return null;
@@ -90,7 +102,7 @@ export function AutomationLaneView({
     }
     parts.push(`L ${width.toFixed(1)} ${toY(last.value).toFixed(1)}`);
     return parts.join(' ');
-  }, [height, lane.points, range.max, range.min, stageDurationSec, width]);
+  }, [lane.points, toX, toY, width]);
 
   const updatePoint = (index: number, patch: Partial<AutomationPoint>) => {
     const points = lane.points.map((point, i) => (i === index ? { ...point, ...patch } : point));

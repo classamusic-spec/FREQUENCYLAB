@@ -6,7 +6,7 @@ import { EmptyState, Screen, ScreenHeader } from '../src/design/components/Scree
 import { InstrumentPanel } from '../src/design/components/InstrumentPanel';
 import { DnaChip } from '../src/design/components/Badges';
 import { Label, Text } from '../src/design/components/Text';
-import { colors, space } from '../src/design/tokens';
+import { space } from '../src/design/tokens';
 import { useHistory } from '../src/state/history';
 
 /**
@@ -86,7 +86,7 @@ export default function HistoryScreen() {
   );
 }
 
-function groupByDay(sessions: readonly Session[]): Array<[string, Session[]]> {
+function groupByDay(sessions: readonly Session[]): [string, Session[]][] {
   const map = new Map<string, Session[]>();
   for (const session of sessions) {
     const day = new Date(session.startedAt).toLocaleDateString(undefined, {

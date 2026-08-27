@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
-import { colors, radius, space } from '../tokens';
+import { colors, space } from '../tokens';
 import { Label, Text } from './Text';
 
 export interface SignalMeterProps {

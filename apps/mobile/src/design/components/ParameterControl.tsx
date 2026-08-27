@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { clamp, type ParamDescriptor } from '@frequencylab/dsp-core';
-import { colors, radius, space } from '../tokens';
+import { colors, space } from '../tokens';
 import * as haptics from '../haptics';
 import { NumericEntrySheet } from './NumericEntrySheet';
 import { Label, Text } from './Text';
@@ -42,6 +42,23 @@ export function ParameterControl({
   const normalised = toNormalised(value, descriptor);
   const step = stepFor(descriptor);
 
+  const applyDelta = useCallback(
+    (delta: number) => {
+      const base = toNormalised(startValue, descriptor);
+      const next = fromNormalised(clamp(base + delta, 0, 1), descriptor);
+      const snapped = snap(next, step, descriptor);
+      if (snapped !== value) {
+        haptics.detent();
+        onChange(snapped);
+      }
+    },
+    [descriptor, onChange, startValue, step, value],
+  );
+
+  const commit = useCallback(() => {
+    onCommit?.(value);
+  }, [onCommit, value]);
+
   const gesture = useMemo(
     () =>
       Gesture.Pan()
@@ -52,27 +69,17 @@ export function ParameterControl({
           runOnJS(setStartValue)(value);
         })
         .onUpdate((event) => {
+          // Vertical distance divides the sensitivity, so sliding away from the
+          // row gives fine adjustment — the same model as the large encoder.
           const fineness = 1 + Math.abs(event.translationY) / 50;
           const delta = event.translationX / (240 * fineness);
           runOnJS(applyDelta)(delta);
         })
         .onFinalize(() => {
-          if (onCommit) runOnJS(onCommit)(value);
+          runOnJS(commit)();
         }),
-    // `value` is intentionally in the dependency list: the gesture reads it to
-    // compute the commit, and a stale closure would commit the wrong number.
-    [automated, disabled, onCommit, value],
+    [applyDelta, automated, commit, disabled, value],
   );
-
-  function applyDelta(delta: number): void {
-    const base = toNormalised(startValue, descriptor);
-    const next = fromNormalised(clamp(base + delta, 0, 1), descriptor);
-    const snapped = snap(next, step, descriptor);
-    if (snapped !== value) {
-      haptics.detent();
-      onChange(snapped);
-    }
-  }
 
   return (
     <View style={styles.row}>

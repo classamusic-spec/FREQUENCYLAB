@@ -14,7 +14,7 @@ import { Screen, ScreenHeader, SectionHeader } from '../src/design/components/Sc
 import { InstrumentPanel, PanelRow } from '../src/design/components/InstrumentPanel';
 import { HardwareButton } from '../src/design/components/HardwareButton';
 import { Text } from '../src/design/components/Text';
-import { colors, radius, space } from '../src/design/tokens';
+import { colors, space } from '../src/design/tokens';
 import * as haptics from '../src/design/haptics';
 import { useProtocolLibrary } from '../src/state/library';
 

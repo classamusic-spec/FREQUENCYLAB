@@ -10,7 +10,7 @@ export interface SegmentOption<T extends string> {
 }
 
 export interface SegmentSelectorProps<T extends string> {
-  options: ReadonlyArray<SegmentOption<T>>;
+  options: readonly SegmentOption<T>[];
   value: T;
   onChange: (value: T) => void;
   /** Lets long option sets scroll instead of shrinking below the touch target. */

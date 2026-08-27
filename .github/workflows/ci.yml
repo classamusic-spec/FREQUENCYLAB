@@ -25,6 +25,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Lint
+        run: npm run lint
+
       # The DSP validation suite renders audio offline and measures it
       # numerically, so this is the gate that actually proves the engine works.
       - name: Test

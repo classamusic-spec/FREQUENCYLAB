@@ -75,7 +75,7 @@ export class SessionController implements RenderSource {
   private backend: AudioBackend | null = null;
   private protocol: Protocol | null = null;
   private listeners = new Set<Listener>();
-  private subscriptions: Array<{ remove: () => void }> = [];
+  private subscriptions: { remove: () => void }[] = [];
 
   private state: PlaybackState = 'idle';
   private route: OutputRoute = { kind: 'unknown', reliable: false };

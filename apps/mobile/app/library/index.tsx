@@ -14,7 +14,7 @@ import { EvidenceBadge } from '../../src/design/components/Badges';
 import { Label, Text } from '../../src/design/components/Text';
 import { colors, radius, space } from '../../src/design/tokens';
 
-const CATEGORIES: Array<{ value: LibraryCategory | 'all'; label: string }> = [
+const CATEGORIES: { value: LibraryCategory | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'research', label: 'Research' },
   { value: 'acoustics', label: 'Acoustics' },
@@ -86,7 +86,7 @@ export default function LibraryScreen() {
 
       <SectionHeader label="What the ratings mean" />
       <InstrumentPanel tone="recessed">
-        {(Object.keys(EVIDENCE_DESCRIPTIONS) as Array<keyof typeof EVIDENCE_DESCRIPTIONS>).map(
+        {(Object.keys(EVIDENCE_DESCRIPTIONS) as (keyof typeof EVIDENCE_DESCRIPTIONS)[]).map(
           (level) => (
             <View key={level} style={styles.ratingRow}>
               <EvidenceBadge level={level} />

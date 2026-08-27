@@ -19,7 +19,7 @@ import { SegmentSelector } from '../../src/design/components/SegmentSelector';
 import { SignalFlowView } from '../../src/design/components/SignalFlowView';
 import { DnaChip, Tag } from '../../src/design/components/Badges';
 import { Label, Text } from '../../src/design/components/Text';
-import { colors, radius, space } from '../../src/design/tokens';
+import { colors, space } from '../../src/design/tokens';
 import * as haptics from '../../src/design/haptics';
 import { useProtocolLibrary } from '../../src/state/library';
 import { useLab } from '../../src/state/lab';
@@ -139,7 +139,8 @@ export default function ProtocolScreen() {
         <PanelRow label="DSP" value={dna.dspVersion} />
         <PanelRow label="Schema" value={`v${dna.schemaVersion}`} />
         <PanelDivider />
-        <Text variant="readoutXs" tone="tertiary" numberOfLines={2}>
+        <DnaChip human={dna.human} fingerprint={dna.fingerprint} />
+        <Text variant="readoutXs" tone="tertiary" numberOfLines={2} style={styles.fingerprint}>
           {dna.fingerprint}
         </Text>
         <View style={styles.dnaActions}>
@@ -381,6 +382,7 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: space.sm },
   actionButton: { flex: 1 },
   dnaActions: { flexDirection: 'row', gap: space.sm, marginTop: space.md },
+  fingerprint: { marginTop: space.sm },
   verifyRow: { gap: space.xxs },
   verifyNote: { marginTop: space.xxs },
   moduleRow: { paddingVertical: space.xs, gap: 2 },

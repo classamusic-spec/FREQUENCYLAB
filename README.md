@@ -75,6 +75,7 @@ Requires Node 20 or newer.
 npm install
 npm test          # 137 tests, including the DSP validation suite
 npm run typecheck # dsp-core and the app
+npm run lint      # eslint, zero warnings tolerated
 ```
 
 ### Running the app

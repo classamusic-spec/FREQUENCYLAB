@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
+import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import Svg, { Circle, G, Line, Path } from 'react-native-svg';
 import { clamp, formatHz } from '@frequencylab/dsp-core';
 import { colors, radius, space } from '../tokens';
@@ -12,10 +12,11 @@ import { Label, Text } from './Text';
  * The signature control (§69).
  *
  * Gestures, in the order they are resolved:
- *  - vertical drag changes the value;
- *  - horizontal distance from the start point scales sensitivity, so sliding
- *    away from the knob mid-gesture gives fine adjustment without a mode;
- *  - a drag that begins on the ring itself tracks the angle directly;
+ *  - a drag that begins on the ring tracks the angle directly, so the knob
+ *    turns under the finger the way a physical encoder does;
+ *  - a drag that begins on the cap moves vertically, with horizontal distance
+ *    from the start scaling sensitivity — sliding away from the knob gives
+ *    fine adjustment without a mode;
  *  - tap opens numeric entry, which is also the accessible path (§50);
  *  - long press resets to the default.
  *
@@ -81,6 +82,13 @@ export function FrequencyEncoder({
   const [dragging, setDragging] = useState(false);
   const startNormalised = useRef(0);
   const lastDetentIndex = useRef(0);
+  const lastAngle = useRef(0);
+  /**
+   * True when the gesture began on the ring rather than on the knob cap.
+   * A shared value, not a ref: the gesture callbacks are worklets running on
+   * the UI thread, where a JavaScript ref is not reachable.
+   */
+  const circularMode = useSharedValue(false);
 
   const normalised = toNormalised(value, min, max, taper);
   const effectiveStep = step ?? defaultStep(min, max, precision);
@@ -99,40 +107,106 @@ export function FrequencyEncoder({
     [effectiveStep, max, min, onChange, taper],
   );
 
-  const begin = useCallback(() => {
-    if (disabled || locked) return;
-    haptics.beginGesture();
-    startNormalised.current = normalised;
-    lastDetentIndex.current = Math.round(value / effectiveStep);
-    setDragging(true);
-  }, [disabled, effectiveStep, locked, normalised, value]);
+  /**
+   * Applies a drag delta relative to where the gesture began. The ref is read
+   * here, on the JS thread at gesture time, rather than inside the gesture's
+   * memo body — where it would be a render-phase ref access and would capture a
+   * stale start position.
+   */
+  const applyDelta = useCallback(
+    (delta: number) => {
+      emit(startNormalised.current + delta);
+    },
+    [emit],
+  );
+
+  /**
+   * Circular tracking. The finger's angle is converted into a position along
+   * the encoder's 270° sweep, and movement is applied as a *delta* rather than
+   * an absolute position — so grabbing the ring anywhere continues from the
+   * current value instead of snapping the knob to wherever the finger landed.
+   */
+  const applyAngle = useCallback(
+    (x: number, y: number) => {
+      const centre = size / 2;
+      let degrees = (Math.atan2(y - centre, x - centre) * 180) / Math.PI;
+      // Unwrap across the gap at the bottom of the dial so a drag through it
+      // does not read as a full sweep in the opposite direction.
+      let delta = degrees - lastAngle.current;
+      if (delta > 180) delta -= 360;
+      else if (delta < -180) delta += 360;
+      lastAngle.current = degrees;
+      startNormalised.current = clamp(startNormalised.current + delta / SWEEP, 0, 1);
+      emit(startNormalised.current);
+    },
+    [emit, size],
+  );
+
+  const begin = useCallback(
+    (x: number, y: number) => {
+      if (disabled || locked) return;
+      haptics.beginGesture();
+      startNormalised.current = normalised;
+      lastDetentIndex.current = Math.round(value / effectiveStep);
+
+      const centre = size / 2;
+      lastAngle.current = (Math.atan2(y - centre, x - centre) * 180) / Math.PI;
+      setDragging(true);
+    },
+    [disabled, effectiveStep, locked, normalised, size, value],
+  );
 
   const finish = useCallback(() => {
     setDragging(false);
     onCommit?.(value);
   }, [onCommit, value]);
 
+  /*
+   * The gesture callbacks below are worklets: they run on the UI thread when
+   * the finger moves, not while rendering. Two React rules cannot see through
+   * the gesture builder to know that.
+   *
+   *  - `react-hooks/refs`: the JS-thread functions these dispatch through
+   *    `runOnJS` read refs that only live for the duration of a drag.
+   *  - `react-hooks/immutability`: writing a Reanimated shared value from a
+   *    worklet is the idiomatic way to carry state onto the UI thread, and is
+   *    not the render-phase mutation the rule is guarding against.
+   *
+   * Disabled for this block only, rather than restructuring working gesture
+   * code around a false positive.
+   */
+  /* eslint-disable react-hooks/refs, react-hooks/immutability */
   const gesture = useMemo(
     () =>
       Gesture.Pan()
         .enabled(!disabled && !locked)
         .minDistance(2)
-        .onBegin(() => {
-          runOnJS(begin)();
+        .onBegin((event) => {
+          // The ring is everything outside the knob cap. Starting there means
+          // the user reached for the dial's edge, which is a turning gesture.
+          const centre = size / 2;
+          circularMode.value =
+            Math.sqrt((event.x - centre) ** 2 + (event.y - centre) ** 2) > centre - 34;
+          runOnJS(begin)(event.x, event.y);
         })
         .onUpdate((event) => {
+          if (circularMode.value) {
+            runOnJS(applyAngle)(event.x, event.y);
+            return;
+          }
           // Vertical travel drives the value; horizontal offset divides the
           // sensitivity, so the further the finger slides from the knob the
           // finer the adjustment becomes. 220 px of travel covers full range.
           const fineness = 1 + Math.abs(event.translationX) / 60;
           const delta = -event.translationY / (220 * fineness);
-          runOnJS(emit)(startNormalised.current + delta);
+          runOnJS(applyDelta)(delta);
         })
         .onFinalize(() => {
           runOnJS(finish)();
         }),
-    [begin, disabled, emit, finish, locked],
+    [applyAngle, applyDelta, begin, circularMode, disabled, finish, locked, size],
   );
+  /* eslint-enable react-hooks/refs, react-hooks/immutability */
 
   const handleLongPress = useCallback(() => {
     if (disabled || locked || defaultValue === undefined) return;
@@ -296,7 +370,7 @@ interface Geometry {
   trackRadius: number;
   trackWidth: number;
   knobRadius: number;
-  ticks: Array<{ x1: number; y1: number; x2: number; y2: number; major: boolean }>;
+  ticks: { x1: number; y1: number; x2: number; y2: number; major: boolean }[];
 }
 
 function buildGeometry(size: number): Geometry {

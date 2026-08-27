@@ -310,8 +310,8 @@ function buildLogBars(
   sampleRate: number,
   width: number,
   height: number,
-): Array<{ x: number; y: number; width: number; height: number }> {
-  const result: Array<{ x: number; y: number; width: number; height: number }> = [];
+): { x: number; y: number; width: number; height: number }[] {
+  const result: { x: number; y: number; width: number; height: number }[] = [];
   const barWidth = width / bars;
   const nyquist = sampleRate / 2;
   const minLog = Math.log10(20);

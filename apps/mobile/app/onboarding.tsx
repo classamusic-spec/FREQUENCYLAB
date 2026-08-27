@@ -12,7 +12,7 @@ import { Screen } from '../src/design/components/Screen';
 import { InstrumentPanel } from '../src/design/components/InstrumentPanel';
 import { HardwareButton } from '../src/design/components/HardwareButton';
 import { Label, Text } from '../src/design/components/Text';
-import { colors, radius, space } from '../src/design/tokens';
+import { colors, space } from '../src/design/tokens';
 import * as haptics from '../src/design/haptics';
 import { usePreferences } from '../src/state/preferences';
 
@@ -169,7 +169,7 @@ export default function OnboardingScreen() {
   );
 }
 
-const LEVELS: Array<{ value: ExperienceLevel; title: string; body: string }> = [
+const LEVELS: { value: ExperienceLevel; title: string; body: string }[] = [
   {
     value: 'simple',
     title: 'Simple',
