@@ -1,4 +1,4 @@
-import { AudioManager } from 'react-native-audio-api';
+import { loadNativeAudio } from './native';
 import type { OutputRoute, OutputRouteKind } from '@frequencylab/dsp-core';
 
 /**
@@ -15,8 +15,11 @@ const BLUETOOTH_HINTS = ['bluetooth', 'a2dp', 'hfp', 'airpod', 'le audio'];
 const SPEAKER_HINTS = ['speaker', 'receiver', 'builtin', 'built-in', 'earpiece'];
 
 export async function detectOutputRoute(): Promise<OutputRoute> {
+  const native = loadNativeAudio();
+  if (!native) return { kind: 'unknown', reliable: false };
+
   try {
-    const info = await AudioManager.getDevicesInfo();
+    const info = await native.AudioManager.getDevicesInfo();
     const current = info.currentOutputs?.[0];
     if (!current) {
       return { kind: 'unknown', reliable: false };

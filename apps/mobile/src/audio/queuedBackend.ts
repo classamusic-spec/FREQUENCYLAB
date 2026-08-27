@@ -1,9 +1,5 @@
-import {
-  AudioContext,
-  AudioManager,
-  type AudioBuffer,
-  type AudioBufferQueueSourceNode,
-} from 'react-native-audio-api';
+import type { AudioBuffer, AudioBufferQueueSourceNode, AudioContext } from 'react-native-audio-api';
+import { loadNativeAudio, nativeAudioFailure } from './native';
 import {
   AudioBackendUnavailableError,
   DEFAULT_BACKEND_OPTIONS,
@@ -76,6 +72,13 @@ export class QueuedAudioBackend implements AudioBackend {
     this.source = source;
     this.currentState = 'starting';
 
+    const native = loadNativeAudio();
+    if (!native) {
+      this.currentState = 'failed';
+      throw new AudioBackendUnavailableError(nativeAudioFailure());
+    }
+    const { AudioContext: NativeAudioContext, AudioManager } = native;
+
     try {
       // Playback category with background mode: sessions continue with the
       // screen locked, and the system treats us as media rather than as a UI
@@ -90,7 +93,7 @@ export class QueuedAudioBackend implements AudioBackend {
       AudioManager.observeAudioInterruptions(true);
       AudioManager.observeVolumeChanges(true);
 
-      this.context = new AudioContext({ sampleRate: this.options.sampleRate });
+      this.context = new NativeAudioContext({ sampleRate: this.options.sampleRate });
       this.node = this.context.createBufferQueueSource();
       this.node.connect(this.context.destination);
       this.node.onBufferEnded = () => {
@@ -176,7 +179,7 @@ export class QueuedAudioBackend implements AudioBackend {
     try {
       this.node?.disconnect();
       await this.context?.close();
-      await AudioManager.setAudioSessionActivity(false);
+      await loadNativeAudio()?.AudioManager.setAudioSessionActivity(false);
     } catch {
       // Teardown is best effort; the session is going away regardless.
     }

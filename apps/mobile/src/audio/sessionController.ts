@@ -9,7 +9,7 @@ import {
   type Protocol,
   type SessionTelemetry,
 } from '@frequencylab/dsp-core';
-import { AudioManager } from 'react-native-audio-api';
+import { loadNativeAudio } from './native';
 import { QueuedAudioBackend } from './queuedBackend';
 import { NullAudioBackend } from './nullBackend';
 import {
@@ -202,7 +202,8 @@ export class SessionController implements RenderSource {
     this.state = 'preparing';
     this.emit();
 
-    this.backend = await this.createBackend();
+    const options = this.backendOptionsForProtocol();
+    this.backend = new QueuedAudioBackend(options);
     this.attachSystemListeners();
 
     try {
@@ -210,26 +211,34 @@ export class SessionController implements RenderSource {
       this.state = 'playing';
       this.startTelemetry();
     } catch (error) {
-      this.state = 'error';
-      this.error = error instanceof Error ? error.message : 'Playback could not start.';
+      // The native audio module is missing or refused to start. Fall back to a
+      // backend that advances the clock and reports itself inaudible, rather
+      // than leaving the app in a state that looks broken for no stated reason.
+      const reason =
+        error instanceof AudioBackendUnavailableError
+          ? error.reason
+          : error instanceof Error
+            ? error.message
+            : 'Playback could not start.';
+      this.backend = new NullAudioBackend(reason, options);
+      try {
+        await this.backend.start(this);
+        this.state = 'playing';
+        this.error = reason;
+        this.startTelemetry();
+      } catch {
+        this.state = 'error';
+        this.error = reason;
+      }
     }
     this.emit();
   }
 
-  private async createBackend(): Promise<AudioBackend> {
-    try {
-      const backend = new QueuedAudioBackend({
-        ...this.backendOptions,
-        sampleRate: this.protocol?.sampleRate ?? this.backendOptions.sampleRate,
-      });
-      return backend;
-    } catch (error) {
-      const reason =
-        error instanceof AudioBackendUnavailableError
-          ? error.reason
-          : 'The native audio engine is not available in this build.';
-      return new NullAudioBackend(reason, this.backendOptions);
-    }
+  private backendOptionsForProtocol(): AudioBackendOptions {
+    return {
+      ...this.backendOptions,
+      sampleRate: this.protocol?.sampleRate ?? this.backendOptions.sampleRate,
+    };
   }
 
   async pause(): Promise<void> {
@@ -245,7 +254,9 @@ export class SessionController implements RenderSource {
   }
 
   async stop(reason: StopReason = 'user', notice?: string): Promise<void> {
-    if (this.state === 'idle' || this.state === 'stopping') return;
+    // 'completed' is already torn down; stopping again would produce a second
+    // session record for the same playback.
+    if (this.state === 'idle' || this.state === 'stopping' || this.state === 'completed') return;
     this.state = 'stopping';
     this.notice = notice;
     this.pendingStop = reason;
@@ -383,6 +394,8 @@ export class SessionController implements RenderSource {
    */
   private attachSystemListeners(): void {
     this.detachSystemListeners();
+    const AudioManager = loadNativeAudio()?.AudioManager;
+    if (!AudioManager) return;
     try {
       const interruption = AudioManager.addSystemEventListener('interruption', (event) => {
         if (event.type === 'began') {

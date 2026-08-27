@@ -17,6 +17,8 @@ import { useExperiments } from './experiments';
 
 interface PlayerState {
   snapshot: ControllerSnapshot;
+  /** Guards against writing two records for the same playback. */
+  recorded: boolean;
   /** Experiment this session belongs to, when it was started from one. */
   experimentContext?: { experimentId: string; assignmentIndex: number };
   /** Session written when playback finished, awaiting a rating. */
@@ -46,6 +48,7 @@ interface PlayerState {
  */
 export const usePlayer = create<PlayerState>((set, get) => ({
   snapshot: sessionController.snapshot(),
+  recorded: false,
 
   attach: () => {
     let previousState = sessionController.playbackState;
@@ -53,7 +56,8 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       set({ snapshot });
       // Completion is detected here rather than in the render path, so writing
       // the session record never happens on the audio thread.
-      if (previousState === 'playing' && snapshot.state === 'completed') {
+      if (previousState === 'playing' && snapshot.state === 'completed' && !get().recorded) {
+        set({ recorded: true });
         void writeSessionRecord(snapshot, 'completed', get().experimentContext).then((session) => {
           if (session) set({ lastCompletedSessionId: session.id });
         });
@@ -63,13 +67,13 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
 
   loadAndPlay: async (protocol, options = {}) => {
-    set({ experimentContext: options.experiment, lastCompletedSessionId: undefined });
+    set({ experimentContext: options.experiment, lastCompletedSessionId: undefined, recorded: false });
     await sessionController.load(protocol, { masterGain: options.masterGain });
     await sessionController.play();
   },
 
   load: async (protocol, masterGain) => {
-    set({ experimentContext: undefined, lastCompletedSessionId: undefined });
+    set({ experimentContext: undefined, lastCompletedSessionId: undefined, recorded: false });
     await sessionController.load(protocol, { masterGain });
   },
 
@@ -77,8 +81,13 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   pause: () => sessionController.pause(),
 
   stop: async () => {
+    if (get().recorded) {
+      await sessionController.stop('user');
+      return;
+    }
     const snapshot = sessionController.snapshot();
     const reason: SessionEndReason = snapshot.telemetry?.finished ? 'completed' : 'stoppedByUser';
+    set({ recorded: true });
     await sessionController.stop('user');
     const session = await writeSessionRecord(snapshot, reason, get().experimentContext);
     if (session) set({ lastCompletedSessionId: session.id });

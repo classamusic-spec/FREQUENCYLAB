@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  verify:
+    name: Typecheck, test, bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # The DSP validation suite renders audio offline and measures it
+      # numerically, so this is the gate that actually proves the engine works.
+      - name: Test
+        run: npm test
+
+      - name: Build the DSP core
+        run: npm run build --workspace @frequencylab/dsp-core
+
+      # Bundling both platforms proves the whole module graph resolves and
+      # every transform runs, which is as close to a device as CI can get.
+      - name: Bundle iOS
+        working-directory: apps/mobile
+        run: npx expo export --platform ios --output-dir /tmp/export-ios
+
+      - name: Bundle Android
+        working-directory: apps/mobile
+        run: npx expo export --platform android --output-dir /tmp/export-android
