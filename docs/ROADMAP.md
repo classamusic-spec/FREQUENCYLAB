@@ -26,7 +26,7 @@ player with live telemetry, history, ratings, blinded experiments with committed
 assignments, personal insights, the evidence library, the offline AI designer,
 WAV and DNA export, data export and delete, and DSP diagnostics.
 
-**Validation.** 134 tests including numerical DSP validation. Both iOS and
+**Validation.** 137 tests including numerical DSP validation. Both iOS and
 Android bundles build clean.
 
 ## Not built, and why
@@ -41,6 +41,7 @@ Android bundles build clean.
 | Light mode | Needs its own material study — printed markings rather than illuminated ones — not an inversion of the dark palette. |
 | Subscriptions | No billing integration. Everything is unlocked and the Profile screen says so rather than showing a paywall that does nothing. |
 | Localisation | Strings are inline English. Extraction is the prerequisite. |
+| Analytics | The consent flag exists in preferences; no events are collected and no endpoint exists. Safety events are stored locally and bounded to 200 records. |
 | UI and E2E tests | Screens typecheck and bundle; no component tests yet. |
 
 ## Phase 2 — depth on what exists

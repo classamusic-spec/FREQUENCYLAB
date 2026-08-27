@@ -17,7 +17,7 @@ import * as haptics from '../../src/design/haptics';
 import { useExperiments } from '../../src/state/experiments';
 import { useHistory } from '../../src/state/history';
 import { useProtocolLibrary } from '../../src/state/library';
-import { usePlayer } from '../../src/state/player';
+import { useSessionStart } from '../../src/state/sessionStart';
 import { usePreferences } from '../../src/state/preferences';
 
 /**
@@ -38,7 +38,7 @@ export default function ExperimentScreen() {
   const abandon = useExperiments((state) => state.abandon);
   const sessions = useHistory((state) => state.sessions);
   const protocols = useProtocolLibrary((state) => state.protocols);
-  const loadAndPlay = usePlayer((state) => state.loadAndPlay);
+  const requestStart = useSessionStart((state) => state.request);
   const preferences = usePreferences((state) => state.preferences);
 
   const analysis = useMemo(
@@ -66,11 +66,11 @@ export default function ExperimentScreen() {
     haptics.confirm();
     // The assignment is marked complete by the player once a session record
     // actually exists — starting one is not the same as running one.
-    await loadAndPlay(protocol, {
+    await requestStart(protocol, {
       masterGain: preferences.comfortableOutputLevel,
       experiment: { experimentId: experiment.id, assignmentIndex: plan.index },
+      onStarted: () => router.push('/session'),
     });
-    router.push('/session');
   };
 
   return (

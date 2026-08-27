@@ -16,7 +16,7 @@ import { Label, Text } from '../src/design/components/Text';
 import { colors, radius, space } from '../src/design/tokens';
 import * as haptics from '../src/design/haptics';
 import { useProtocolLibrary } from '../src/state/library';
-import { usePlayer } from '../src/state/player';
+import { useSessionStart } from '../src/state/sessionStart';
 import { usePreferences } from '../src/state/preferences';
 
 const EXAMPLES = [
@@ -40,7 +40,7 @@ export default function AiDesignerScreen() {
   const [prompt, setPrompt] = useState('');
   const [result, setResult] = useState<DesignResult | null>(null);
   const saveProtocol = useProtocolLibrary((state) => state.save);
-  const loadAndPlay = usePlayer((state) => state.loadAndPlay);
+  const requestStart = useSessionStart((state) => state.request);
   const preferences = usePreferences((state) => state.preferences);
 
   const generate = (text: string) => {
@@ -183,8 +183,10 @@ export default function AiDesignerScreen() {
               style={styles.action}
               onPress={async () => {
                 await saveProtocol(protocol);
-                await loadAndPlay(protocol, { masterGain: preferences.comfortableOutputLevel });
-                router.replace('/session');
+                await requestStart(protocol, {
+                  masterGain: preferences.comfortableOutputLevel,
+                  onStarted: () => router.replace('/session'),
+                });
               }}
             />
           </View>

@@ -24,6 +24,7 @@ import * as haptics from '../../src/design/haptics';
 import { useLab } from '../../src/state/lab';
 import { useProtocolLibrary, summarise } from '../../src/state/library';
 import { usePlayer, useScopeCapture } from '../../src/state/player';
+import { useSessionStart } from '../../src/state/sessionStart';
 import { usePreferences } from '../../src/state/preferences';
 
 /**
@@ -110,7 +111,7 @@ function LabWorkspace() {
   const dna = useLab((state) => state.dna);
 
   const saveProtocol = useProtocolLibrary((state) => state.save);
-  const loadAndPlay = usePlayer((state) => state.loadAndPlay);
+  const requestStart = useSessionStart((state) => state.request);
   const stopPlayback = usePlayer((state) => state.stop);
   const snapshot = usePlayer((state) => state.snapshot);
   const preferences = usePreferences((state) => state.preferences);
@@ -140,11 +141,13 @@ function LabWorkspace() {
     }
     // Auditions start at the selected stage, not at the top of the protocol:
     // waiting five minutes to hear the stage you are editing is not workable.
-    await loadAndPlay(draft, { masterGain: preferences.comfortableOutputLevel });
     let offset = 0;
     for (let i = 0; i < stageIndex; i++) offset += draft.stages[i].durationSec;
-    usePlayer.getState().seek(offset);
-  }, [auditioning, draft, loadAndPlay, preferences.comfortableOutputLevel, stageIndex, stopPlayback]);
+    await requestStart(draft, {
+      masterGain: preferences.comfortableOutputLevel,
+      onStarted: () => usePlayer.getState().seek(offset),
+    });
+  }, [auditioning, draft, preferences.comfortableOutputLevel, requestStart, stageIndex, stopPlayback]);
 
   if (!stage || !graph) return null;
 

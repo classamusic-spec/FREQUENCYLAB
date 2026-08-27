@@ -23,7 +23,7 @@ import { colors, radius, space } from '../../src/design/tokens';
 import * as haptics from '../../src/design/haptics';
 import { useProtocolLibrary } from '../../src/state/library';
 import { useLab } from '../../src/state/lab';
-import { usePlayer } from '../../src/state/player';
+import { useSessionStart } from '../../src/state/sessionStart';
 import { usePreferences } from '../../src/state/preferences';
 import { estimateBytes, exportDnaFile, exportProtocolToWav, formatBytes, share } from '../../src/features/export';
 
@@ -49,7 +49,7 @@ export default function ProtocolScreen() {
   const fork = useProtocolLibrary((state) => state.fork);
   const remove = useProtocolLibrary((state) => state.remove);
   const openInLab = useLab((state) => state.open);
-  const loadAndPlay = usePlayer((state) => state.loadAndPlay);
+  const requestStart = useSessionStart((state) => state.request);
   const preferences = usePreferences((state) => state.preferences);
 
   const [stageIndex, setStageIndex] = useState(0);
@@ -116,8 +116,10 @@ export default function ProtocolScreen() {
           style={styles.actionButton}
           disabled={!validation?.ok}
           onPress={async () => {
-            await loadAndPlay(protocol, { masterGain: preferences.comfortableOutputLevel });
-            router.push('/session');
+            await requestStart(protocol, {
+              masterGain: preferences.comfortableOutputLevel,
+              onStarted: () => router.push('/session'),
+            });
           }}
         />
         <HardwareButton

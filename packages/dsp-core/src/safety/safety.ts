@@ -1,4 +1,5 @@
 import { validateProtocol } from '../protocol/validate.js';
+import { defaultOptions, defaultParams } from '../graph/descriptors.js';
 import { totalDurationSec, type Protocol } from '../protocol/schema.js';
 import type { StimulationEngine } from '../protocol/builders.js';
 
@@ -214,4 +215,49 @@ export const DEFAULT_INTERRUPTION_POLICY: InterruptionPolicy = {
  */
 export function recommendedMasterGain(protocol: Protocol, comfortableOutputLevel: number): number {
   return Math.min(protocol.master.gain, Math.max(0.05, comfortableOutputLevel));
+}
+
+/**
+ * Rewrites a protocol's binaural engines as monaural ones.
+ *
+ * This is the action behind "use monaural instead" on the headphones check
+ * (§42): rather than refusing to play, the product offers the engine that
+ * actually works on the output the user has. Carrier, beat, amplitude and
+ * waveform carry across; `separation` and the calculation mode have no monaural
+ * equivalent and are dropped, which is exactly the difference between the two
+ * engines.
+ */
+export function convertBinauralToMonaural(protocol: Protocol): Protocol {
+  let changed = false;
+  const stages = protocol.stages.map((stage) => {
+    const nodes = stage.graph.nodes.map((node) => {
+      if (node.kind !== 'binaural') return node;
+      changed = true;
+      return {
+        ...node,
+        kind: 'monaural' as const,
+        params: defaultParams('monaural', {
+          carrier: node.params.carrier,
+          beat: node.params.beat,
+          amplitude: node.params.amplitude,
+          mix: 0.5,
+          pan: 0,
+        }),
+        options: defaultOptions('monaural', { waveform: node.options.waveform ?? 'sine' }),
+      };
+    });
+    return { ...stage, graph: { ...stage.graph, nodes } };
+  });
+
+  if (!changed) return protocol;
+  return {
+    ...protocol,
+    name: `${protocol.name} (monaural)`,
+    stages,
+  };
+}
+
+/** True when any stage contains a binaural engine. */
+export function usesBinaural(protocol: Protocol): boolean {
+  return protocol.stages.some((stage) => stage.graph.nodes.some((node) => node.kind === 'binaural'));
 }

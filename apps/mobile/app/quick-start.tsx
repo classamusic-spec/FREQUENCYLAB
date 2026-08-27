@@ -17,7 +17,7 @@ import { DnaChip } from '../src/design/components/Badges';
 import { Label, Text } from '../src/design/components/Text';
 import { space } from '../src/design/tokens';
 import { usePreferences } from '../src/state/preferences';
-import { usePlayer } from '../src/state/player';
+import { useSessionStart } from '../src/state/sessionStart';
 import { useProtocolLibrary } from '../src/state/library';
 import { protocolDna } from '@frequencylab/dsp-core';
 
@@ -35,7 +35,7 @@ export default function QuickStartScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ goal?: string }>();
   const preferences = usePreferences((state) => state.preferences);
-  const loadAndPlay = usePlayer((state) => state.loadAndPlay);
+  const requestStart = useSessionStart((state) => state.request);
   const saveProtocol = useProtocolLibrary((state) => state.save);
 
   const [goal, setGoal] = useState<SimpleGoal>(
@@ -61,8 +61,10 @@ export default function QuickStartScreen() {
   const noise = protocol.stages[0]?.graph.nodes.find((node) => node.id === 'noise');
 
   const start = async () => {
-    await loadAndPlay(protocol, { masterGain: preferences.comfortableOutputLevel });
-    router.replace('/session');
+    await requestStart(protocol, {
+      masterGain: preferences.comfortableOutputLevel,
+      onStarted: () => router.replace('/session'),
+    });
   };
 
   return (

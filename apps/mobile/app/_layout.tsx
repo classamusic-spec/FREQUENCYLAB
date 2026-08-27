@@ -24,6 +24,7 @@ import { useProtocolLibrary } from '../src/state/library';
 import { useHistory } from '../src/state/history';
 import { useExperiments } from '../src/state/experiments';
 import { usePlayerAttachment } from '../src/state/player';
+import { PreflightSheet } from '../src/design/components/PreflightSheet';
 
 void SplashScreen.preventAutoHideAsync();
 void SystemUI.setBackgroundColorAsync(colors.background);
@@ -94,6 +95,9 @@ export default function RootLayout() {
           <Stack.Screen name="diagnostics" options={{ presentation: 'modal' }} />
           <Stack.Screen name="ai" options={{ presentation: 'modal' }} />
         </Stack>
+        {/* Rendered once at the root so every path into playback passes the
+            output-route and safety checks, not just the ones that remembered to. */}
+        <PreflightSheet />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

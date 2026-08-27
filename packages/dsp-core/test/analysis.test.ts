@@ -4,6 +4,9 @@ import {
   armCommitment,
   bootstrapDifferenceCi,
   buildPresets,
+  buildStage,
+  convertBinauralToMonaural,
+  createProtocol,
   cohensD,
   createExperiment,
   deriveInsights,
@@ -19,6 +22,7 @@ import {
   routeChangeAction,
   summarise,
   validateProtocol,
+  usesBinaural,
   verifySchedule,
   welchTTest,
   type Experiment,
@@ -497,5 +501,66 @@ describe('safety preflight', () => {
       routeChangeAction({ kind: 'speaker', reliable: true }, { kind: 'headphones', reliable: true }, true)
         .action,
     ).toBe('continue');
+  });
+});
+
+describe('monaural fallback', () => {
+  it('converts every binaural engine and leaves a valid protocol', () => {
+    const [calm] = buildPresets();
+    expect(usesBinaural(calm)).toBe(true);
+
+    const converted = convertBinauralToMonaural(calm);
+    expect(usesBinaural(converted)).toBe(false);
+    expect(validateProtocol(converted).ok).toBe(true);
+
+    const before = calm.stages[0].graph.nodes.find((node) => node.id === 'tone');
+    const after = converted.stages[0].graph.nodes.find((node) => node.id === 'tone');
+    expect(after?.kind).toBe('monaural');
+    expect(after?.params.carrier).toBe(before?.params.carrier);
+    expect(after?.params.beat).toBe(before?.params.beat);
+  });
+
+  it('produces an identical, audible signal in both channels after conversion', () => {
+    // A noise-free protocol, so the assertion is about the engine rather than
+    // about a decorrelated noise bed sitting on top of it.
+    const binaural = createProtocol({
+      id: 'convert-test',
+      name: 'Convert Test',
+      stages: [
+        buildStage({
+          id: 'stage-1',
+          name: 'Tone',
+          durationSec: 120,
+          engine: 'binaural',
+          carrierHz: 200,
+          beatHz: 10,
+          amplitude: 0.4,
+          crossfadeSec: 0,
+        }),
+      ],
+      master: { fadeInSec: 1, fadeOutSec: 1, gain: 0.8 },
+      createdAt: NOW,
+    });
+
+    const before = renderProtocolOffline(binaural, { sampleRate: 48000, startSec: 30, maxSeconds: 1 });
+    let differs = 0;
+    for (let i = 0; i < 4096; i++) {
+      if (Math.abs(before.left[i] - before.right[i]) > 1e-4) differs++;
+    }
+    expect(differs).toBeGreaterThan(3000);
+
+    const converted = convertBinauralToMonaural(binaural);
+    expect(usesBinaural(converted)).toBe(false);
+    const after = renderProtocolOffline(converted, { sampleRate: 48000, startSec: 30, maxSeconds: 1 });
+    expect(peak(after.left)).toBeGreaterThan(0.05);
+    // Monaural sums both tones before the output, so the channels are identical
+    // and the beat survives on a single speaker.
+    for (let i = 100; i < 400; i++) expect(after.left[i]).toBeCloseTo(after.right[i], 5);
+  });
+
+  it('leaves a protocol without a binaural engine untouched', () => {
+    const [, , , , , , gamma] = buildPresets();
+    expect(usesBinaural(gamma)).toBe(false);
+    expect(convertBinauralToMonaural(gamma)).toBe(gamma);
   });
 });

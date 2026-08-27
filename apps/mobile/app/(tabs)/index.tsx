@@ -18,7 +18,7 @@ import { useProtocolLibrary, summarise } from '../../src/state/library';
 import { useHistory } from '../../src/state/history';
 import { useExperiments } from '../../src/state/experiments';
 import { usePreferences } from '../../src/state/preferences';
-import { usePlayer } from '../../src/state/player';
+import { useSessionStart } from '../../src/state/sessionStart';
 
 /**
  * Home (§40).
@@ -35,7 +35,7 @@ export default function HomeScreen() {
   const sessionsUntilInsights = useHistory((state) => state.sessionsUntilInsights);
   const experiments = useExperiments((state) => state.experiments);
   const preferences = usePreferences((state) => state.preferences);
-  const loadAndPlay = usePlayer((state) => state.loadAndPlay);
+  const requestStart = useSessionStart((state) => state.request);
 
   const recent = useMemo(() => {
     const seen = new Set<string>();
@@ -64,8 +64,10 @@ export default function HomeScreen() {
       durationSec: recommendation.durationSec,
       intensity: 'balanced',
     });
-    await loadAndPlay(protocol, { masterGain: preferences.comfortableOutputLevel });
-    router.push('/session');
+    await requestStart(protocol, {
+      masterGain: preferences.comfortableOutputLevel,
+      onStarted: () => router.push('/session'),
+    });
   };
 
   return (

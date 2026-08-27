@@ -1,7 +1,7 @@
 # Testing
 
 ```bash
-npm test           # 134 tests
+npm test           # 137 tests
 npm run typecheck  # dsp-core and the app
 ```
 
@@ -85,6 +85,13 @@ time-of-day confound is flagged.
 Two tests guard the product's claims: no generated insight body contains
 *causes*, *treats*, *heals*, *cures*, *fixes* or *prevents*; no shipped preset
 is named after a condition.
+
+### Safety fallback
+
+Converting a protocol's binaural engines to monaural preserves carrier, beat
+and amplitude, leaves a valid protocol, produces sample-identical channels
+(which is the defining property of a monaural beat), and is a no-op on a
+protocol that has no binaural engine.
 
 ### AI designer
 

@@ -75,7 +75,22 @@ then shows "check your output" rather than a confident wrong answer.
 
 ## Preflight
 
-`preflight()` runs before playback and returns checks in priority order:
+**Every path into playback goes through one gate.** Home, Simple Mode, Explorer
+auditions, Lab auditions, a protocol's Play button, an experiment's next
+session and the AI designer's "run it" all call `useSessionStart.request()`, so
+the output-route check cannot be forgotten on a new screen.
+
+A clean protocol on a known-good route starts immediately — the sheet appears
+only when there is something to decide. Acknowledgements are remembered per
+output route and cleared when the route changes, so repeated auditioning does
+not re-ask but plugging into a speaker does.
+
+When binaural playback is heading for a speaker, the sheet offers **Use
+monaural**, which rebuilds the protocol with the monaural engine — carrier, beat
+and amplitude preserved, `separation` and the calculation mode dropped because
+they have no monaural equivalent. A blocker leaves no "start anyway" button.
+
+`preflight()` returns checks in priority order:
 
 - **blocker** — a validation error; the session cannot start;
 - **warning** — needs an explicit acknowledgement (headphones missing for

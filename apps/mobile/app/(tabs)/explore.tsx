@@ -26,6 +26,7 @@ import { Label, Text } from '../../src/design/components/Text';
 import { BANDS, bandForFrequency, colors, layout, space } from '../../src/design/tokens';
 import { useExplorer, requiresRebuild } from '../../src/state/explorer';
 import { usePlayer, useScopeCapture } from '../../src/state/player';
+import { useSessionStart } from '../../src/state/sessionStart';
 import { usePreferences } from '../../src/state/preferences';
 import { useProtocolLibrary } from '../../src/state/library';
 
@@ -45,7 +46,7 @@ export default function ExploreScreen() {
   const recipe = useExplorer((state) => state.recipe);
   const setRecipe = useExplorer((state) => state.set);
   const toProtocol = useExplorer((state) => state.toProtocol);
-  const loadAndPlay = usePlayer((state) => state.loadAndPlay);
+  const requestStart = useSessionStart((state) => state.request);
   const snapshot = usePlayer((state) => state.snapshot);
   const stop = usePlayer((state) => state.stop);
   const preferences = usePreferences((state) => state.preferences);
@@ -67,10 +68,10 @@ export default function ExploreScreen() {
   const dna = protocolDna(protocol);
 
   const restart = useCallback(async () => {
-    await loadAndPlay(useExplorer.getState().toProtocol('explorer-preview'), {
+    await requestStart(useExplorer.getState().toProtocol('explorer-preview'), {
       masterGain: preferences.comfortableOutputLevel,
     });
-  }, [loadAndPlay, preferences.comfortableOutputLevel]);
+  }, [preferences.comfortableOutputLevel, requestStart]);
 
   const apply = useCallback(
     (patch: Parameters<typeof setRecipe>[0]) => {

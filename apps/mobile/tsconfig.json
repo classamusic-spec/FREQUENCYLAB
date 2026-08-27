@@ -8,7 +8,10 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      // Typecheck against the DSP core's source, exactly as Metro bundles it,
+      // so the app never has to be built in a particular order to be checked.
+      "@frequencylab/dsp-core": ["../../packages/dsp-core/src/index.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],

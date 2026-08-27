@@ -49,7 +49,7 @@ frequencylab/
 │       ├── src/analysis/  statistics, experiments, personal insights
 │       ├── src/library/   evidence-rated frequency library
 │       ├── src/safety/    preflight checks and route policy
-│       └── test/          134 tests, including numerical DSP validation
+│       └── test/          137 tests, including numerical DSP validation
 └── apps/
     └── mobile/            Expo + React Native instrument
         ├── app/           expo-router screens
@@ -73,7 +73,7 @@ Requires Node 20 or newer.
 
 ```bash
 npm install
-npm test          # 134 tests, including the DSP validation suite
+npm test          # 137 tests, including the DSP validation suite
 npm run typecheck # dsp-core and the app
 ```
 
