@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderGraphOffline } from '../src/index.js';
+import { makeNode, renderGraphOffline, type RoutingGraph } from '../src/index.js';
 import {
   crossingRate,
   envelope,
@@ -181,11 +181,11 @@ describe('isochronic engine', () => {
 
 describe('stereo motion', () => {
   it('moves the signal between the channels at the requested rate', () => {
-    const graph = {
+    const graph: RoutingGraph = {
       nodes: [
-        { id: 'src', kind: 'oscillator' as const, params: { frequency: 300, amplitude: 0.5, phase: 0, pan: 0 }, options: { waveform: 'sine' } },
-        { id: 'mov', kind: 'stereoMotion' as const, params: { rate: 1, depth: 1, center: 0 }, options: { shape: 'sine' } },
-        { id: 'output', kind: 'output' as const, params: {}, options: {} },
+        makeNode('src', 'oscillator', { frequency: 300, amplitude: 0.5, pan: 0 }),
+        makeNode('mov', 'stereoMotion', { rate: 1, depth: 1, center: 0 }),
+        makeNode('output', 'output'),
       ],
       connections: [
         { from: 'src', to: 'mov' },
