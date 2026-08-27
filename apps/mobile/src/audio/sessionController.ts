@@ -9,8 +9,10 @@ import {
   type Protocol,
   type SessionTelemetry,
 } from '@frequencylab/dsp-core';
+import { Platform } from 'react-native';
 import { loadNativeAudio } from './native';
 import { QueuedAudioBackend } from './queuedBackend';
+import { WebAudioBackend } from './webAudioBackend';
 import { NullAudioBackend } from './nullBackend';
 import {
   AudioBackendUnavailableError,
@@ -203,7 +205,10 @@ export class SessionController implements RenderSource {
     this.emit();
 
     const options = this.backendOptionsForProtocol();
-    this.backend = new QueuedAudioBackend(options);
+    // Web has no native audio module, but it does have the Web Audio API, so the
+    // browser preview plays through that rather than the silent fallback.
+    this.backend =
+      Platform.OS === 'web' ? new WebAudioBackend(options) : new QueuedAudioBackend(options);
     this.attachSystemListeners();
 
     try {
