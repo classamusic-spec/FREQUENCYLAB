@@ -66,24 +66,24 @@ export default function ExploreScreen() {
   const protocol = useMemo(() => toProtocol('explorer-preview'), [toProtocol]);
   const dna = protocolDna(protocol);
 
-  const apply = useCallback(
-    (patch: Parameters<typeof setRecipe>[0]) => {
-      const needsRebuild = requiresRebuild(patch, recipe);
-      setRecipe(patch);
-      if (needsRebuild && playing) {
-        // A structural change cannot be a live parameter write, so the
-        // protocol is rebuilt and restarted from the same position.
-        void restart();
-      }
-    },
-    [playing, recipe, setRecipe],
-  );
-
   const restart = useCallback(async () => {
     await loadAndPlay(useExplorer.getState().toProtocol('explorer-preview'), {
       masterGain: preferences.comfortableOutputLevel,
     });
   }, [loadAndPlay, preferences.comfortableOutputLevel]);
+
+  const apply = useCallback(
+    (patch: Parameters<typeof setRecipe>[0]) => {
+      const needsRebuild = requiresRebuild(patch, recipe);
+      setRecipe(patch);
+      if (needsRebuild && playing) {
+        // A structural change cannot be a live parameter write — the module
+        // simply is not in the graph — so the protocol is rebuilt and restarted.
+        void restart();
+      }
+    },
+    [playing, recipe, restart, setRecipe],
+  );
 
   const togglePlayback = async () => {
     if (playing) {

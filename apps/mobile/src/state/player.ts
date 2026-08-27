@@ -13,6 +13,7 @@ import {
   type ScopeCapture,
 } from '../audio/sessionController';
 import { useHistory } from './history';
+import { useExperiments } from './experiments';
 
 interface PlayerState {
   snapshot: ControllerSnapshot;
@@ -136,6 +137,15 @@ async function writeSessionRecord(
   };
 
   await useHistory.getState().record(session);
+
+  // Link the assignment only now: an experiment session counts once it has
+  // produced a record, not when the user pressed start.
+  if (experiment) {
+    await useExperiments
+      .getState()
+      .completeSession(experiment.experimentId, experiment.assignmentIndex, session.id);
+  }
+
   return session;
 }
 
