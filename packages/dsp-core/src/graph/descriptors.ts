@@ -1,6 +1,12 @@
 import { ENVELOPE_SHAPES, WAVEFORMS } from '../dsp/oscillator.js';
 import { NOISE_COLORS } from '../dsp/noise.js';
-import { MAX_BEAT_HZ, MAX_CARRIER_HZ, MIN_BEAT_HZ, MIN_CARRIER_HZ } from '../math/constants.js';
+import {
+  MAX_BEAT_HZ,
+  MAX_CARRIER_HZ,
+  MAX_TONE_HZ,
+  MIN_BEAT_HZ,
+  MIN_CARRIER_HZ,
+} from '../math/constants.js';
 import type { NodeDescriptor, NodeKind, ParamDescriptor } from './types.js';
 
 /**
@@ -75,7 +81,12 @@ export const NODE_DESCRIPTORS: Record<NodeKind, NodeDescriptor> = {
     category: 'generator',
     maxInputs: 0,
     description: 'A single phase-continuous tone. The simplest generator in the rack.',
-    params: [carrier({ key: 'frequency', label: 'Frequency' }), amplitude(0.4), phase, pan],
+    params: [
+      carrier({ key: 'frequency', label: 'Frequency', max: MAX_TONE_HZ }),
+      amplitude(0.4),
+      phase,
+      pan,
+    ],
     options: [
       { key: 'waveform', label: 'Waveform', values: WAVEFORMS, default: 'sine' },
     ],

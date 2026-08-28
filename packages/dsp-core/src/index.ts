@@ -55,3 +55,10 @@ export * from './library/entries.js';
 export * from './protocol/presets.js';
 export * from './safety/safety.js';
 export * from './ai/designer.js';
+
+export * from './archive/types.js';
+export * from './archive/transforms.js';
+export * from './archive/entries.js';
+export * from './archive/search.js';
+export * from './archive/import.js';
+export * from './archive/protocol.js';
