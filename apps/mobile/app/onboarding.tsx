@@ -1,31 +1,58 @@
-import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import Svg, { Circle, Line, Path } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AMBIENT_AWARENESS_NOTICE,
   NOT_MEDICAL_NOTICE,
   VOLUME_GUIDANCE,
   type ExperienceLevel,
 } from '@frequencylab/dsp-core';
-import { Screen } from '../src/design/components/Screen';
 import { InstrumentPanel } from '../src/design/components/InstrumentPanel';
 import { HardwareButton } from '../src/design/components/HardwareButton';
+import { KnobFace } from '../src/design/components/KnobFace';
+import { BrushedGrain } from '../src/design/components/Surface';
+import { LiveCarrierBeat, LiveStereo } from '../src/design/components/OnboardingDiagrams';
+import { ChevronIcon } from '../src/design/components/Icons';
 import { Label, Text } from '../src/design/components/Text';
-import { colors, space } from '../src/design/tokens';
+import { LIGHT, SURFACES } from '../src/design/materials';
+import { colors, motion, radius, space } from '../src/design/tokens';
 import * as haptics from '../src/design/haptics';
+import { useReducedMotion } from '../src/design/useReducedMotion';
 import { usePreferences } from '../src/state/preferences';
+
+const STEPS = 5;
+const LAST = STEPS - 1;
 
 /**
  * Onboarding (§52).
  *
- * Five screens, no account, no questionnaire. The third and fourth exist
- * because the product cannot work without the user understanding them: what
- * headphones are for, and what this is not.
+ * Five screens, no account, no questionnaire. The middle three exist because
+ * the product cannot work without the user understanding them: what a carrier
+ * and a beat actually are, what headphones are for, and what this is not.
+ *
+ * The presentation is deliberately kinetic — steps are swipeable, content
+ * staggers in, and the two teaching diagrams run live rather than sitting
+ * still. An instrument that will spend its life animating measured values
+ * should introduce itself the same way. Every motion here is suppressed under
+ * reduced motion, where the content becomes immediate rather than merely faster.
  */
 export default function OnboardingScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
   const update = usePreferences((state) => state.update);
+
   const [step, setStep] = useState(0);
   const [level, setLevel] = useState<ExperienceLevel>('simple');
 
@@ -38,134 +65,364 @@ export default function OnboardingScreen() {
     router.replace('/calibration');
   };
 
+  const go = useCallback(
+    (next: number) => {
+      const clamped = Math.max(0, Math.min(LAST, next));
+      if (clamped === step) return;
+      haptics.engage();
+      setStep(clamped);
+    },
+    [step],
+  );
+
+  /*
+   * Horizontal swipe between steps. A worklet reads the finished translation
+   * and dispatches the step change back to the JS thread; the pages themselves
+   * are not dragged, because a half-dragged safety notice would be worse than
+   * a clean transition.
+   */
+  const swipe = Gesture.Pan()
+    .activeOffsetX([-18, 18])
+    .failOffsetY([-24, 24])
+    .onEnd((event) => {
+      if (event.translationX < -48) runOnJS(go)(step + 1);
+      else if (event.translationX > 48) runOnJS(go)(step - 1);
+    });
+
   return (
-    <Screen scroll={false} style={styles.root}>
-      <View style={styles.progress}>
-        {[0, 1, 2, 3, 4].map((index) => (
-          <View key={index} style={[styles.progressDot, index <= step ? styles.progressDotOn : null]} />
-        ))}
+    <View style={styles.root}>
+      <LinearGradient
+        colors={SURFACES.chassis}
+        start={LIGHT.vertical.start}
+        end={LIGHT.vertical.end}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+      <BrushedGrain opacity={0.45} />
+
+      <View style={[styles.header, { paddingTop: insets.top + space.md }]}>
+        <ProgressRail step={step} onSelect={go} reducedMotion={reducedMotion} />
       </View>
 
-      <View style={styles.body}>
-        {step === 0 ? (
-          <View style={styles.stepContent}>
-            <Label>Welcome to</Label>
-            <Text variant="hero" style={styles.wordmark}>
-              FREQUENCY
-            </Text>
-            <Text variant="hero" style={styles.wordmarkSecond}>
-              LAB
-            </Text>
-            <Text variant="body" tone="secondary" style={styles.lede}>
-              Precision sound. Personal experimentation.
-            </Text>
-          </View>
-        ) : null}
+      <GestureDetector gesture={swipe}>
+        <View style={styles.body}>
+          {/* Keyed on the step so every transition remounts and replays the
+              stagger, which is what makes paging feel like a new panel sliding
+              into the instrument rather than text being swapped. */}
+          <StepPage key={step} centred={step === 0} reducedMotion={reducedMotion}>
+            {step === 0 ? <WelcomeStep reducedMotion={reducedMotion} /> : null}
+            {step === 1 ? <CarrierStep /> : null}
+            {step === 2 ? <HeadphonesStep /> : null}
+            {step === 3 ? <SafetyStep /> : null}
+            {step === 4 ? <LevelStep level={level} onSelect={setLevel} /> : null}
+          </StepPage>
+        </View>
+      </GestureDetector>
 
-        {step === 1 ? (
-          <View style={styles.stepContent}>
-            <Label>How it works</Label>
-            <Text variant="title" style={styles.heading}>
-              Two numbers, doing different jobs
-            </Text>
-            <CarrierBeatDiagram />
-            <Text variant="body" tone="secondary" style={styles.paragraph}>
-              The <Text variant="body">carrier</Text> is the tone you actually hear — usually a
-              couple of hundred hertz, like a low hum.
-            </Text>
-            <Text variant="body" tone="secondary" style={styles.paragraph}>
-              The <Text variant="body">beat</Text> is how fast that tone pulses or shifts. It is a
-              rate, not a pitch. A 7.83 Hz beat does not mean your headphones are producing a
-              7.83 Hz sound — nothing can.
-            </Text>
-          </View>
-        ) : null}
-
-        {step === 2 ? (
-          <View style={styles.stepContent}>
-            <Label>Headphones</Label>
-            <Text variant="title" style={styles.heading}>
-              Binaural mode needs two ears
-            </Text>
-            <StereoDiagram />
-            <Text variant="body" tone="secondary" style={styles.paragraph}>
-              In binaural mode each ear gets its own tone, and the beat only appears once your
-              hearing combines them. Through a speaker the two tones mix in the air first, and the
-              effect is gone.
-            </Text>
-            <Text variant="body" tone="secondary" style={styles.paragraph}>
-              No headphones? The monaural and isochronic engines work on any output, and the app
-              will offer them.
-            </Text>
-          </View>
-        ) : null}
-
-        {step === 3 ? (
-          <View style={styles.stepContent}>
-            <Label>Safety</Label>
-            <Text variant="title" style={styles.heading}>
-              Three things before you start
-            </Text>
-            <InstrumentPanel tone="flat" style={styles.safetyPanel}>
-              <Text variant="heading">Comfortable volume</Text>
-              <Text variant="bodySm" tone="secondary">
-                {VOLUME_GUIDANCE}
-              </Text>
-            </InstrumentPanel>
-            <InstrumentPanel tone="flat" style={styles.safetyPanel}>
-              <Text variant="heading">Environmental awareness</Text>
-              <Text variant="bodySm" tone="secondary">
-                {AMBIENT_AWARENESS_NOTICE}
-              </Text>
-            </InstrumentPanel>
-            <InstrumentPanel tone="flat" style={styles.safetyPanel}>
-              <Text variant="heading">Not medical treatment</Text>
-              <Text variant="bodySm" tone="secondary">
-                {NOT_MEDICAL_NOTICE}
-              </Text>
-            </InstrumentPanel>
-          </View>
-        ) : null}
-
-        {step === 4 ? (
-          <View style={styles.stepContent}>
-            <Label>Choose a starting point</Label>
-            <Text variant="title" style={styles.heading}>
-              You can change this any time
-            </Text>
-            {LEVELS.map((option) => (
-              <LevelOption
-                key={option.value}
-                option={option}
-                selected={level === option.value}
-                onSelect={() => {
-                  haptics.engage();
-                  setLevel(option.value);
-                }}
-              />
-            ))}
-          </View>
-        ) : null}
-      </View>
-
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + space.xl }]}>
         {step > 0 ? (
-          <HardwareButton
-            label="Back"
-            variant="ghost"
-            style={styles.footerButton}
-            onPress={() => setStep((current) => current - 1)}
-          />
-        ) : null}
+          <Pressable
+            onPress={() => go(step - 1)}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            style={styles.backButton}
+          >
+            <ChevronIcon direction="left" color={colors.textSecondary} size={20} />
+          </Pressable>
+        ) : (
+          <View style={styles.backSpacer} />
+        )}
+
         <HardwareButton
-          label={step === 4 ? 'Start' : 'Continue'}
+          label={step === LAST ? 'Start' : 'Continue'}
           variant="primary"
           size="lg"
-          style={styles.footerButton}
-          onPress={() => (step === 4 ? void finish() : setStep((current) => current + 1))}
+          style={styles.continueButton}
+          onPress={() => (step === LAST ? void finish() : go(step + 1))}
         />
       </View>
-    </Screen>
+    </View>
+  );
+}
+
+/** Fades and lifts a step's content in, staggering its children. */
+function StepPage({
+  children,
+  centred,
+  reducedMotion,
+}: {
+  children: ReactNode;
+  /** Centres the page vertically. Off for steps whose heading should anchor. */
+  centred?: boolean;
+  reducedMotion: boolean;
+}) {
+  const enter = useSharedValue(reducedMotion ? 1 : 0);
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    enter.value = withTiming(1, {
+      duration: motion.settle,
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+    });
+  }, [enter, reducedMotion]);
+
+  const style = useAnimatedStyle(() => ({
+    opacity: enter.value,
+    transform: [{ translateY: (1 - enter.value) * 18 }],
+  }));
+
+  return (
+    <Animated.View style={[styles.page, centred ? styles.pageCentred : styles.pageAnchored, style]}>
+      <View style={styles.pageInner}>{children}</View>
+    </Animated.View>
+  );
+}
+
+/** One staggered element inside a step. */
+function Stagger({ index = 0, children }: { index?: number; children: ReactNode }) {
+  const reducedMotion = useReducedMotion();
+  const enter = useSharedValue(reducedMotion ? 1 : 0);
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    enter.value = withDelay(
+      70 * index,
+      withTiming(1, { duration: motion.settle, easing: Easing.bezier(0.16, 1, 0.3, 1) }),
+    );
+  }, [enter, index, reducedMotion]);
+
+  const style = useAnimatedStyle(() => ({
+    opacity: enter.value,
+    transform: [{ translateY: (1 - enter.value) * 14 }],
+  }));
+
+  return <Animated.View style={style}>{children}</Animated.View>;
+}
+
+/**
+ * The step indicator, as a row of milled channels that fill.
+ *
+ * Tappable, so a user who wants to re-read the safety step is not forced to
+ * swipe back through the others.
+ */
+function ProgressRail({
+  step,
+  onSelect,
+  reducedMotion,
+}: {
+  step: number;
+  onSelect: (index: number) => void;
+  reducedMotion: boolean;
+}) {
+  return (
+    <View style={styles.rail} accessibilityRole="tablist">
+      {Array.from({ length: STEPS }, (_, index) => (
+        <Pressable
+          key={index}
+          onPress={() => onSelect(index)}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: index === step }}
+          accessibilityLabel={`Step ${index + 1} of ${STEPS}`}
+          hitSlop={10}
+          style={styles.railSegment}
+        >
+          <View style={styles.railChannel}>
+            <RailFill filled={index <= step} active={index === step} reducedMotion={reducedMotion} />
+          </View>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function RailFill({
+  filled,
+  active,
+  reducedMotion,
+}: {
+  filled: boolean;
+  active: boolean;
+  reducedMotion: boolean;
+}) {
+  const progress = useSharedValue(filled ? 1 : 0);
+
+  useEffect(() => {
+    const target = filled ? 1 : 0;
+    progress.value = reducedMotion
+      ? target
+      : withTiming(target, { duration: motion.standard, easing: Easing.out(Easing.cubic) });
+  }, [filled, progress, reducedMotion]);
+
+  const style = useAnimatedStyle(() => ({
+    // Grows from the left, so a step change reads as travel rather than a
+    // light switching on.
+    transform: [{ scaleX: progress.value }],
+    opacity: 0.45 + progress.value * 0.55,
+  }));
+
+  return (
+    <Animated.View
+      style={[styles.railFill, active ? styles.railFillActive : null, style]}
+      pointerEvents="none"
+    />
+  );
+}
+
+function WelcomeStep({ reducedMotion }: { reducedMotion: boolean }) {
+  const [ring, setRing] = useState(reducedMotion ? 0.62 : 0);
+  const raf = useRef(0);
+
+  /*
+   * The dial breathes: it sweeps up to a value and then drifts gently around
+   * it. A still knob on the welcome screen would say "picture of an
+   * instrument"; a moving one says "the instrument is already running".
+   */
+  useEffect(() => {
+    if (reducedMotion) return;
+    const begun = Date.now();
+    const step = () => {
+      const t = (Date.now() - begun) / 1000;
+      const settle = Math.min(1, t / 1.1);
+      const eased = 1 - Math.pow(1 - settle, 3);
+      const drift = settle >= 1 ? Math.sin((t - 1.1) * 0.9) * 0.05 : 0;
+      setRing(0.62 * eased + drift);
+      raf.current = requestAnimationFrame(step);
+    };
+    raf.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf.current);
+  }, [reducedMotion]);
+
+  return (
+    <View style={styles.welcome}>
+      <Stagger index={0}>
+        <View style={styles.welcomeDial}>
+          <KnobFace size={192} normalised={ring} accent={colors.signal} showIndicator={false} />
+        </View>
+      </Stagger>
+
+      <Stagger index={1}>
+        <Label style={styles.welcomeEyebrow}>Welcome to</Label>
+      </Stagger>
+
+      <Stagger index={2}>
+        <Text variant="title" uppercase style={styles.wordmark}>
+          Frequency Lab
+        </Text>
+      </Stagger>
+
+      <Stagger index={3}>
+        <Text variant="body" tone="secondary" style={styles.lede}>
+          A programmable psychoacoustic instrument. Precision sound, and an honest account of what
+          it does and does not do.
+        </Text>
+      </Stagger>
+
+      <Stagger index={4}>
+        <Label tone="tertiary" style={styles.swipeHint}>
+          Swipe between steps
+        </Label>
+      </Stagger>
+    </View>
+  );
+}
+
+function CarrierStep() {
+  return (
+    <>
+      <Stagger index={0}>
+        <Label>How it works</Label>
+        <Text variant="title" style={styles.heading}>
+          Two numbers, doing different jobs
+        </Text>
+      </Stagger>
+
+      <Stagger index={1}>
+        <View style={styles.diagramWell}>
+          <LiveCarrierBeat />
+        </View>
+      </Stagger>
+
+      <Stagger index={2}>
+        <Text variant="body" tone="secondary" style={styles.paragraph}>
+          The <Text variant="body">carrier</Text> is the tone you actually hear — usually a couple
+          of hundred hertz, like a low hum.
+        </Text>
+      </Stagger>
+
+      <Stagger index={3}>
+        <Text variant="body" tone="secondary" style={styles.paragraph}>
+          The <Text variant="body">beat</Text> is how fast that tone pulses or shifts. It is a rate,
+          not a pitch. A 7.83 Hz beat does not mean your headphones are producing a 7.83 Hz sound —
+          nothing can.
+        </Text>
+      </Stagger>
+    </>
+  );
+}
+
+function HeadphonesStep() {
+  return (
+    <>
+      <Stagger index={0}>
+        <Label>Headphones</Label>
+        <Text variant="title" style={styles.heading}>
+          Binaural mode needs two ears
+        </Text>
+      </Stagger>
+
+      <Stagger index={1}>
+        <View style={styles.diagramWell}>
+          <LiveStereo />
+        </View>
+      </Stagger>
+
+      <Stagger index={2}>
+        <Text variant="body" tone="secondary" style={styles.paragraph}>
+          Each ear gets its own tone, and the beat appears only once your hearing combines them.
+          Through a speaker the two mix in the air first, and the effect is gone.
+        </Text>
+      </Stagger>
+
+      <Stagger index={3}>
+        <Text variant="body" tone="secondary" style={styles.paragraph}>
+          No headphones? The monaural and isochronic engines work on any output, and the app will
+          offer them.
+        </Text>
+      </Stagger>
+    </>
+  );
+}
+
+const SAFETY = [
+  { title: 'Comfortable volume', body: VOLUME_GUIDANCE },
+  { title: 'Environmental awareness', body: AMBIENT_AWARENESS_NOTICE },
+  { title: 'Not medical treatment', body: NOT_MEDICAL_NOTICE },
+];
+
+function SafetyStep() {
+  return (
+    <>
+      <Stagger index={0}>
+        <Label>Safety</Label>
+        <Text variant="title" style={styles.heading}>
+          Three things before you start
+        </Text>
+      </Stagger>
+
+      {SAFETY.map((item, index) => (
+        <Stagger key={item.title} index={index + 1}>
+          <InstrumentPanel tone="raised" style={styles.safetyPanel}>
+            <View style={styles.safetyHeader}>
+              <View style={styles.safetyMark} />
+              <Text variant="heading">{item.title}</Text>
+            </View>
+            <Text variant="bodySm" tone="secondary" style={styles.safetyBody}>
+              {item.body}
+            </Text>
+          </InstrumentPanel>
+        </Stagger>
+      ))}
+    </>
   );
 }
 
@@ -187,110 +444,167 @@ const LEVELS: { value: ExperienceLevel; title: string; body: string }[] = [
   },
 ];
 
-function LevelOption({
-  option,
-  selected,
+function LevelStep({
+  level,
   onSelect,
 }: {
-  option: (typeof LEVELS)[number];
-  selected: boolean;
-  onSelect: () => void;
+  level: ExperienceLevel;
+  onSelect: (value: ExperienceLevel) => void;
 }) {
   return (
-    <InstrumentPanel
-      tone={selected ? 'raised' : 'flat'}
-      style={[styles.levelOption, selected ? styles.levelOptionSelected : null]}
-      onTouchEnd={onSelect}
-      accessible
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-      accessibilityLabel={`${option.title}. ${option.body}`}
-    >
-      <View style={styles.levelHeader}>
-        <Text variant="heading" tone={selected ? 'primary' : 'secondary'}>
-          {option.title}
+    <>
+      <Stagger index={0}>
+        <Label>Choose a starting point</Label>
+        <Text variant="title" style={styles.heading}>
+          You can change this any time
         </Text>
-        <View style={[styles.radio, selected ? styles.radioOn : null]} />
-      </View>
-      <Text variant="bodySm" tone="tertiary">
-        {option.body}
-      </Text>
-    </InstrumentPanel>
-  );
-}
+      </Stagger>
 
-/** A carrier waveform with a slow amplitude envelope drawn over it. */
-function CarrierBeatDiagram() {
-  const width = 280;
-  const height = 96;
-  const carrier: string[] = [];
-  const envelope: string[] = [];
-  for (let i = 0; i <= 280; i++) {
-    const t = i / 280;
-    const env = 0.5 + 0.45 * Math.sin(2 * Math.PI * t * 2 - Math.PI / 2);
-    const y = height / 2 - Math.sin(2 * Math.PI * t * 22) * env * (height / 2 - 8);
-    carrier.push(`${i === 0 ? 'M' : 'L'} ${i} ${y.toFixed(1)}`);
-    envelope.push(`${i === 0 ? 'M' : 'L'} ${i} ${(height / 2 - env * (height / 2 - 8)).toFixed(1)}`);
-  }
-  return (
-    <View style={styles.diagram}>
-      <Svg width={width} height={height}>
-        <Path d={carrier.join(' ')} stroke={colors.signal} strokeWidth={1.2} fill="none" />
-        <Path d={envelope.join(' ')} stroke={colors.warning} strokeWidth={1} fill="none" opacity={0.7} />
-      </Svg>
-      <View style={styles.diagramLegend}>
-        <Label tone="signal">Carrier · the tone</Label>
-        <Label tone="warning">Beat · the rate</Label>
-      </View>
-    </View>
-  );
-}
-
-function StereoDiagram() {
-  return (
-    <View style={styles.diagram}>
-      <Svg width={280} height={96}>
-        <Circle cx={60} cy={48} r={26} stroke={colors.hairlineStrong} strokeWidth={1} fill="none" />
-        <Circle cx={220} cy={48} r={26} stroke={colors.hairlineStrong} strokeWidth={1} fill="none" />
-        <Line x1={86} y1={48} x2={130} y2={48} stroke={colors.signal} strokeWidth={1.4} />
-        <Line x1={150} y1={48} x2={194} y2={48} stroke={colors.signal} strokeWidth={1.4} />
-        <Circle cx={140} cy={48} r={12} stroke={colors.signal} strokeWidth={1.4} fill="none" />
-      </Svg>
-      <View style={styles.diagramLegend}>
-        <Label>200.000 Hz left</Label>
-        <Label tone="signal">7.830 Hz perceived</Label>
-        <Label>207.830 Hz right</Label>
-      </View>
-    </View>
+      {LEVELS.map((option, index) => {
+        const selected = level === option.value;
+        return (
+          <Stagger key={option.value} index={index + 1}>
+            <Pressable
+              onPress={() => {
+                haptics.engage();
+                onSelect(option.value);
+              }}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              accessibilityLabel={`${option.title}. ${option.body}`}
+            >
+              <InstrumentPanel
+                tone={selected ? 'raised' : 'flat'}
+                style={[styles.levelOption, selected ? styles.levelOptionSelected : null]}
+              >
+                <View style={styles.levelHeader}>
+                  <Text variant="heading" tone={selected ? 'primary' : 'secondary'}>
+                    {option.title}
+                  </Text>
+                  {/* Selection is a filled mark as well as a colour, so it is
+                      readable without colour vision (§50). */}
+                  <View style={[styles.radio, selected ? styles.radioOn : null]}>
+                    {selected ? <View style={styles.radioCore} /> : null}
+                  </View>
+                </View>
+                <Text variant="bodySm" tone="tertiary" style={styles.levelBody}>
+                  {option.body}
+                </Text>
+              </InstrumentPanel>
+            </Pressable>
+          </Stagger>
+        );
+      })}
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { paddingHorizontal: space.xl },
-  progress: { flexDirection: 'row', gap: space.xs, justifyContent: 'center', paddingTop: space.lg },
-  progressDot: { width: 22, height: 2, borderRadius: 1, backgroundColor: colors.surfaceHigh },
-  progressDotOn: { backgroundColor: colors.signal },
-  body: { flex: 1, justifyContent: 'center' },
-  stepContent: { gap: space.md },
-  wordmark: { letterSpacing: -2 },
-  wordmarkSecond: { letterSpacing: 10, marginTop: -12 },
-  lede: { marginTop: space.lg },
+  root: { flex: 1, backgroundColor: colors.background },
+  header: { paddingHorizontal: space.xl, paddingBottom: space.md },
+
+  rail: { flexDirection: 'row', gap: space.xs },
+  railSegment: { flex: 1, paddingVertical: space.sm },
+  // A milled channel: shaded by its own rim, lit along the bottom lip.
+  railChannel: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.surfaceRecessed,
+    overflow: 'hidden',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(96,110,132,0.22)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.9)',
+  },
+  railFill: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.signal,
+    transformOrigin: 'left',
+  },
+  railFillActive: {
+    shadowColor: colors.signal,
+    shadowOpacity: 0.5,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 0 },
+  },
+
+  body: { flex: 1 },
+  page: { flex: 1 },
+  pageCentred: { justifyContent: 'center' },
+  pageAnchored: { justifyContent: 'flex-start', paddingTop: space.huge },
+  pageInner: { paddingHorizontal: space.xl, gap: space.md },
+
+  welcome: { alignItems: 'center', gap: space.sm },
+  welcomeDial: { marginBottom: space.lg },
+  welcomeEyebrow: { textAlign: 'center' },
+  wordmark: { letterSpacing: 6, textAlign: 'center', marginTop: space.xxs },
+  lede: { textAlign: 'center', marginTop: space.md, maxWidth: 320 },
+  swipeHint: { textAlign: 'center', marginTop: space.xxl },
+
   heading: { marginTop: space.xxs },
   paragraph: { marginTop: space.xs },
-  diagram: { alignItems: 'center', gap: space.sm, marginVertical: space.lg },
-  diagramLegend: { flexDirection: 'row', gap: space.md, flexWrap: 'wrap', justifyContent: 'center' },
-  safetyPanel: { marginTop: space.xs },
+
+  // The diagrams sit in a well, so they read as an instrument readout rather
+  // than a picture dropped onto the page.
+  diagramWell: {
+    marginVertical: space.lg,
+    paddingVertical: space.lg,
+    borderRadius: radius.panel,
+    backgroundColor: colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.edgeLight,
+    shadowColor: '#33486A',
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+
+  safetyPanel: { marginTop: space.sm },
+  safetyHeader: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  safetyMark: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.signal },
+  safetyBody: { marginTop: space.xs },
+
   levelOption: { marginTop: space.sm },
   levelOptionSelected: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.signalDim },
   levelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  levelBody: { marginTop: space.xs },
   radio: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1,
     borderColor: colors.hairlineStrong,
+    backgroundColor: colors.surfaceRecessed,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  radioOn: { backgroundColor: colors.signal, borderColor: colors.signal },
-  footer: { flexDirection: 'row', gap: space.sm, paddingBottom: space.xxl },
-  footerButton: { flex: 1 },
+  radioOn: { borderColor: colors.signal },
+  radioCore: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.signal },
+
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    paddingHorizontal: space.xl,
+    paddingTop: space.md,
+  },
+  backButton: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceRaised,
+    borderTopWidth: 1,
+    borderTopColor: colors.edgeLight,
+    shadowColor: '#33486A',
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  backSpacer: { width: 0 },
+  continueButton: { flex: 1 },
 });

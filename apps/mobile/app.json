@@ -5,20 +5,26 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "frequencylab",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "backgroundColor": "#08090B",
+    "backgroundColor": "#F4F6F9",
     "splash": {
-      "backgroundColor": "#08090B",
+      "image": "./assets/splash-icon.png",
+      "imageWidth": 180,
+      "backgroundColor": "#F4F6F9",
       "resizeMode": "contain"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.frequencylab.app",
       "requireFullScreen": false,
       "infoPlist": {
-        "UIBackgroundModes": ["audio"],
+        "UIBackgroundModes": [
+          "audio"
+        ],
         "NSHealthShareUsageDescription": "FREQUENCY LAB can read heart rate and heart-rate variability around a session so you can see how your body responded. This is optional and the app works fully without it.",
         "NSHealthUpdateUsageDescription": "FREQUENCY LAB can record completed sessions as mindful minutes. This is optional.",
         "ITSAppUsesNonExemptEncryption": false
@@ -27,9 +33,13 @@
     "android": {
       "package": "com.frequencylab.app",
       "edgeToEdgeEnabled": true,
-      "permissions": ["android.permission.FOREGROUND_SERVICE", "android.permission.WAKE_LOCK"],
+      "permissions": [
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.WAKE_LOCK"
+      ],
       "adaptiveIcon": {
-        "backgroundColor": "#08090B"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F4F6F9"
       }
     },
     "plugins": [
@@ -38,7 +48,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#08090B",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "backgroundColor": "#F4F6F9",
           "resizeMode": "contain"
         }
       ],
@@ -48,12 +60,19 @@
           "iosBackgroundMode": true,
           "iosForegroundService": true,
           "androidForegroundService": true,
-          "androidPermissions": ["FOREGROUND_SERVICE", "WAKE_LOCK"]
+          "androidPermissions": [
+            "FOREGROUND_SERVICE",
+            "WAKE_LOCK"
+          ]
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "icon": "./assets/icon.png",
+    "web": {
+      "favicon": "./assets/favicon.png"
     }
   }
 }

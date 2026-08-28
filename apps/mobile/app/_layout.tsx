@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { StyleSheet } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -27,6 +27,7 @@ import { useExperiments } from '../src/state/experiments';
 import { useArchive } from '../src/state/archive';
 import { usePlayerAttachment } from '../src/state/player';
 import { PreflightSheet } from '../src/design/components/PreflightSheet';
+import { SplashSequence } from '../src/design/components/SplashSequence';
 
 void SplashScreen.preventAutoHideAsync();
 void SystemUI.setBackgroundColorAsync(colors.background);
@@ -44,6 +45,8 @@ export default function RootLayout() {
   });
 
   const [hydrated, setHydrated] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
+  const handleSplashDone = useCallback(() => setSplashDone(true), []);
   const hydratePreferences = usePreferences((state) => state.hydrate);
   const hydrateProtocols = useProtocolLibrary((state) => state.hydrate);
   const hydrateHistory = useHistory((state) => state.hydrate);
@@ -67,17 +70,18 @@ export default function RootLayout() {
   const ready = fontsLoaded && hydrated;
 
   useEffect(() => {
-    if (!ready) return;
+    // Hidden immediately: the animated sequence below is already painting the
+    // same mark on the same background, so handing over early avoids the
+    // native splash lingering over an app that is ready to draw.
     void SplashScreen.hideAsync();
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !splashDone) return;
     if (!preferences.onboardingCompletedAt) {
       router.replace('/onboarding');
     }
-  }, [preferences.onboardingCompletedAt, ready, router]);
-
-  if (!ready) {
-    // Held on the splash background rather than flashing an unstyled tree.
-    return <View style={styles.boot} />;
-  }
+  }, [preferences.onboardingCompletedAt, ready, router, splashDone]);
 
   return (
     <GestureHandlerRootView style={styles.root}>
@@ -107,6 +111,9 @@ export default function RootLayout() {
         {/* Rendered once at the root so every path into playback passes the
             output-route and safety checks, not just the ones that remembered to. */}
         <PreflightSheet />
+        {splashDone ? null : (
+          <SplashSequence waiting={!ready} onDone={handleSplashDone} />
+        )}
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
@@ -114,5 +121,4 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  boot: { flex: 1, backgroundColor: colors.background },
 });

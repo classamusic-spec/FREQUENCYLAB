@@ -113,7 +113,9 @@ export function KnobFace({
     const count = small ? 60 : 120;
     for (let i = 0; i < count; i++) {
       const a = (i / count) * 360 + (i % 3) * 1.3;
-      const inner = polar(c, R.cap * 0.16, a);
+      // Converges at the centre: a sunburst that stops short leaves a bright
+      // unbrushed disc, which reads as a blemish rather than a turned boss.
+      const inner = polar(c, R.cap * 0.03, a);
       const outer = polar(c, R.cap * 0.97, a);
       // Spokes crossing the light direction catch it; the rest fall dark.
       const litness = Math.cos(((a - 135) * Math.PI) / 90);
@@ -331,6 +333,17 @@ export function KnobFace({
         stroke="rgba(96,110,132,0.30)"
         strokeWidth={1.4}
         strokeLinecap="round"
+      />
+
+      {/* The turned centre pivot the brushing radiates from. */}
+      <Circle cx={c} cy={c} r={Math.max(2, R.cap * 0.045)} fill="url(#cap)" />
+      <Circle
+        cx={c}
+        cy={c}
+        r={Math.max(2, R.cap * 0.045)}
+        fill="none"
+        stroke="rgba(96,110,132,0.28)"
+        strokeWidth={0.7}
       />
 
       {/* Optional milled indicator, for caps that do not carry a readout. */}
