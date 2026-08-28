@@ -54,7 +54,8 @@ frequencylab/
     └── mobile/            Expo + React Native instrument
         ├── app/           expo-router screens
         └── src/
-            ├── audio/     backend interface, queued-buffer backend, controller
+            ├── audio/     backend interface, queued-buffer backend, controller,
+            │              lock-screen transport
             ├── design/    tokens and the instrument component library
             ├── state/     zustand stores
             ├── storage/   AsyncStorage repositories

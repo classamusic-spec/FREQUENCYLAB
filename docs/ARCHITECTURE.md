@@ -110,6 +110,34 @@ A third implementation — running the renderer inside an audio worklet runtime
 via `createWorkletSourceNode` — would cut latency to a single block. The seam is
 sized for it; it is not built, because it could not be validated here.
 
+## Playing behind a locked screen
+
+A preset runs for fifteen to forty-five minutes and the listener is lying down
+with their eyes shut, so for most of a session the app is not on screen. Three
+pieces carry it across the lock:
+
+- **iOS** declares the `audio` background mode, and `QueuedAudioBackend` sets
+  the `playback` audio-session category before it opens a context — the
+  category that means "media", rather than a UI sound the ringer switch can
+  silence.
+- **Android** runs a `mediaPlayback` foreground service. It is started by the
+  media notification itself: `PlaybackNotificationManager.show()` is what
+  subscribes the service, so publishing the transport and staying alive in the
+  background are the same act.
+- **`NowPlayingTransport`** (`audio/nowPlaying.ts`) mirrors the controller out
+  to the lock screen — protocol name, stage, elapsed and total time — and turns
+  play, pause and stop back into controller calls. It publishes exactly the
+  three controls the engine can honour and switches the rest off, because iOS
+  enables skip, seek and next/previous by default and a protocol has no next
+  track. On web it drives the Media Session API instead, which browsers surface
+  only sometimes; nothing on the native path depends on it.
+
+The sleep timer is the part of this that can be measured. Its deadline is
+wall-clock and it is re-read from `render()` — whenever the backend pulls the
+next block — rather than from a JS timer, so a throttled app cannot make a
+session overrun. Suppressing every long timer in the browser build and running
+the clock fast still stops the session on time, over its full six-second fade.
+
 ## Why the DSP is in TypeScript
 
 The brief suggests a native C++ core. That would be the right call for a

@@ -48,11 +48,17 @@ fades:
 | Event | Behaviour |
 |---|---|
 | User presses Stop | 450 ms fade, then teardown |
+| User presses Stop on the lock screen | The same 450 ms fade — the transport calls the same `stop()` |
 | User presses Pause | 250 ms fade, then suspend |
+| Sleep timer expires | 6 s fade, then teardown |
 | Headphones disconnect | Pause, with a notice |
 | Interruption begins | Pause |
-| Interruption ends | Resume if the system says it should |
+| Interruption ends | Resume only if the system asks *and* this interruption is what paused it |
 | Session completes | The protocol's own fade-out, then teardown |
+
+`stop()` floors its fade at the manual-stop length, so no caller can make a stop
+sharper than the one the user hears from the button. The sleep timer is the one
+caller that lengthens it, because it is the one stop nobody is awake to expect.
 
 A stop is never a discontinuity. The test suite asserts that a stop fade
 reaches exact silence and that no sample step during it exceeds the waveform's
@@ -63,9 +69,11 @@ own maximum slope.
 `routeChangeAction` lives in the shared core, so it is covered by tests rather
 than being UI logic:
 
-- **Losing a private route** (headphones or Bluetooth → speaker) **pauses.** An
-  unexpected disconnect must never dump an immersive tone into a room at the
-  volume the user chose for headphones.
+- **Losing a private route** (headphones or Bluetooth → speaker) **pauses**, and
+  the pause remembers why. An unexpected disconnect must never dump an
+  immersive tone into a room at the volume the user chose for headphones — and
+  nothing may undo that pause on its own afterwards, including an interruption
+  that ends while the phone is still on the speaker.
 - **Gaining a route** continues.
 - **Moving to a speaker while binaural is active** ducks and notifies, because
   the effect is no longer present.

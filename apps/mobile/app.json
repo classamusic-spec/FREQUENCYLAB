@@ -35,6 +35,8 @@
       "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.POST_NOTIFICATIONS",
         "android.permission.WAKE_LOCK"
       ],
       "adaptiveIcon": {
@@ -58,11 +60,15 @@
         "react-native-audio-api",
         {
           "iosBackgroundMode": true,
-          "iosForegroundService": true,
           "androidForegroundService": true,
+          "androidFSTypes": [
+            "mediaPlayback"
+          ],
           "androidPermissions": [
-            "FOREGROUND_SERVICE",
-            "WAKE_LOCK"
+            "android.permission.FOREGROUND_SERVICE",
+            "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+            "android.permission.POST_NOTIFICATIONS",
+            "android.permission.WAKE_LOCK"
           ]
         }
       ]

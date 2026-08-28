@@ -36,11 +36,12 @@ interface PlayerState {
    */
   lastCompletedSessionId?: string | null;
   /**
-   * Set when the sleep timer ended this playback, so the session screen can
-   * leave the way it does after a stop by hand rather than sitting on a frozen
-   * player. Cleared when the next protocol is loaded.
+   * Set when playback was ended by something other than this store — the sleep
+   * timer, or the lock-screen transport — so the session screen can leave the
+   * way it does after a stop by hand rather than sitting on a frozen player.
+   * Cleared when the next protocol is loaded.
    */
-  sleepTimerStopped: boolean;
+  externallyStopped: boolean;
   attach: () => () => void;
   loadAndPlay: (
     protocol: Protocol,
@@ -69,7 +70,7 @@ interface PlayerState {
 export const usePlayer = create<PlayerState>((set, get) => ({
   snapshot: sessionController.snapshot(),
   recorded: false,
-  sleepTimerStopped: false,
+  externallyStopped: false,
 
   attach: () => {
     let previousState = sessionController.playbackState;
@@ -87,8 +88,9 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       }
 
       /*
-       * The sleep timer stops the session from outside React, so the record it
-       * leaves behind has to be written here too.
+       * A stop that did not come through this store: the sleep timer, or the
+       * stop button on the lock screen. Both end playback from outside React,
+       * so the record they leave behind has to be written here.
        *
        * It is written on the transition *into* the fade rather than after the
        * teardown: at this point the backend is still running, so the snapshot
@@ -96,16 +98,18 @@ export const usePlayer = create<PlayerState>((set, get) => ({
        * disposed backend no longer reports. The state is emitted repeatedly
        * while the fade runs, hence the latch.
        */
+      const stopReason = sessionController.pendingStopReason;
       if (
         snapshot.state === 'stopping' &&
-        sessionController.pendingStopReason === 'sleepTimer' &&
-        !get().sleepTimerStopped
+        (stopReason === 'sleepTimer' || stopReason === 'remote') &&
+        !get().externallyStopped
       ) {
-        set({ sleepTimerStopped: true });
+        set({ externallyStopped: true });
         if (!get().recorded) {
           set({ recorded: true });
           // `stoppedByUser`, because that is what happened: the user asked for
-          // this stop when they armed the timer. The protocol did not finish.
+          // this stop, when they armed the timer or when they reached for the
+          // lock screen. The protocol did not finish.
           void writeSessionRecord(snapshot, 'stoppedByUser', get().experimentContext)
             .then((session) => set({ lastCompletedSessionId: session ? session.id : null }))
             .catch(() => set({ lastCompletedSessionId: null }));
@@ -121,7 +125,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       experimentContext: options.experiment,
       lastCompletedSessionId: undefined,
       recorded: false,
-      sleepTimerStopped: false,
+      externallyStopped: false,
     });
     await sessionController.load(protocol, { masterGain: options.masterGain });
     await sessionController.play();
@@ -132,7 +136,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       experimentContext: undefined,
       lastCompletedSessionId: undefined,
       recorded: false,
-      sleepTimerStopped: false,
+      externallyStopped: false,
     });
     await sessionController.load(protocol, { masterGain });
   },

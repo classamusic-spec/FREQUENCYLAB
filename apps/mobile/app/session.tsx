@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { formatClock } from '@frequencylab/dsp-core';
@@ -52,7 +52,7 @@ export default function SessionScreen() {
   const lastCompletedSessionId = usePlayer((state) => state.lastCompletedSessionId);
   const armSleepTimer = usePlayer((state) => state.armSleepTimer);
   const cancelSleepTimer = usePlayer((state) => state.cancelSleepTimer);
-  const sleepTimerStopped = usePlayer((state) => state.sleepTimerStopped);
+  const externallyStopped = usePlayer((state) => state.externallyStopped);
   const preferences = usePreferences((state) => state.preferences);
 
   const [showDetails, setShowDetails] = useState(false);
@@ -65,12 +65,27 @@ export default function SessionScreen() {
   const capture = useScopeCapture(showDetails || showScopes ? 24 : 8, playing && (showDetails || showScopes));
   const telemetry = snapshot.telemetry;
 
+  /*
+   * Keeping the screen awake is a web-only measure now.
+   *
+   * A browser tab has no background audio: locking the phone or sleeping the
+   * laptop suspends the AudioContext and the session with it, so the wake lock
+   * is the only thing holding a browser session open. On device it would be
+   * the wrong instrument for the job — the app declares the audio background
+   * mode and a media foreground service instead, so playback survives the lock
+   * screen — and a lit screen for forty-five minutes is battery spent against
+   * the point of the product, which is someone lying down with their eyes shut.
+   */
   useEffect(() => {
-    // The screen may lock, but the device must not sleep the process out from
-    // under a running session.
-    void activateKeepAwakeAsync('frequency-lab-session');
+    if (Platform.OS !== 'web') return;
+    // Both halves reject rather than resolving when the browser declines the
+    // lock — no permission, no user activation, a headless run — and an
+    // unhandled rejection in the console is not a thing a session screen should
+    // be printing. Losing the lock costs a screen that may dim; it is not worth
+    // saying anything about.
+    void activateKeepAwakeAsync('frequency-lab-session').catch(() => undefined);
     return () => {
-      void deactivateKeepAwake('frequency-lab-session');
+      void Promise.resolve(deactivateKeepAwake('frequency-lab-session')).catch(() => undefined);
     };
   }, []);
 
@@ -81,17 +96,18 @@ export default function SessionScreen() {
   }, [snapshot.state]);
 
   /*
-   * The sleep timer ends the session from outside the component tree, so the
-   * screen leaves on the state rather than on the press that caused it — and
-   * only once the fade has finished, so the last seconds of a session are not
-   * played to a screen that has already gone. No rating prompt: the whole point
-   * of the timer is that nobody is awake to answer one.
+   * The sleep timer and the lock-screen stop button both end the session from
+   * outside the component tree, so the screen leaves on the state rather than on
+   * the press that caused it — and only once the fade has finished, so the last
+   * seconds of a session are not played to a screen that has already gone. No
+   * rating prompt either way: whoever ended it that way is asleep, or is not
+   * looking at the app.
    */
   useEffect(() => {
-    if (!sleepTimerStopped) return;
+    if (!externallyStopped) return;
     if (snapshot.state !== 'idle') return;
     router.back();
-  }, [router, sleepTimerStopped, snapshot.state]);
+  }, [router, externallyStopped, snapshot.state]);
 
   useEffect(() => {
     if (snapshot.state !== 'completed') return;

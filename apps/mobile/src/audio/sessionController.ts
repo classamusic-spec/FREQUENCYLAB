@@ -24,6 +24,7 @@ import {
   type RenderSource,
 } from './types';
 import { detectOutputRoute } from './route';
+import { NowPlayingTransport, type NowPlayingInfo, type TransportCommand } from './nowPlaying';
 
 export type PlaybackState =
   | 'idle'
@@ -34,7 +35,32 @@ export type PlaybackState =
   | 'completed'
   | 'error';
 
-export type StopReason = 'user' | 'completed' | 'routeLost' | 'error' | 'replaced' | 'sleepTimer';
+/**
+ * Why playback stopped.
+ *
+ * `user` is a press inside the app and `remote` the same press on the lock
+ * screen. They are told apart because the app's own stop writes the session
+ * record on its way out and a stop from the lock screen has nobody to write it
+ * — the player store watches for the ones it did not start.
+ */
+export type StopReason =
+  | 'user'
+  | 'remote'
+  | 'completed'
+  | 'routeLost'
+  | 'error'
+  | 'replaced'
+  | 'sleepTimer';
+
+/**
+ * Why playback is paused.
+ *
+ * Kept because the answer decides whether anything is allowed to start it
+ * again on its own. Only a pause the system caused may be undone by the
+ * system; a pause the listener asked for, or one caused by their headphones
+ * coming out, is theirs to undo (§28, §57).
+ */
+export type PauseReason = 'user' | 'interruption' | 'routeLost';
 
 /**
  * An armed sleep timer.
@@ -114,6 +140,16 @@ export class SessionController implements RenderSource {
   private peakGainReductionDb = 0;
   private stopReason: StopReason | null = null;
   private pendingStop: StopReason | null = null;
+  private pauseReason: PauseReason | null = null;
+
+  /**
+   * The lock-screen / notification transport.
+   *
+   * Owned here rather than by a screen for the same reason the sleep timer is:
+   * it belongs to the playback, and the playback outlives the component tree.
+   * It is the only interface to a session once the phone is face down.
+   */
+  private readonly transport = new NowPlayingTransport();
 
   // Sleep timer. Held here rather than in the store because playback outlives
   // the component tree: navigating away from the session screen, or a re-render
@@ -180,6 +216,9 @@ export class SessionController implements RenderSource {
 
   private emit(): void {
     const snapshot = this.snapshot();
+    // Before the listeners, so the lock screen and the app never disagree about
+    // what is playing. `update` is a no-op unless something actually changed.
+    this.syncNowPlaying(snapshot);
     for (const listener of this.listeners) listener(snapshot);
   }
 
@@ -247,6 +286,7 @@ export class SessionController implements RenderSource {
     if (this.state === 'paused' && this.backend) {
       this.renderer.cancelStopFade();
       await this.backend.resume();
+      this.pauseReason = null;
       this.state = 'playing';
       this.startTelemetry();
       this.emit();
@@ -263,6 +303,7 @@ export class SessionController implements RenderSource {
 
   private async startBackend(): Promise<void> {
     this.state = 'preparing';
+    this.pauseReason = null;
     this.emit();
 
     // Nothing may replace a live backend without disposing it first.
@@ -278,6 +319,7 @@ export class SessionController implements RenderSource {
     try {
       await this.backend.start(this);
       this.state = 'playing';
+      this.showTransport();
       this.startTelemetry();
     } catch (error) {
       // The native audio module is missing or refused to start. Fall back to a
@@ -312,8 +354,15 @@ export class SessionController implements RenderSource {
     };
   }
 
-  async pause(): Promise<void> {
+  /**
+   * Pauses over a short fade.
+   *
+   * `reason` is recorded rather than acted on: it is what `attachSystemListeners`
+   * consults before letting the system resume a session on its own.
+   */
+  async pause(reason: PauseReason = 'user'): Promise<void> {
     if (this.state !== 'playing' || !this.backend) return;
+    this.pauseReason = reason;
     this.pauseCount++;
     // A short fade before suspending: cutting a tone mid-cycle clicks.
     this.renderer?.beginStopFade(0.25);
@@ -443,6 +492,64 @@ export class SessionController implements RenderSource {
     }, ms);
   }
 
+  /**
+   * Publishes the lock-screen transport for the session that just started.
+   *
+   * Only for a backend that actually makes sound: a silent fallback backend
+   * advancing the protocol clock must not appear on the lock screen as though
+   * something were playing (§65).
+   */
+  private showTransport(): void {
+    if (!this.protocol || !this.backend?.audible) return;
+    this.transport.attach(this.nowPlayingDescription(this.snapshot()), (command) =>
+      this.handleTransportCommand(command),
+    );
+  }
+
+  private syncNowPlaying(snapshot: ControllerSnapshot): void {
+    if (!this.protocol) return;
+    this.transport.update(this.nowPlayingDescription(snapshot));
+  }
+
+  /** What the lock screen says: the protocol, where it is, and what is armed. */
+  private nowPlayingDescription(snapshot: ControllerSnapshot): NowPlayingInfo {
+    const stage = snapshot.telemetry?.stageName ?? '';
+    const timer =
+      this.sleepTimerEndsAt === null ? '' : `Sleep timer · ${this.sleepTimerMinutes} min`;
+    return {
+      title: this.protocol?.name ?? 'Session',
+      detail: [stage, timer].filter(Boolean).join('  ·  ') || 'Frequency Lab',
+      durationSec: snapshot.telemetry?.durationSec ?? this.durationSec,
+      elapsedSec: snapshot.telemetry?.positionSec ?? 0,
+      // Still 'playing' through a stop: the fade is audible, and a transport
+      // that flipped to paused while sound was still coming out would be lying.
+      playing: this.state === 'playing' || this.state === 'stopping',
+    };
+  }
+
+  /**
+   * A press on the lock screen.
+   *
+   * Every command is checked against the state it claims to act on, so a
+   * remote-control event that arrives late — after the session has been torn
+   * down, which is exactly when iOS is most likely to deliver one — cannot
+   * start audio in someone's ears. Stopping goes through the ordinary `stop()`,
+   * fade and all: there is no sharper path out of a session from here (§28).
+   */
+  private handleTransportCommand(command: TransportCommand): void {
+    if (command === 'play') {
+      if (this.state === 'paused') void this.play();
+      return;
+    }
+    if (command === 'pause') {
+      if (this.state === 'playing') void this.pause('user');
+      return;
+    }
+    if (this.state === 'playing' || this.state === 'paused') {
+      void this.stop('remote');
+    }
+  }
+
   /** Disposes the current backend, tolerating a backend that never started. */
   private async disposeBackend(): Promise<void> {
     const backend = this.backend;
@@ -464,9 +571,13 @@ export class SessionController implements RenderSource {
     // deadline left to fire into whatever plays next.
     this.clearSleepTimer();
     this.detachSystemListeners();
+    // Taken down before the backend, so the lock screen never offers a
+    // transport for a session that no longer exists.
+    this.transport.release();
     await this.disposeBackend();
     this.stopReason = reason;
     this.pendingStop = null;
+    this.pauseReason = null;
     this.state = reason === 'completed' ? 'completed' : reason === 'replaced' ? 'idle' : 'idle';
     this.emit();
   }
@@ -597,8 +708,16 @@ export class SessionController implements RenderSource {
     try {
       const interruption = AudioManager.addSystemEventListener('interruption', (event) => {
         if (event.type === 'began') {
-          void this.pause();
-        } else if (event.shouldResume && this.state === 'paused') {
+          void this.pause('interruption');
+          return;
+        }
+        // Resuming is the system's suggestion, not its decision. It is honoured
+        // only for the pause this interruption itself caused: a session the
+        // listener paused, or one paused because their headphones came out,
+        // stays silent until they ask for it back. Nothing may put sound into
+        // someone's ears on its own (§28) — and resuming a route-loss pause
+        // would put it into a room speaker.
+        if (event.shouldResume && this.state === 'paused' && this.pauseReason === 'interruption') {
           void this.play();
         }
       });
@@ -629,7 +748,11 @@ export class SessionController implements RenderSource {
 
     if (decision.action === 'pauseAndNotify') {
       this.notice = decision.message;
-      await this.pause();
+      // Latched even when the session is already paused for another reason, so
+      // an interruption ending later cannot resume into the speaker the
+      // headphones were just swapped for.
+      this.pauseReason = 'routeLost';
+      await this.pause('routeLost');
     } else if (decision.action === 'duckAndNotify') {
       this.notice = decision.message;
       this.renderer?.setMasterGain(0.25);

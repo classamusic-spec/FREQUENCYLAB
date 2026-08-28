@@ -1,6 +1,7 @@
 import type {
   AudioContext as AudioContextType,
   AudioManager as AudioManagerType,
+  PlaybackNotificationManager as PlaybackNotificationManagerType,
 } from 'react-native-audio-api';
 
 /**
@@ -16,6 +17,12 @@ import type {
 interface NativeAudioModule {
   AudioContext: typeof AudioContextType;
   AudioManager: typeof AudioManagerType;
+  /**
+   * The lock-screen / notification transport. Optional on purpose: it arrived
+   * later than the audio context did, and a build linked against an older
+   * native module should lose the lock-screen controls rather than the audio.
+   */
+  PlaybackNotificationManager?: typeof PlaybackNotificationManagerType;
 }
 
 let cached: NativeAudioModule | null = null;
