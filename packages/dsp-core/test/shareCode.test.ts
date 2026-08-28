@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_EXPLORER_RECIPE,
   DEFAULT_MASTER,
   buildPresets,
+  designProtocol,
+  protocolFromExplorer,
   makeNode,
   buildStage,
   createProtocol,
@@ -212,6 +215,47 @@ describe('share codes', () => {
     expect(description).toContain('min');
     expect(description).toContain('Hz carrier');
     expect(description).toContain('stage');
+  });
+
+  it('covers every path that creates a protocol', () => {
+    // Presets are covered above; these are the other two ways a protocol comes
+    // into existence. If either grows a module the notation cannot carry, the
+    // encoder returns null and this fails rather than silently degrading to
+    // file-only sharing.
+    const built: Protocol[] = [];
+    for (const engine of ['binaural', 'monaural', 'isochronic'] as const) {
+      for (const noiseLevel of [0, 0.15]) {
+        for (const motionDepth of [0, 0.5]) {
+          built.push(
+            protocolFromExplorer(
+              { ...DEFAULT_EXPLORER_RECIPE, engine, noiseLevel, motionDepth },
+              { id: 'explorer' },
+            ),
+          );
+        }
+      }
+    }
+    for (const prompt of [
+      'help me relax before bed',
+      'deep focus for 45 minutes',
+      'meditation with brown noise',
+      '40 Hz gamma session',
+      'wind down slowly to delta',
+    ]) {
+      const designed = designProtocol({ prompt }).protocol;
+      if (designed) built.push(designed);
+    }
+
+    expect(built.length).toBeGreaterThan(15);
+    for (const protocol of built) {
+      const code = encodeShareCode(protocol);
+      expect(code, `${protocol.name}: no share code`).not.toBeNull();
+      expect(code!.length).toBeLessThan(120);
+      const result = parseShareCode(code!);
+      expect(result.ok, code!).toBe(true);
+      if (!result.ok) continue;
+      expect(protocolFingerprint(result.protocol), code!).toBe(protocolFingerprint(protocol));
+    }
   });
 
   it('gives the same check to protocols that differ only by name', () => {
