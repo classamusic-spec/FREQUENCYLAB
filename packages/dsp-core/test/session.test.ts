@@ -120,6 +120,43 @@ describe('protocol clock', () => {
     expect(renderer.finished).toBe(true);
   });
 
+  it('recovers from an aborted stop without a click', () => {
+    // Auto-resume after an interruption cancels a stop fade part-way through.
+    // The fade multiplies the buffers before the master chain, so nothing
+    // downstream would smooth a jump — cancelling used to snap the gain to full
+    // in one sample.
+    const protocol = sweepProtocol(30, 10, 10);
+    const renderer = new SessionRenderer(protocol, { sampleRate: SR, blockSize: 128 });
+    const left = new Float32Array(128);
+    const right = new Float32Array(128);
+    const trace: number[] = [];
+
+    const pump = (blocks: number) => {
+      for (let i = 0; i < blocks; i++) {
+        renderer.render(left, right, 128);
+        for (let j = 0; j < 128; j++) trace.push(left[j]);
+      }
+    };
+
+    pump(40);
+    renderer.beginStopFade(0.4);
+    pump(60);
+    renderer.cancelStopFade();
+    pump(200);
+
+    // The largest single-sample jump across the whole trace, including the
+    // cancel, must stay within what one cycle of the signal can move.
+    let biggestStep = 0;
+    for (let i = 1; i < trace.length; i++) {
+      biggestStep = Math.max(biggestStep, Math.abs(trace[i] - trace[i - 1]));
+    }
+    expect(biggestStep, 'a discontinuity in the recovery').toBeLessThan(0.05);
+
+    // And the level really does come back, rather than staying faded.
+    const tail = trace.slice(-2000);
+    expect(Math.max(...tail.map(Math.abs))).toBeGreaterThan(0.05);
+  });
+
   it('keeps the clock aligned with the sample count', () => {
     const protocol = sweepProtocol(30, 10, 6);
     const renderer = new SessionRenderer(protocol, { sampleRate: SR, blockSize: 128 });

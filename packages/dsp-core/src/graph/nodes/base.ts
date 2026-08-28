@@ -48,6 +48,18 @@ export abstract class RuntimeNode {
     for (const [key, value] of Object.entries(node.params)) this.raw.set(key, value);
   }
 
+  /**
+   * Declared range per parameter, captured when the node is prepared.
+   *
+   * `prepare` clamped the *initial* value and nothing clamped after that, so an
+   * automation lane — which calls `setParamTarget` every block — could drive a
+   * parameter arbitrarily far outside its descriptor. A lane holding an
+   * oscillator's amplitude at 50 rendered a peak of 20 with the limiter off,
+   * and above Nyquist a frequency lane aliased. The descriptor is the contract;
+   * it has to hold on every write, not just the first.
+   */
+  private ranges = new Map<string, { min: number; max: number }>();
+
   prepare(sampleRate: number, blockSize: number): void {
     this.sampleRate = sampleRate;
     this.blockSize = blockSize;
@@ -56,7 +68,9 @@ export abstract class RuntimeNode {
     this.outL = new Float32Array(blockSize);
     this.outR = new Float32Array(blockSize);
     this.smoothers.clear();
+    this.ranges.clear();
     for (const param of getDescriptor(this.kind).params) {
+      this.ranges.set(param.key, { min: param.min, max: param.max });
       const initial = clamp(this.raw.get(param.key) ?? param.default, param.min, param.max);
       this.smoothers.set(
         param.key,
@@ -69,22 +83,33 @@ export abstract class RuntimeNode {
   /** Hook for subclasses to build their own state once buffers exist. */
   protected onPrepare(): void {}
 
+  /** Clamps to the declared range. Non-finite input holds the current value. */
+  private bounded(key: string, value: number): number | null {
+    if (!Number.isFinite(value)) return null;
+    const range = this.ranges.get(key);
+    return range ? clamp(value, range.min, range.max) : value;
+  }
+
   /** Moves a parameter's smoother target. Safe to call from any thread. */
   setParamTarget(key: string, value: number): void {
+    const next = this.bounded(key, value);
+    if (next === null) return;
     const smoother = this.smoothers.get(key);
     if (!smoother) {
-      this.raw.set(key, value);
+      this.raw.set(key, next);
       return;
     }
-    smoother.setTarget(value);
-    this.raw.set(key, value);
+    smoother.setTarget(next);
+    this.raw.set(key, next);
   }
 
   /** Snaps a parameter with no ramp. Only valid while the engine is silent. */
   setParamImmediate(key: string, value: number): void {
+    const next = this.bounded(key, value);
+    if (next === null) return;
     const smoother = this.smoothers.get(key);
-    if (smoother) smoother.reset(value);
-    this.raw.set(key, value);
+    if (smoother) smoother.reset(next);
+    this.raw.set(key, next);
   }
 
   getOption(key: string, fallback = ''): string {

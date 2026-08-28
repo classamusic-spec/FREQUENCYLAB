@@ -67,6 +67,8 @@ export class SessionRenderer {
   private positionSamples = 0;
   private stopFadeGain = 1;
   private stopFadeRate = 0;
+  /** Where the stop fade is heading: 0 while stopping, 1 while recovering. */
+  private stopFadeTarget = 1;
   private lastStageIndex = -1;
 
   constructor(protocol: Protocol, options: SessionRendererOptions = {}) {
@@ -146,6 +148,7 @@ export class SessionRenderer {
     this.seek(0);
     this.stopFadeGain = 1;
     this.stopFadeRate = 0;
+    this.stopFadeTarget = 1;
     for (const stage of this.compiled) {
       if (stage) stage.graph.resetPhases();
     }
@@ -158,15 +161,29 @@ export class SessionRenderer {
    */
   beginStopFade(seconds = 0.4): void {
     this.stopFadeRate = seconds > 0 ? 1 / (seconds * this.sampleRate) : 1;
+    this.stopFadeTarget = 0;
   }
 
+  /**
+   * Aborts a stop fade and brings the level back at the same rate.
+   *
+   * This used to assign `stopFadeGain = 1` outright. The fade multiplies the
+   * scratch buffers *before* the master chain, so nothing downstream smoothed
+   * it: cancelling part-way through — the documented auto-resume path after an
+   * interruption — stepped the gain from wherever it had fallen to full in one
+   * sample, which is a click in the one place the brief says there must never
+   * be a discontinuity.
+   */
   cancelStopFade(): void {
-    this.stopFadeRate = 0;
-    this.stopFadeGain = 1;
+    this.stopFadeTarget = 1;
+    if (this.stopFadeGain >= 1) {
+      this.stopFadeGain = 1;
+      this.stopFadeRate = 0;
+    }
   }
 
   get stopFadeComplete(): boolean {
-    return this.stopFadeRate > 0 && this.stopFadeGain <= 0;
+    return this.stopFadeTarget === 0 && this.stopFadeRate > 0 && this.stopFadeGain <= 0;
   }
 
   /** Live master gain, 0..1.5. Used by the intensity control during playback. */
@@ -253,12 +270,19 @@ export class SessionRenderer {
     }
 
     if (this.stopFadeRate > 0) {
+      const direction = this.stopFadeTarget > this.stopFadeGain ? 1 : -1;
       for (let i = 0; i < frames; i++) {
-        const g = Math.max(0, this.stopFadeGain - this.stopFadeRate * i);
+        const g = clamp(this.stopFadeGain + direction * this.stopFadeRate * i, 0, 1);
         this.scratchL[i] *= g;
         this.scratchR[i] *= g;
       }
-      this.stopFadeGain = Math.max(0, this.stopFadeGain - this.stopFadeRate * frames);
+      this.stopFadeGain = clamp(
+        this.stopFadeGain + direction * this.stopFadeRate * frames,
+        0,
+        1,
+      );
+      // Once recovery reaches full level there is nothing left to apply.
+      if (this.stopFadeTarget === 1 && this.stopFadeGain >= 1) this.stopFadeRate = 0;
     }
 
     this.master.process(this.scratchL, this.scratchR, frames, positionSec, this.durationSec);

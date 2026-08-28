@@ -13,8 +13,14 @@ import {
   withNode,
   withoutNode,
   wouldCreateCycle,
+  DEFAULT_MASTER,
+  buildStandardGraph,
+  createProtocol,
+  makeSweepLane,
+  renderProtocolOffline,
   type RoutingGraph,
 } from '../src/index.js';
+import { peak } from './helpers.js';
 
 function chain(): RoutingGraph {
   let graph = emptyGraph();
@@ -182,5 +188,73 @@ describe('render order', () => {
     graph = withNode(graph, makeNode('orphan', 'noise'));
     const compiled = new RenderGraph(graph, 48000, 128);
     expect(compiled.nodeIds).not.toContain('orphan');
+  });
+});
+
+describe('parameter ranges', () => {
+  it('clamps an automation lane to the parameter it drives', () => {
+    // The descriptor is the contract, and it has to hold on every write rather
+    // than only on the first. `prepare` clamped the initial value and nothing
+    // clamped afterwards, so a lane — which writes every block — could hold an
+    // oscillator's amplitude at 50 and render a peak above 20 with the limiter
+    // off, leaving the one unbypassable safety stage to do a gain stage's job.
+    const graph = buildStandardGraph({
+      engine: 'binaural',
+      carrierHz: 220,
+      beatHz: 10,
+      amplitude: 0.5,
+    });
+    const protocol = createProtocol({
+      id: 'runaway',
+      name: 'runaway',
+      intent: 'explore',
+      stages: [
+        {
+          id: 's',
+          name: 's',
+          durationSec: 2,
+          crossfadeSec: 0,
+          graph,
+          automation: [makeSweepLane('lane', 'tone:amplitude', 50, 50, 2)],
+        },
+      ],
+      master: { ...DEFAULT_MASTER, gain: 1, limiter: false, fadeInSec: 0, fadeOutSec: 0 },
+    });
+
+    const { left, right } = renderProtocolOffline(protocol, { sampleRate: 48000 });
+    // Deliberately rendered with the limiter disabled: the clamp must hold on
+    // its own, not because something downstream caught it.
+    expect(peak(left), 'left').toBeLessThan(1.2);
+    expect(peak(right), 'right').toBeLessThan(1.2);
+  });
+
+  it('ignores a non-finite parameter write rather than poisoning the signal', () => {
+    const graph = buildStandardGraph({
+      engine: 'binaural',
+      carrierHz: 220,
+      beatHz: 10,
+      amplitude: 0.5,
+    });
+    const protocol = createProtocol({
+      id: 'nan',
+      name: 'nan',
+      intent: 'explore',
+      stages: [
+        {
+          id: 's',
+          name: 's',
+          durationSec: 1,
+          crossfadeSec: 0,
+          graph,
+          automation: [makeSweepLane('lane', 'tone:amplitude', Number.NaN, Number.NaN, 1)],
+        },
+      ],
+      master: { ...DEFAULT_MASTER, fadeInSec: 0, fadeOutSec: 0 },
+    });
+
+    const { left } = renderProtocolOffline(protocol, { sampleRate: 48000 });
+    for (let i = 0; i < left.length; i++) {
+      expect(Number.isFinite(left[i]), `sample ${i} is not finite`).toBe(true);
+    }
   });
 });

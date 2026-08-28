@@ -25,7 +25,15 @@ export function sha256Bytes(input: Uint8Array): Uint8Array {
   ]);
 
   const bitLength = input.length * 8;
-  const paddedLength = (((input.length + 9) >> 6) + 1) << 6;
+  /*
+   * SHA-256 pads to the *smallest* multiple of 64 that fits the message, the
+   * 0x80 terminator and the 8-byte length. `((len + 9) >> 6) + 1` is
+   * `floor((len+9)/64) + 1`, which is one block too many whenever `len + 9` is
+   * already a multiple of 64 — that is, `len ≡ 55 (mod 64)`. Those digests were
+   * self-consistent but not SHA-256, so roughly one protocol in sixty-four had
+   * a fingerprint no other implementation could reproduce.
+   */
+  const paddedLength = Math.ceil((input.length + 9) / 64) * 64;
   const message = new Uint8Array(paddedLength);
   message.set(input);
   message[input.length] = 0x80;

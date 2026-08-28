@@ -242,7 +242,7 @@ describe('share codes', () => {
       '40 Hz gamma session',
       'wind down slowly to delta',
     ]) {
-      const designed = designProtocol({ prompt }).protocol;
+      const designed = designProtocol({ prompt, now: '2026-01-01T00:00:00.000Z', id: 'ai' }).protocol;
       if (designed) built.push(designed);
     }
 

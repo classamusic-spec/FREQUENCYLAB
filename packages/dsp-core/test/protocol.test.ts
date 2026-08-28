@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import {
   DSP_VERSION,
   PROTOCOL_SCHEMA_VERSION,
@@ -258,5 +259,22 @@ describe('migration', () => {
     const tone = migrated.stages[0].graph.nodes.find((node) => node.id === 'tone');
     expect(tone?.params.amplitude).toBeDefined();
     expect(validateProtocol(migrated).ok).toBe(true);
+  });
+});
+
+describe('sha256', () => {
+  it('is real SHA-256 at every message length', () => {
+    // Protocol DNA is advertised as "the SHA-256 of the canonical form", which
+    // only means something if another implementation agrees. The padding used
+    // to allocate one block too many when the length was 55 mod 64, so about
+    // one protocol in sixty-four had a fingerprint nothing else could
+    // reproduce — self-consistent, and not SHA-256.
+    const mismatched: number[] = [];
+    for (let length = 0; length <= 200; length++) {
+      const bytes = Buffer.alloc(length, 0x61);
+      const expected = createHash('sha256').update(bytes).digest('hex');
+      if (sha256Hex(bytes.toString('latin1')) !== expected) mismatched.push(length);
+    }
+    expect(mismatched, `lengths that differ: ${mismatched.join(', ')}`).toEqual([]);
   });
 });
