@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -47,9 +47,25 @@ export default function CalibrationScreen() {
   });
   const [playingChannel, setPlayingChannel] = useState<TestChannel | null>(null);
 
+  /*
+   * True once this screen has started a test tone of its own.
+   *
+   * Calibration used to call `stop()` unconditionally — on unmount and on both
+   * buttons — which silently killed whatever the user had playing. Opening
+   * Recalibrate from Profile mid-session ended that session and wrote a
+   * `stoppedByUser` record for it. The screen may only stop playback it owns.
+   */
+  const ownsPlayback = useRef(false);
+
+  const stopOwnPlayback = useCallback(async () => {
+    if (!ownsPlayback.current) return;
+    ownsPlayback.current = false;
+    await stop();
+  }, [stop]);
+
   useEffect(() => {
     return () => {
-      void stop();
+      if (ownsPlayback.current) void stop();
     };
   }, [stop]);
 
@@ -57,6 +73,7 @@ export default function CalibrationScreen() {
     async (channel: TestChannel) => {
       haptics.engage();
       setPlayingChannel(channel);
+      ownsPlayback.current = true;
       await loadAndPlay(testProtocol(channel), { masterGain: level });
     },
     [level, loadAndPlay],
@@ -150,7 +167,7 @@ export default function CalibrationScreen() {
         variant="primary"
         size="lg"
         onPress={async () => {
-          await stop();
+          await stopOwnPlayback();
           await update({
             comfortableOutputLevel: level,
             calibrationCompletedAt: new Date().toISOString(),
@@ -162,7 +179,7 @@ export default function CalibrationScreen() {
         label="Skip for now"
         variant="ghost"
         onPress={async () => {
-          await stop();
+          await stopOwnPlayback();
           router.replace('/');
         }}
       />

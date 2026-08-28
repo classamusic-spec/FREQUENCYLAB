@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import {
@@ -23,6 +23,7 @@ import { ChevronIcon } from '../../src/design/components/Icons';
 import { Label, Text } from '../../src/design/components/Text';
 import { colors, space } from '../../src/design/tokens';
 import * as haptics from '../../src/design/haptics';
+import { confirm, notify } from '../../src/design/dialogs';
 import { useProtocolLibrary } from '../../src/state/library';
 import { useLab } from '../../src/state/lab';
 import { useSessionStart } from '../../src/state/sessionStart';
@@ -91,7 +92,7 @@ export default function ProtocolScreen() {
       haptics.confirm();
       await share(result.uri, 'audio/wav', result.filename);
     } catch (error) {
-      Alert.alert('Export failed', error instanceof Error ? error.message : 'Unknown error.');
+      notify('Export failed', error instanceof Error ? error.message : 'Unknown error.');
     } finally {
       setExporting(false);
     }
@@ -181,7 +182,7 @@ export default function ProtocolScreen() {
             onPress={() => {
               void Clipboard.setStringAsync(encodeDnaString(protocol));
               haptics.confirm();
-              Alert.alert(
+              notify(
                 'Full DNA copied',
                 'This is the complete, lossless form — thousands of characters. For sending to someone, the share code above is the same protocol in one line.',
               );
@@ -337,19 +338,17 @@ export default function ProtocolScreen() {
           label="Delete"
           variant="danger"
           style={styles.actionButton}
-          onPress={() =>
-            Alert.alert('Delete protocol?', `"${protocol.name}" will be removed from this device.`, [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: async () => {
-                  await remove(protocol.id);
-                  router.back();
-                },
-              },
-            ])
-          }
+          onPress={async () => {
+            const agreed = await confirm({
+              title: 'Delete protocol?',
+              message: `"${protocol.name}" will be removed from this device.`,
+              confirmLabel: 'Delete',
+              destructive: true,
+            });
+            if (!agreed) return;
+            await remove(protocol.id);
+            router.back();
+          }}
         />
       </View>
     </Screen>

@@ -188,9 +188,23 @@ export class SessionController implements RenderSource {
     this.emit();
   }
 
+  /**
+   * Guards against a second `play()` while the first is still starting.
+   *
+   * Starting a backend is asynchronous, so two taps a few hundred milliseconds
+   * apart both used to get past a `state === 'playing'` check, and the second
+   * overwrote `this.backend` while the first was still running. The orphan kept
+   * its audio context open with nothing holding a reference to it, so `stop()`
+   * — which disposes only the current backend — could not silence it and the
+   * user was left with audio they had no control over.
+   */
+  private starting: Promise<void> | null = null;
+
   async play(): Promise<void> {
     if (!this.renderer || !this.protocol) return;
     if (this.state === 'playing') return;
+    // A start already in flight: join it rather than racing it.
+    if (this.starting) return this.starting;
 
     if (this.state === 'paused' && this.backend) {
       this.renderer.cancelStopFade();
@@ -201,8 +215,20 @@ export class SessionController implements RenderSource {
       return;
     }
 
+    this.starting = this.startBackend();
+    try {
+      await this.starting;
+    } finally {
+      this.starting = null;
+    }
+  }
+
+  private async startBackend(): Promise<void> {
     this.state = 'preparing';
     this.emit();
+
+    // Nothing may replace a live backend without disposing it first.
+    await this.disposeBackend();
 
     const options = this.backendOptionsForProtocol();
     // Web has no native audio module, but it does have the Web Audio API, so the
@@ -225,6 +251,8 @@ export class SessionController implements RenderSource {
           : error instanceof Error
             ? error.message
             : 'Playback could not start.';
+      // The backend that failed to start may still hold an audio context.
+      await this.disposeBackend();
       this.backend = new NullAudioBackend(reason, options);
       try {
         await this.backend.start(this);
@@ -272,13 +300,24 @@ export class SessionController implements RenderSource {
     await this.teardown(reason);
   }
 
+  /** Disposes the current backend, tolerating a backend that never started. */
+  private async disposeBackend(): Promise<void> {
+    const backend = this.backend;
+    if (!backend) return;
+    this.backend = null;
+    try {
+      await backend.dispose();
+    } catch {
+      // A backend that failed to start may also fail to dispose. Dropping the
+      // reference is what matters; re-throwing here would abort the teardown
+      // and leave the session wedged.
+    }
+  }
+
   private async teardown(reason: StopReason): Promise<void> {
     this.stopTelemetry();
     this.detachSystemListeners();
-    if (this.backend) {
-      await this.backend.dispose();
-      this.backend = null;
-    }
+    await this.disposeBackend();
     this.stopReason = reason;
     this.pendingStop = null;
     this.state = reason === 'completed' ? 'completed' : reason === 'replaced' ? 'idle' : 'idle';

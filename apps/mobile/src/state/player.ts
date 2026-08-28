@@ -22,7 +22,19 @@ interface PlayerState {
   /** Experiment this session belongs to, when it was started from one. */
   experimentContext?: { experimentId: string; assignmentIndex: number };
   /** Session written when playback finished, awaiting a rating. */
-  lastCompletedSessionId?: string;
+  /**
+   * The session record written when playback ended.
+   *
+   * Three states, and the difference matters: `undefined` means the record is
+   * still being written, `null` means playback was too short to record, and a
+   * string is the id to rate. The session screen waits for one of the last two
+   * before navigating — it used to read this the instant the state flipped to
+   * `completed`, which is strictly earlier than the async write resolves, so it
+   * always saw `undefined`, always fell back to `router.back()`, and unmounted
+   * before the id arrived. The rating screen was unreachable from a finished
+   * session, and with it every insight and experiment result that ratings feed.
+   */
+  lastCompletedSessionId?: string | null;
   attach: () => () => void;
   loadAndPlay: (
     protocol: Protocol,
@@ -58,9 +70,11 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       // the session record never happens on the audio thread.
       if (previousState === 'playing' && snapshot.state === 'completed' && !get().recorded) {
         set({ recorded: true });
-        void writeSessionRecord(snapshot, 'completed', get().experimentContext).then((session) => {
-          if (session) set({ lastCompletedSessionId: session.id });
-        });
+        void writeSessionRecord(snapshot, 'completed', get().experimentContext)
+          .then((session) => set({ lastCompletedSessionId: session ? session.id : null }))
+          // A failed write must still resolve the wait, or the session screen
+          // would sit on a finished session with nowhere to go.
+          .catch(() => set({ lastCompletedSessionId: null }));
       }
       previousState = snapshot.state;
     });
@@ -90,7 +104,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     set({ recorded: true });
     await sessionController.stop('user');
     const session = await writeSessionRecord(snapshot, reason, get().experimentContext);
-    if (session) set({ lastCompletedSessionId: session.id });
+    set({ lastCompletedSessionId: session ? session.id : null });
   },
 
   seek: (seconds) => sessionController.seek(seconds),

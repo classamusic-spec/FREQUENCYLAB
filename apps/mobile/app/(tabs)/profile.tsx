@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
@@ -19,6 +19,7 @@ import { SegmentSelector } from '../../src/design/components/SegmentSelector';
 import { Label, Text } from '../../src/design/components/Text';
 import { colors, layout, radius, space } from '../../src/design/tokens';
 import * as haptics from '../../src/design/haptics';
+import { confirm, notify } from '../../src/design/dialogs';
 import { usePreferences } from '../../src/state/preferences';
 import { useHistory } from '../../src/state/history';
 import { useProtocolLibrary } from '../../src/state/library';
@@ -50,7 +51,7 @@ export default function ProfileScreen() {
       const payload = await buildExport(APP_VERSION);
       await Clipboard.setStringAsync(JSON.stringify(payload, null, 2));
       haptics.confirm();
-      Alert.alert(
+      notify(
         'Copied to clipboard',
         'Your complete data — protocols, sessions, ratings, experiments and settings — is now on the clipboard as JSON. Paste it anywhere you like.',
       );
@@ -59,23 +60,18 @@ export default function ProfileScreen() {
     }
   };
 
-  const deleteEverything = () => {
-    Alert.alert(
-      'Delete all data?',
-      'This permanently removes every protocol, session, rating and experiment on this device. It cannot be undone. Export first if you want a copy.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete everything',
-          style: 'destructive',
-          onPress: async () => {
-            await clearAll();
-            haptics.warn();
-            router.replace('/onboarding');
-          },
-        },
-      ],
-    );
+  const deleteEverything = async () => {
+    const agreed = await confirm({
+      title: 'Delete all data?',
+      message:
+        'This permanently removes every protocol, session, rating and experiment on this device. It cannot be undone. Export first if you want a copy.',
+      confirmLabel: 'Delete everything',
+      destructive: true,
+    });
+    if (!agreed) return;
+    await clearAll();
+    haptics.warn();
+    router.replace('/onboarding');
   };
 
   return (

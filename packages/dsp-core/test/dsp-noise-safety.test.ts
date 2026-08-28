@@ -18,6 +18,30 @@ function spectralSlope(signal: Float32Array): number {
 }
 
 describe('noise engine', () => {
+  it('matches every colour to the same loudness, with headroom to spare', () => {
+    // Changing colour must change timbre and not loudness: `NoiseNode` swaps
+    // colour with no smoothing and no re-gain, so a mismatch would arrive as a
+    // step discontinuity in the middle of a session. Brown once ran 20 dB above
+    // pink and peaked at 3.5 — over full scale before any level control.
+    const measured = (['white', 'pink', 'brown'] as const).map((color) => {
+      const source = new NoiseSource(color, 12345);
+      const signal = new Float32Array(SR * 4);
+      for (let i = 0; i < signal.length; i++) signal[i] = source.next();
+      return { color, rms: rms(signal), peak: peak(signal) };
+    });
+
+    const loudest = Math.max(...measured.map((entry) => entry.rms));
+    const quietest = Math.min(...measured.map((entry) => entry.rms));
+    expect(gainToDb(loudest) - gainToDb(quietest), 'colours must be within 1 dB').toBeLessThan(1);
+
+    for (const entry of measured) {
+      // Full scale before the level control has touched it would leave the
+      // limiter doing the work of a gain stage.
+      expect(entry.peak, `${entry.color} peak`).toBeLessThan(1);
+      expect(entry.rms, `${entry.color} is silent`).toBeGreaterThan(0.05);
+    }
+  });
+
   it('generates a flat spectrum for white noise', () => {
     const graph = singleNodeGraph(
       'noise',

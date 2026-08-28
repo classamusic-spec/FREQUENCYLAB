@@ -70,9 +70,17 @@ export default function SessionScreen() {
     };
   }, []);
 
+  // The completion haptic fires as soon as playback ends, independent of the
+  // record being written.
+  useEffect(() => {
+    if (snapshot.state === 'completed') haptics.complete();
+  }, [snapshot.state]);
+
   useEffect(() => {
     if (snapshot.state !== 'completed') return;
-    haptics.complete();
+    // `undefined` means the session record is still being written. Leaving on
+    // that value is what used to skip the rating screen entirely.
+    if (lastCompletedSessionId === undefined) return;
     if (lastCompletedSessionId) router.replace(`/rate/${lastCompletedSessionId}`);
     else router.back();
   }, [lastCompletedSessionId, router, snapshot.state]);

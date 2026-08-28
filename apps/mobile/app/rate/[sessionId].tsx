@@ -32,7 +32,25 @@ export default function RateSessionScreen() {
   const experiments = useExperiments((state) => state.experiments);
 
   const session = sessions.find((candidate) => candidate.id === sessionId);
-  const [ratings, setRatings] = useState<Record<MetricKey, number>>({});
+
+  /*
+   * Ratings already on the session are the base; this screen only layers the
+   * current edits on top of them.
+   *
+   * It used to start from an empty object and write that straight back, so
+   * opening an already-rated session from History showed every metric as "—"
+   * and one tap on Done erased the ratings that were there. Deriving the base
+   * rather than seeding state also means a session that arrives late from
+   * hydration fills in on its own.
+   */
+  const stored = useMemo(() => {
+    const map: Record<MetricKey, number> = {};
+    for (const rating of session?.ratings ?? []) map[rating.metric] = rating.value;
+    return map;
+  }, [session?.ratings]);
+
+  const [edits, setEdits] = useState<Record<MetricKey, number>>({});
+  const ratings = useMemo(() => ({ ...stored, ...edits }), [stored, edits]);
 
   const experiment = useMemo(
     () => experiments.find((candidate) => candidate.id === session?.experimentId),
@@ -60,7 +78,9 @@ export default function RateSessionScreen() {
       metric,
       value,
     }));
-    await rate(session.id, collected);
+    // Writing an empty set over existing ratings would be a silent deletion, so
+    // leaving without rating anything leaves the record alone.
+    if (collected.length > 0) await rate(session.id, collected);
     haptics.confirm();
     router.replace('/');
   };
@@ -129,7 +149,7 @@ export default function RateSessionScreen() {
                   key={value}
                   onPress={() => {
                     haptics.detent();
-                    setRatings((current) => ({ ...current, [metric.key]: value }));
+                    setEdits((current) => ({ ...current, [metric.key]: value }));
                   }}
                   accessibilityRole="button"
                   accessibilityLabel={`${metric.label} ${value} out of 10`}

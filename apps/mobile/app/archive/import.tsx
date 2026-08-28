@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
@@ -16,6 +16,7 @@ import { formatHz } from '../../src/design/components/ArchiveCard';
 import { Label, Text } from '../../src/design/components/Text';
 import { colors, radius, space } from '../../src/design/tokens';
 import { useArchive } from '../../src/state/archive';
+import { notify } from '../../src/design/dialogs';
 
 /**
  * Importing a frequency collection (§17).
@@ -65,7 +66,7 @@ export default function ArchiveImportScreen() {
       setFilename(asset.name ?? 'Imported file');
       if (!title) setTitle(asset.name ?? 'Imported collection');
     } catch {
-      Alert.alert('Could not read that file', 'Open it in a text editor and paste the contents instead.');
+      notify('Could not read that file', 'Open it in a text editor and paste the contents instead.');
     }
   };
 

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   CATEGORY_LABELS,
@@ -20,6 +20,7 @@ import { ArchiveCard } from '../../../src/design/components/ArchiveCard';
 import { Label, Text } from '../../../src/design/components/Text';
 import { colors, radius, space } from '../../../src/design/tokens';
 import { useArchive } from '../../../src/state/archive';
+import { confirm, notify } from '../../../src/design/dialogs';
 import { useProtocolLibrary } from '../../../src/state/library';
 
 const DURATIONS = [
@@ -87,7 +88,7 @@ export default function ArchiveSetScreen() {
 
       const unplayable = stages.filter((stage) => !stage.transform.available);
       if (unplayable.length === stages.length) {
-        Alert.alert(
+        notify(
           'Nothing in this collection can be played',
           'Every value here falls outside what headphones can produce, even after octave division.',
         );
@@ -103,7 +104,7 @@ export default function ArchiveSetScreen() {
 
       const saved = await saveProtocol(protocol);
       if (unplayable.length > 0) {
-        Alert.alert(
+        notify(
           'Some values were left out',
           `${unplayable.length} of ${stages.length} could not be rendered as sound at all and were omitted rather than substituted. They stay in the archive.`,
         );
@@ -220,23 +221,18 @@ export default function ArchiveSetScreen() {
           <HardwareButton
             label="Delete this collection"
             variant="danger"
-            onPress={() =>
-              Alert.alert(
-                'Delete this collection?',
-                `${collection.entryIds.length} imported entries and their provenance will be removed from this device. Protocols already built from them are unaffected.`,
-                [
-                  { text: 'Keep', style: 'cancel' },
-                  {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: () => {
-                      void removeSet(collection.id);
-                      router.back();
-                    },
-                  },
-                ],
-              )
-            }
+            onPress={async () => {
+              const agreed = await confirm({
+                title: 'Delete this collection?',
+                message: `${collection.entryIds.length} imported entries and their provenance will be removed from this device. Protocols already built from them are unaffected.`,
+                confirmLabel: 'Delete',
+                cancelLabel: 'Keep',
+                destructive: true,
+              });
+              if (!agreed) return;
+              await removeSet(collection.id);
+              router.back();
+            }}
           />
         </>
       ) : null}
