@@ -258,3 +258,59 @@ describe('parameter ranges', () => {
     }
   });
 });
+
+describe('phase continuity across a stage boundary', () => {
+  const OUTPUT = 'output';
+  const build = (kind: 'binaural' | 'oscillator'): RoutingGraph => {
+    let graph = emptyGraph();
+    graph = withNode(graph, makeNode('tone', kind));
+    graph = withNode(graph, makeNode(OUTPUT, 'output'));
+    return withConnection(graph, 'tone', OUTPUT);
+  };
+
+  const render = (graph: RenderGraph, frames: number): void => {
+    graph.render(frames, { sampleRate: 48000, blockSize: frames, timeSec: 0 });
+  };
+
+  it('continues the incoming graph a quarter cycle behind the outgoing one', () => {
+    const outgoing = new RenderGraph(build("binaural"), 48000, 4096);
+    const incoming = new RenderGraph(build("binaural"), 48000, 4096);
+    // Leave the outgoing graph somewhere arbitrary in its cycle.
+    render(outgoing, 137);
+
+    incoming.adoptPhasesFrom(outgoing);
+
+    // Both graphs now render the same tone. A quarter cycle apart means the two
+    // are in quadrature: uncorrelated, which is the assumption the equal-power
+    // cross-fade is built on and the whole reason for the offset.
+    render(outgoing, 4096);
+    render(incoming, 4096);
+    let product = 0;
+    let outgoingPower = 0;
+    let incomingPower = 0;
+    for (let i = 0; i < 4096; i++) {
+      product += outgoing.outL[i] * incoming.outL[i];
+      outgoingPower += outgoing.outL[i] * outgoing.outL[i];
+      incomingPower += incoming.outL[i] * incoming.outL[i];
+    }
+    const correlation = product / Math.sqrt(outgoingPower * incomingPower);
+    expect(Math.abs(correlation)).toBeLessThan(0.02);
+  });
+
+  it('leaves a graph alone when the stage rewired its modules', () => {
+    // Lab Mode can change a node's kind between stages. There is no phase to
+    // carry over then, and the incoming graph must simply start from its own.
+    const outgoing = new RenderGraph(build("binaural"), 48000, 4096);
+    const incoming = new RenderGraph(build("oscillator"), 48000, 4096);
+    render(outgoing, 137);
+
+    const before = Float32Array.from(incoming.outL);
+    incoming.adoptPhasesFrom(outgoing);
+    render(incoming, 256);
+
+    const fresh = new RenderGraph(build("oscillator"), 48000, 4096);
+    render(fresh, 256);
+    expect(before.every((value) => value === 0)).toBe(true);
+    for (let i = 0; i < 256; i++) expect(incoming.outL[i]).toBeCloseTo(fresh.outL[i], 6);
+  });
+});

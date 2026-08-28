@@ -50,6 +50,42 @@ export interface SessionRendererOptions {
  * touches the UI. Stage graphs are compiled ahead of the boundary that needs
  * them so a compile never happens inside a render call.
  */
+/**
+ * Time constant for the cross-fade's block statistics, in seconds.
+ *
+ * Long enough that the correction never steps audibly, short enough to follow
+ * the beat between two detuned stages — which is the case that needs it, and
+ * which runs anywhere from a fraction of a hertz to a few hertz. Expressed in
+ * seconds rather than as a per-block coefficient because a fixed coefficient
+ * would silently mean 88 ms at 48 kHz and 265 ms at 16 kHz, and the second is
+ * too slow to see a 0.8 Hz beat at all.
+ */
+const FADE_STATS_TAU_SEC = 0.04;
+
+/*
+ * Bounds on the correction, in amplitude.
+ *
+ * The lower bound can never bind. By AM-GM the cross term is at most the sum of
+ * the two power terms, so the mix is never more than twice the power the
+ * equal-power law was aiming for, and the correction is never below 1/sqrt(2).
+ * Half is belt and braces against a degenerate statistic, not a design choice.
+ *
+ * The upper bound is a real limit and does bind, on two stages that detune
+ * during the fade and drift towards cancellation. It is safe to make it
+ * generous: the correction is above 1 only when the mix is *below* the level
+ * the fade was aiming for, and it restores exactly to that level and no
+ * further, so a large bound can never make anything louder than the stage it is
+ * fading between — it only decides how deep an interference notch gets filled.
+ * Four is where the returns stop: on the Frequency Sweep Demo's exponential
+ * carrier drift, the worst boundary in the shipped set, raising it from 2 to 4
+ * lifts the notch from -8.78 dB to -3.40 dB and going on to 8 buys 0.14 dB
+ * more. What is left there is two detuning tones genuinely interfering, which
+ * is physics rather than a fade law, and no gain the two signals share can
+ * remove it.
+ */
+const MIN_FADE_CORRECTION = 0.5;
+const MAX_FADE_CORRECTION = 4;
+
 export class SessionRenderer {
   readonly sampleRate: number;
   readonly blockSize: number;
@@ -70,6 +106,19 @@ export class SessionRenderer {
   /** Where the stop fade is heading: 0 while stopping, 1 while recovering. */
   private stopFadeTarget = 1;
   private lastStageIndex = -1;
+  /** Stage index whose graph has already adopted the previous stage's phase. */
+  private phaseAdoptedFor = -1;
+  /*
+   * Smoothed block statistics of the two graphs being cross-faded: mean square
+   * of each and their mean product. See `render` for what they are for. Held
+   * across blocks so the correction cannot jitter at the block rate; reset at
+   * the start of every fade.
+   */
+  private fadePrevPower = 0;
+  private fadeCurrentPower = 0;
+  private fadeCovariance = 0;
+  private fadeStatsPrimed = false;
+  private readonly fadeStatsCoefficient: number;
 
   constructor(protocol: Protocol, options: SessionRendererOptions = {}) {
     this.protocol = protocol;
@@ -82,6 +131,8 @@ export class SessionRenderer {
     this.scratchL = new Float32Array(this.blockSize);
     this.scratchR = new Float32Array(this.blockSize);
     this.context = { sampleRate: this.sampleRate, blockSize: this.blockSize, timeSec: 0 };
+    this.fadeStatsCoefficient =
+      1 - Math.exp(-this.blockSize / this.sampleRate / FADE_STATS_TAU_SEC);
 
     if ((options.compile ?? 'lazy') === 'eager') {
       for (let i = 0; i < protocol.stages.length; i++) this.compileStage(i);
@@ -142,6 +193,11 @@ export class SessionRenderer {
     }
     this.master.reset();
     this.lastStageIndex = -1;
+    // A seek can land mid-fade in a stage that already adopted phase, or jump
+    // backwards past one that has; either way the adoption has to happen again
+    // against whatever the graphs hold now.
+    this.phaseAdoptedFor = -1;
+    this.fadeStatsPrimed = false;
   }
 
   reset(): void {
@@ -234,17 +290,37 @@ export class SessionRenderer {
     }
 
     const stageTime = positionSec - current.startSec;
-    this.applyAutomation(current, stageTime);
-    this.context.timeSec = positionSec;
-    current.graph.render(frames, this.context);
-
     const crossfade = current.stage.crossfadeSec;
     const previous = index > 0 ? this.compiled[index - 1] : undefined;
     const crossfading = crossfade > 0 && index > 0 && stageTime < crossfade && previous !== undefined;
 
+    /*
+     * Put the incoming graph's oscillators in a known relationship to the
+     * outgoing one's — a quarter cycle behind — once, before either renders a
+     * sample of this stage.
+     *
+     * Without this the incoming graph starts every oscillator at phase 0 while
+     * the outgoing one sits at whatever `frequency x duration` left it, so the
+     * two meet at an offset that is an accident of the stage length. Measured on
+     * the shipped presets, that accident cost between +3.00 dB and -19.37 dB
+     * across the fade: Calm and Focus bumped, and Meditation's return to alpha
+     * very nearly cancelled itself to silence in the middle of a session.
+     * `adoptPhasesFrom` explains why the answer is a quarter cycle rather than
+     * flush alignment.
+     */
+    if (crossfading && previous && this.phaseAdoptedFor !== index) {
+      current.graph.adoptPhasesFrom(previous.graph);
+      this.phaseAdoptedFor = index;
+      this.fadeStatsPrimed = false;
+    }
+
+    this.applyAutomation(current, stageTime);
+    this.context.timeSec = positionSec;
+    current.graph.render(frames, this.context);
+
     if (crossfading && previous) {
       // The outgoing stage keeps rendering with its automation held at its final
-      // value, so the two graphs are phase-continuous across the boundary.
+      // value, so it stays phase-continuous with itself across the boundary.
       this.applyAutomation(previous, previous.stage.durationSec);
       previous.graph.render(frames, this.context);
     }
@@ -256,13 +332,77 @@ export class SessionRenderer {
     if (crossfading && previous) {
       const prevL = previous.graph.outL;
       const prevR = previous.graph.outR;
+
+      /*
+       * Cross-fade with the correlation measured rather than assumed.
+       *
+       * The sine/cosine law is the right one for two *uncorrelated* signals,
+       * whose powers add. Consecutive stages are usually the same carrier with
+       * a different beat, which is about as correlated as two signals get — and
+       * once phase-aligned above, deliberately so. Their amplitudes add, not
+       * their powers, and sin + cos peaks at sqrt(2): the +3 dB bump measured on
+       * Calm and Focus. Neither law is right in general, because a stage that
+       * sweeps its carrier starts correlated and decorrelates as the fade runs.
+       *
+       * So measure it. With P for mean square and C for the mean product, the
+       * power of the mix is
+       *
+       *   gOut^2 P_prev + gIn^2 P_cur + 2 gIn gOut C
+       *
+       * of which the first two terms are exactly what the equal-power law was
+       * aiming for. Scaling both gains by the square root of their ratio to the
+       * whole removes the third term's contribution, which collapses to the
+       * equal-power law when C is 0 and to a linear-amplitude fade when the two
+       * signals are identical. The correction is bounded either side: it is a
+       * fade law, not a compressor, and a pair of signals that genuinely cancel
+       * cannot be rescued by a gain they share.
+       */
+      let sumPrev = 0;
+      let sumCurrent = 0;
+      let sumProduct = 0;
+      for (let i = 0; i < frames; i++) {
+        sumPrev += prevL[i] * prevL[i] + prevR[i] * prevR[i];
+        sumCurrent += srcL[i] * srcL[i] + srcR[i] * srcR[i];
+        sumProduct += prevL[i] * srcL[i] + prevR[i] * srcR[i];
+      }
+      const inverseFrames = 1 / (2 * frames);
+      const blockPrev = sumPrev * inverseFrames;
+      const blockCurrent = sumCurrent * inverseFrames;
+      const blockProduct = sumProduct * inverseFrames;
+
+      // One-pole across blocks, so the correction tracks a sweep without
+      // stepping at the block rate. Primed from the first block of the fade
+      // rather than from zero, which would otherwise read as silence.
+      if (!this.fadeStatsPrimed) {
+        this.fadePrevPower = blockPrev;
+        this.fadeCurrentPower = blockCurrent;
+        this.fadeCovariance = blockProduct;
+        this.fadeStatsPrimed = true;
+      } else {
+        const a = this.fadeStatsCoefficient;
+        this.fadePrevPower += a * (blockPrev - this.fadePrevPower);
+        this.fadeCurrentPower += a * (blockCurrent - this.fadeCurrentPower);
+        this.fadeCovariance += a * (blockProduct - this.fadeCovariance);
+      }
+
+      const powerPrev = this.fadePrevPower;
+      const powerCurrent = this.fadeCurrentPower;
+      const covariance = this.fadeCovariance;
+
       for (let i = 0; i < frames; i++) {
         const t = clamp((stageTime + i * inverseRate) / crossfade, 0, 1);
-        // Equal-power cross-fade: two uncorrelated signals sum without a dip.
         const gainIn = Math.sin((t * Math.PI) / 2);
         const gainOut = Math.cos((t * Math.PI) / 2);
-        this.scratchL[i] = srcL[i] * gainIn + prevL[i] * gainOut;
-        this.scratchR[i] = srcR[i] * gainIn + prevR[i] * gainOut;
+
+        const uncorrelated = gainOut * gainOut * powerPrev + gainIn * gainIn * powerCurrent;
+        const actual = uncorrelated + 2 * gainIn * gainOut * covariance;
+        const correction =
+          uncorrelated > 0 && actual > 0
+            ? clamp(Math.sqrt(uncorrelated / actual), MIN_FADE_CORRECTION, MAX_FADE_CORRECTION)
+            : 1;
+
+        this.scratchL[i] = (srcL[i] * gainIn + prevL[i] * gainOut) * correction;
+        this.scratchR[i] = (srcR[i] * gainIn + prevR[i] * gainOut) * correction;
       }
     } else {
       this.scratchL.set(srcL.subarray(0, frames));

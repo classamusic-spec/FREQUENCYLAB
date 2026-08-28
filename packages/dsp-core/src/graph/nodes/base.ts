@@ -158,6 +158,31 @@ export abstract class RuntimeNode {
 
   /** Called when playback restarts, so oscillators can re-align phase. */
   reset(): void {}
+
+  /**
+   * Writes this node's oscillator phases, in the normalised 0..1 domain, into
+   * `out`, and returns how many it wrote.
+   *
+   * A stage boundary compiles a fresh graph whose oscillators all start at
+   * phase 0, while the outgoing stage's are wherever `frequency x duration`
+   * happened to leave them. The two signals therefore meet at an offset that is
+   * an accident of the stage length, and a cross-fade between them lands
+   * anywhere between +3 dB and near-total cancellation depending on that
+   * accident. Capturing and re-adopting phase removes the accident.
+   *
+   * `out` is caller-owned and reused, so this allocates nothing. Order is fixed
+   * per node kind and is the only thing `adoptPhases` relies on; a node that
+   * writes nothing simply keeps whatever phase it started with.
+   */
+  capturePhases(_out: Float64Array): number {
+    return 0;
+  }
+
+  /** Adopts the first `count` phases captured from the same node kind. */
+  adoptPhases(_phases: Float64Array, _count: number): void {}
 }
+
+/** Most oscillator phases any one node holds. */
+export const MAX_NODE_PHASES = 4;
 
 const EMPTY = new Float32Array(0);

@@ -200,6 +200,68 @@ describe('stage transitions', () => {
     expect(ratio).toBeGreaterThan(0.75);
     expect(ratio).toBeLessThan(1.3);
   });
+
+  /*
+   * The two tests above pass against a cross-fade that swings +3 dB in the
+   * middle, because they average over two whole seconds and a fade artefact
+   * lasts a fraction of that. This one looks at the level in 50 ms windows,
+   * which is the timescale you actually hear.
+   *
+   * It sweeps the first stage's duration on purpose. The two stages hold the
+   * same carrier, so what changes with duration is only where the outgoing
+   * oscillators happen to be when the incoming ones start. That used to decide
+   * everything: the incoming graph began every oscillator at phase zero, so the
+   * two met at an offset that was an accident of the stage length, and the
+   * shipped presets landed anywhere from +3.00 dB (Calm, Focus) to -19.37 dB
+   * (Meditation's return to alpha, a near-total dropout mid-session). A fade
+   * between two stages must not depend on how long the first one ran.
+   */
+  const boundaryLevelSpreadDb = (firstStageSec: number): number => {
+    const stage = (id: string, name: string, durationSec: number, crossfadeSec: number) =>
+      buildStage({
+        id,
+        name,
+        durationSec,
+        engine: 'binaural',
+        carrierHz: 220,
+        beatHz: 8,
+        amplitude: 0.36,
+        crossfadeSec,
+      });
+    const protocol = createProtocol({
+      id: 'fade-probe',
+      name: 'Fade probe',
+      intent: 'explore',
+      createdAt: FIXED_DATE,
+      generatedBy: 'preset',
+      // No session fade, so the only level shape in the window is the one the
+      // cross-fade puts there.
+      master: { fadeInSec: 0, fadeOutSec: 0 },
+      stages: [stage('a', 'A', firstStageSec, 0), stage('b', 'B', 12, 4)],
+    });
+
+    const rendered = renderProtocolOffline(protocol, { sampleRate: SR });
+    const window = Math.round(SR * 0.05);
+    let quietest = Infinity;
+    let loudest = 0;
+    // The whole fade, plus a second either side for a reference level.
+    const from = Math.round((firstStageSec - 1) * SR);
+    const to = Math.round((firstStageSec + 5) * SR);
+    for (let i = from; i + window <= to; i += window) {
+      const level = rms(rendered.left.subarray(i, i + window));
+      if (level < quietest) quietest = level;
+      if (level > loudest) loudest = level;
+    }
+    return 20 * Math.log10(loudest / quietest);
+  };
+
+  it('holds its level through the fade whatever phase the stages meet at', () => {
+    // Fractional seconds so the 220 Hz carrier lands somewhere different in its
+    // cycle each time, which is exactly what used to vary the outcome.
+    for (const durationSec of [20, 20.13, 20.37, 20.61, 20.89]) {
+      expect(boundaryLevelSpreadDb(durationSec), `${durationSec}s first stage`).toBeLessThan(0.5);
+    }
+  });
 });
 
 describe('session fades', () => {

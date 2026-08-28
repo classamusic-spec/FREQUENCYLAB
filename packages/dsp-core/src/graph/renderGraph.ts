@@ -1,5 +1,5 @@
 import { createRuntimeNode } from './factory.js';
-import type { RuntimeNode, RenderContext } from './nodes/base.js';
+import { MAX_NODE_PHASES, type RuntimeNode, type RenderContext } from './nodes/base.js';
 import { reachableFromOutput, topologicalOrder, validateGraph } from './validate.js';
 import { OUTPUT_NODE_ID, parseParamAddress, type RoutingGraph } from './types.js';
 
@@ -15,6 +15,8 @@ export class RenderGraph {
   private readonly order: RuntimeNode[] = [];
   private readonly sources = new Map<string, RuntimeNode[]>();
   private readonly output: RuntimeNode;
+  /** Reused by `adoptPhasesFrom`, so a stage boundary allocates nothing. */
+  private readonly phaseScratch = new Float64Array(MAX_NODE_PHASES);
 
   readonly sampleRate: number;
   readonly blockSize: number;
@@ -98,6 +100,43 @@ export class RenderGraph {
   /** Re-aligns every oscillator phase. Only valid before the first block. */
   resetPhases(): void {
     for (const node of this.order) node.reset();
+  }
+
+  /**
+   * Continues this graph's oscillators from where `previous` left off, a quarter
+   * cycle behind.
+   *
+   * Called once, at the first block of a cross-fading stage, before either graph
+   * renders. Only nodes that match by id *and* kind adopt anything, so a Lab
+   * Mode graph that rewires its modules between stages simply has nothing to
+   * match and starts from its own phase as before.
+   *
+   * The quarter turn is the point of the exercise. An equal-power cross-fade is
+   * the correct law for two *uncorrelated* signals, and two copies of the same
+   * tone a quarter cycle apart are exactly that: their correlation is zero, so
+   * sin/cos becomes right by construction rather than by luck. Aligning them
+   * flush instead would make them correlated, which sums their amplitudes and
+   * costs +3 dB in the middle of every fade; leaving them where they fell — the
+   * behaviour this replaces — put them at an offset nobody chose, which on the
+   * shipped Meditation preset happened to be near anti-phase and dropped the
+   * session to -19.4 dB mid-fade.
+   *
+   * Quadrature is also the safest place to start when the two stages are
+   * *detuned* and the offset will not stay put: it is the furthest a phase
+   * relationship can be from both the +3 dB sum and the null it drifts towards.
+   */
+  adoptPhasesFrom(previous: RenderGraph): void {
+    for (const [id, node] of this.nodes) {
+      const source = previous.getNode(id);
+      if (!source || source.kind !== node.kind) continue;
+      const count = source.capturePhases(this.phaseScratch);
+      if (count === 0) continue;
+      for (let i = 0; i < count; i++) {
+        // wrapUnit is in the phasor; a value of 1.25 is re-wrapped on adoption.
+        this.phaseScratch[i] += 0.25;
+      }
+      node.adoptPhases(this.phaseScratch, count);
+    }
   }
 
   /** Renders one block. Result is left in `outL` / `outR`. */

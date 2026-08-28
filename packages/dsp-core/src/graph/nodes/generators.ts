@@ -41,6 +41,15 @@ export class OscillatorNode extends RuntimeNode {
     this.phasor.resetPhase(this.raw.get('phase') ?? 0);
   }
 
+  override capturePhases(out: Float64Array): number {
+    out[0] = this.phasor.value;
+    return 1;
+  }
+
+  override adoptPhases(phases: Float64Array, count: number): void {
+    if (count >= 1) this.phasor.resetPhase(phases[0]);
+  }
+
   render(frames: number, _ctx: RenderContext): void {
     const waveform = this.getOption('waveform', 'sine') as Waveform;
     const frequency = this.smoother('frequency');
@@ -91,6 +100,18 @@ export class BinauralNode extends RuntimeNode {
     const phase = this.raw.get('phase') ?? 0;
     this.leftPhasor.resetPhase(phase);
     this.rightPhasor.resetPhase(phase);
+  }
+
+  override capturePhases(out: Float64Array): number {
+    out[0] = this.leftPhasor.value;
+    out[1] = this.rightPhasor.value;
+    return 2;
+  }
+
+  override adoptPhases(phases: Float64Array, count: number): void {
+    if (count < 2) return;
+    this.leftPhasor.resetPhase(phases[0]);
+    this.rightPhasor.resetPhase(phases[1]);
   }
 
   /** Left and right tone frequencies for the current smoothed parameters. */
@@ -164,6 +185,18 @@ export class MonauralNode extends RuntimeNode {
     this.phasorB.resetPhase(0);
   }
 
+  override capturePhases(out: Float64Array): number {
+    out[0] = this.phasorA.value;
+    out[1] = this.phasorB.value;
+    return 2;
+  }
+
+  override adoptPhases(phases: Float64Array, count: number): void {
+    if (count < 2) return;
+    this.phasorA.resetPhase(phases[0]);
+    this.phasorB.resetPhase(phases[1]);
+  }
+
   render(frames: number, _ctx: RenderContext): void {
     const waveform = this.getOption('waveform', 'sine') as Waveform;
     const carrier = this.smoother('carrier');
@@ -206,6 +239,18 @@ export class IsochronicNode extends RuntimeNode {
   override reset(): void {
     this.carrierPhasor.resetPhase(0);
     this.pulsePhasor.resetPhase(0);
+  }
+
+  override capturePhases(out: Float64Array): number {
+    out[0] = this.carrierPhasor.value;
+    out[1] = this.pulsePhasor.value;
+    return 2;
+  }
+
+  override adoptPhases(phases: Float64Array, count: number): void {
+    if (count < 2) return;
+    this.carrierPhasor.resetPhase(phases[0]);
+    this.pulsePhasor.resetPhase(phases[1]);
   }
 
   render(frames: number, _ctx: RenderContext): void {
@@ -262,6 +307,18 @@ export class AmNode extends RuntimeNode {
     this.modPhasor.resetPhase(0);
   }
 
+  override capturePhases(out: Float64Array): number {
+    out[0] = this.carrierPhasor.value;
+    out[1] = this.modPhasor.value;
+    return 2;
+  }
+
+  override adoptPhases(phases: Float64Array, count: number): void {
+    if (count < 2) return;
+    this.carrierPhasor.resetPhase(phases[0]);
+    this.modPhasor.resetPhase(phases[1]);
+  }
+
   render(frames: number, _ctx: RenderContext): void {
     const waveform = this.getOption('waveform', 'sine') as Waveform;
     const shape = this.getOption('envelope', 'sine') as EnvelopeShape;
@@ -312,6 +369,18 @@ export class FmNode extends RuntimeNode {
     this.modPhasor.resetPhase(0);
   }
 
+  override capturePhases(out: Float64Array): number {
+    out[0] = this.carrierPhasor.value;
+    out[1] = this.modPhasor.value;
+    return 2;
+  }
+
+  override adoptPhases(phases: Float64Array, count: number): void {
+    if (count < 2) return;
+    this.carrierPhasor.resetPhase(phases[0]);
+    this.modPhasor.resetPhase(phases[1]);
+  }
+
   render(frames: number, _ctx: RenderContext): void {
     const waveform = this.getOption('waveform', 'sine') as Waveform;
     const carrier = this.smoother('carrier');
@@ -353,6 +422,15 @@ export class HarmonicNode extends RuntimeNode {
 
   override reset(): void {
     this.stack.resetPhase(0);
+  }
+
+  override capturePhases(out: Float64Array): number {
+    out[0] = this.stack.phase;
+    return 1;
+  }
+
+  override adoptPhases(phases: Float64Array, count: number): void {
+    if (count >= 1) this.stack.resetPhase(phases[0]);
   }
 
   render(frames: number, _ctx: RenderContext): void {

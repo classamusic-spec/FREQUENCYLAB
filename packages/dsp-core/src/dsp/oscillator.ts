@@ -177,6 +177,11 @@ export class HarmonicOscillator {
     this.phasor.resetPhase(normalisedPhase);
   }
 
+  /** Fundamental phase in the normalised 0..1 domain. */
+  get phase(): number {
+    return this.phasor.value;
+  }
+
   /** Sum of all audible partials, normalised so the stack cannot exceed unity. */
   next(fundamental: number): number {
     const t = this.phasor.advance(fundamental);
