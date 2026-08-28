@@ -206,4 +206,95 @@ describe('master limiter', () => {
     // The 2:1 level ratio between the channels must survive.
     expect(rms(left, SR * 0.2) / rms(right, SR * 0.2)).toBeCloseTo(2, 1);
   });
+
+  /**
+   * Single-bin DFT. The segment must span a whole number of cycles of `hz`, or
+   * spectral leakage from the fundamental swamps the harmonics being measured.
+   */
+  const bin = (x: Float32Array, from: number, length: number, hz: number): number => {
+    let re = 0;
+    let im = 0;
+    const w = (2 * Math.PI * hz) / SR;
+    for (let n = 0; n < length; n++) {
+      re += x[from + n] * Math.cos(w * n);
+      im -= x[from + n] * Math.sin(w * n);
+    }
+    return (2 * Math.hypot(re, im)) / length;
+  };
+
+  /** Total harmonic distortion of a tone at `hz`, as a fraction of fundamental. */
+  const thd = (x: Float32Array, from: number, length: number, hz: number): number => {
+    const fundamental = bin(x, from, length, hz);
+    let harmonics = 0;
+    for (let k = 2; k * hz < SR / 2 && k <= 12; k++) {
+      const a = bin(x, from, length, k * hz);
+      harmonics += a * a;
+    }
+    return fundamental > 0 ? Math.sqrt(harmonics) / fundamental : 0;
+  };
+
+  /*
+   * The three tests below are the ones that would have caught the detector this
+   * stage used to have. Every other test here asserts the ceiling holds — and it
+   * did hold, by clipping: the follower read the instantaneous input while the
+   * output read a sample one lookahead older, so the gain was derived from audio
+   * several cycles in the sample's future, the product overshot, and the safety
+   * net below did the real limiting. A ceiling assertion cannot tell limiting
+   * from clipping. These can.
+   */
+
+  it('limits without ever falling back on the clipper', () => {
+    // The old detector clipped 3,248 samples per second here at unity and
+    // 11,974 at 2.0, all while passing the ceiling assertions above.
+    for (const hz of [40, 220, 1000]) {
+      for (const amplitude of [1, 1.2, 2, 4, 10]) {
+        const limiter = new StereoLimiter(SR, { ceilingDb: -1 });
+        const left = new Float32Array(SR);
+        const right = new Float32Array(SR);
+        for (let i = 0; i < SR; i++) {
+          const value = Math.sin((2 * Math.PI * hz * i) / SR) * amplitude;
+          left[i] = value;
+          right[i] = value;
+        }
+        limiter.process(left, right, SR);
+        expect(limiter.readClipEvents(), `${hz} Hz at ${amplitude}`).toBe(0);
+      }
+    }
+  });
+
+  it('adds no audible harmonics to a tone it is holding down', () => {
+    const limiter = new StereoLimiter(SR, { ceilingDb: -1 });
+    const hz = 200;
+    const left = new Float32Array(SR);
+    const right = new Float32Array(SR);
+    for (let i = 0; i < SR; i++) {
+      const value = Math.sin((2 * Math.PI * hz * i) / SR) * 4;
+      left[i] = value;
+      right[i] = value;
+    }
+    limiter.process(left, right, SR);
+    // Second half only, so attack and release have both settled; a whole number
+    // of cycles so the bins are clean.
+    const from = SR / 2;
+    const length = Math.round((Math.floor((SR / 2 / SR) * hz) * SR) / hz);
+    expect(thd(left, from, length, hz)).toBeLessThan(0.0001);
+  });
+
+  it('holds an isolated spike without clipping the bed it sits on', () => {
+    const limiter = new StereoLimiter(SR, { ceilingDb: -1 });
+    const left = new Float32Array(SR);
+    const right = new Float32Array(SR);
+    for (let i = 0; i < SR; i++) {
+      const value = Math.sin((2 * Math.PI * 100 * i) / SR) * 0.1;
+      left[i] = value;
+      right[i] = value;
+    }
+    // One sample, 4x over full scale, with nothing around it: the case the
+    // lookahead exists for and the one an envelope follower cannot catch.
+    left[SR / 2] = 4;
+    right[SR / 2] = 4;
+    limiter.process(left, right, SR);
+    expect(gainToDb(peak(left))).toBeLessThanOrEqual(-1 + 1e-6);
+    expect(limiter.readClipEvents()).toBe(0);
+  });
 });
