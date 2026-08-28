@@ -9,6 +9,7 @@ import {
   binauralFrequencies,
   formatClock,
   formatHz,
+  protocolFromExplorer,
   protocolDna,
   type NoiseColor,
   type ParamDescriptor,
@@ -47,7 +48,6 @@ export default function ExploreScreen() {
   const router = useRouter();
   const recipe = useExplorer((state) => state.recipe);
   const setRecipe = useExplorer((state) => state.set);
-  const toProtocol = useExplorer((state) => state.toProtocol);
   const requestStart = useSessionStart((state) => state.request);
   const snapshot = usePlayer((state) => state.snapshot);
   const stop = usePlayer((state) => state.stop);
@@ -66,7 +66,15 @@ export default function ExploreScreen() {
     [recipe.binauralMode, recipe.beatHz, recipe.carrierHz],
   );
 
-  const protocol = useMemo(() => toProtocol('explorer-preview'), [toProtocol]);
+  // Built from the recipe directly rather than through the store action. The
+  // action has a stable identity, so a memo keyed on it never recomputed: the
+  // displayed identity froze at whatever the recipe was on first render while
+  // the duration caption beside it kept updating, and the two disagreed on the
+  // same line. Compiling here makes the dependency real.
+  const protocol = useMemo(
+    () => protocolFromExplorer(recipe, { id: 'explorer-preview' }),
+    [recipe],
+  );
   const dna = protocolDna(protocol);
 
   const restart = useCallback(async () => {
@@ -148,42 +156,80 @@ export default function ExploreScreen() {
         )}
       </View>
 
+      {/* What is actually being generated depends on the engine. The binaural
+          reading — two detuned tones, one per ear — is false for monaural and
+          isochronic, which put the same signal in both ears, so each engine
+          states its own case rather than sharing one that is wrong for two of
+          the three. */}
       <InstrumentPanel tone="recessed" label="What is being generated">
-        <View style={styles.channelRow}>
-          <PrecisionValueDisplay
-            plate
-            size="sm"
-            label="Left"
-            value={channels.left}
-            unit="Hz"
-            precision={2}
-            integerDigits={3}
-          />
-          <PrecisionValueDisplay
-            plate
-            size="sm"
-            label="Right"
-            value={channels.right}
-            unit="Hz"
-            precision={2}
-            integerDigits={3}
-          />
-          <PrecisionValueDisplay
-            plate
-            size="sm"
-            label="Difference"
-            value={recipe.beatHz}
-            unit="Hz"
-            precision={2}
-            tone="signal"
-          />
-        </View>
-        <PanelDivider />
-        <Text variant="caption" tone="tertiary">
-          Your headphones are producing two tones near {Math.round(recipe.carrierHz)} Hz — not a{' '}
-          {formatHz(recipe.beatHz, 1, 2)} Hz sound. The beat is what you perceive when the two
-          combine; no speaker in the world reproduces {formatHz(recipe.beatHz, 1, 2)} Hz.
-        </Text>
+        {recipe.engine === 'binaural' ? (
+          <>
+            <View style={styles.channelRow}>
+              <PrecisionValueDisplay
+                plate
+                size="sm"
+                label="Left"
+                value={channels.left}
+                unit="Hz"
+                precision={2}
+                integerDigits={3}
+              />
+              <PrecisionValueDisplay
+                plate
+                size="sm"
+                label="Right"
+                value={channels.right}
+                unit="Hz"
+                precision={2}
+                integerDigits={3}
+              />
+              <PrecisionValueDisplay
+                plate
+                size="sm"
+                label="Difference"
+                value={recipe.beatHz}
+                unit="Hz"
+                precision={2}
+                tone="signal"
+              />
+            </View>
+            <PanelDivider />
+            <Text variant="caption" tone="tertiary">
+              Your headphones are producing two tones near {Math.round(recipe.carrierHz)} Hz — not
+              a {formatHz(recipe.beatHz, 1, 2)} Hz sound. The beat is what you perceive when the
+              two combine; no speaker in the world reproduces {formatHz(recipe.beatHz, 1, 2)} Hz.
+            </Text>
+          </>
+        ) : (
+          <>
+            <View style={styles.channelRow}>
+              <PrecisionValueDisplay
+                plate
+                size="sm"
+                label="Carrier"
+                value={recipe.carrierHz}
+                unit="Hz"
+                precision={2}
+                integerDigits={3}
+              />
+              <PrecisionValueDisplay
+                plate
+                size="sm"
+                label={recipe.engine === 'isochronic' ? 'Pulse rate' : 'Beat rate'}
+                value={recipe.beatHz}
+                unit="Hz"
+                precision={2}
+                tone="signal"
+              />
+            </View>
+            <PanelDivider />
+            <Text variant="caption" tone="tertiary">
+              {recipe.engine === 'isochronic'
+                ? `Both ears get the same ${Math.round(recipe.carrierHz)} Hz tone, switched on and off ${formatHz(recipe.beatHz, 1, 2)} times a second. The pulse is physically in the sound, so this works on speakers as well as headphones.`
+                : `Both ears get the same signal: two tones summed before they reach you, beating at ${formatHz(recipe.beatHz, 1, 2)} Hz. That beat is physically present in the air, so this works on speakers as well as headphones.`}
+            </Text>
+          </>
+        )}
       </InstrumentPanel>
 
       <SectionHeader label="Engine" />

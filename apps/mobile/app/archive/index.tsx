@@ -19,6 +19,17 @@ import { Label, Text } from '../../src/design/components/Text';
 import { colors, radius, space } from '../../src/design/tokens';
 import { useArchive } from '../../src/state/archive';
 
+/**
+ * Whether the scope notice has been offered in this app session.
+ *
+ * Deliberately module state rather than a ref: pushing the modal can unmount
+ * this screen, so a ref would reset on the way back and re-push immediately —
+ * the loop this guards against. Reset when the process restarts, which is the
+ * right granularity for a once-per-install notice that is also always one tap
+ * away in the header.
+ */
+let scopeOffered = false;
+
 const FILTERS: { value: ArchiveCategory | 'all' | 'saved'; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'saved', label: 'Saved' },
@@ -57,8 +68,20 @@ export default function ArchiveScreen() {
     if (!hydrated) void hydrate();
   }, [hydrate, hydrated]);
 
+  /*
+   * The scope notice is shown once, before the first entry.
+   *
+   * Pushed at most once per visit: `/archive/scope` is a dismissible modal, so
+   * a swipe-down or a hardware back returned here and this effect pushed it
+   * straight back, which is indistinguishable from a frozen app. Someone who
+   * dismisses it without acknowledging gets the archive anyway — the notice is
+   * still one tap away in the header, and trapping a user is a worse outcome
+   * than their reading it later.
+   */
   useEffect(() => {
-    if (hydrated && !acknowledgedAt) router.push('/archive/scope');
+    if (!hydrated || acknowledgedAt || scopeOffered) return;
+    scopeOffered = true;
+    router.push('/archive/scope');
   }, [acknowledgedAt, hydrated, router]);
 
   const entries = useArchive((state) => state.all)();

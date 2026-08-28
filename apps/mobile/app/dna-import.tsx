@@ -63,6 +63,10 @@ type Parsed =
 function interpret(text: string): Parsed {
   const trimmed = text.trim();
   if (trimmed.length === 0) return { kind: 'none' };
+  // Nothing shorter than the smallest meaningful code can be judged yet.
+  // Reporting "cannot open this" on the first character typed is noise, not
+  // feedback — the shortest valid code is about a dozen characters.
+  if (trimmed.length < 12) return { kind: 'none' };
 
   if (/^FLX\d*\./i.test(trimmed)) {
     const result = decodeDnaString(trimmed);

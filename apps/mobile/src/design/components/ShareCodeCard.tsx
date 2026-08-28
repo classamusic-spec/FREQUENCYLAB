@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { describeShareCode, encodeShareCode, type Protocol } from '@frequencylab/dsp-core';
@@ -29,14 +29,28 @@ export interface ShareCodeCardProps {
  */
 export function ShareCodeCard({ protocol, onShareFile }: ShareCodeCardProps) {
   const [copied, setCopied] = useState(false);
-  const code = encodeShareCode(protocol);
+  // Encoding runs a full parse-and-hash round trip to verify itself, so it is
+  // keyed on the protocol rather than repeated on every unrelated re-render of
+  // the screen (export progress, stage selection, this card's own state).
+  const code = useMemo(() => encodeShareCode(protocol), [protocol]);
+
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (resetTimer.current) clearTimeout(resetTimer.current);
+    },
+    [],
+  );
 
   const copy = () => {
     if (!code) return;
     haptics.confirm();
     void Clipboard.setStringAsync(code);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    // Cleared on unmount: copying and navigating straight away would otherwise
+    // set state on a component that is gone.
+    if (resetTimer.current) clearTimeout(resetTimer.current);
+    resetTimer.current = setTimeout(() => setCopied(false), 2000);
   };
 
   if (!code) {
