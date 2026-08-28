@@ -6,16 +6,23 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius, space } from '../../src/design/tokens';
 import { LIGHT, SURFACES } from '../../src/design/materials';
 import { Label, Text } from '../../src/design/components/Text';
+import {
+  DialIcon,
+  FlaskIcon,
+  PersonIcon,
+  PulseIcon,
+  WaveformIcon,
+} from '../../src/design/components/Icons';
 import * as haptics from '../../src/design/haptics';
 import { usePlayer } from '../../src/state/player';
 import { usePreferences } from '../../src/state/preferences';
 
 const TABS = [
-  { name: 'index', label: 'Home', route: '/' },
-  { name: 'explore', label: 'Explore', route: '/explore' },
-  { name: 'lab', label: 'Lab', route: '/lab' },
-  { name: 'experiments', label: 'Trials', route: '/experiments' },
-  { name: 'profile', label: 'Profile', route: '/profile' },
+  { name: 'index', label: 'Player', route: '/', Icon: WaveformIcon },
+  { name: 'explore', label: 'Explore', route: '/explore', Icon: DialIcon },
+  { name: 'lab', label: 'Lab', route: '/lab', Icon: FlaskIcon },
+  { name: 'experiments', label: 'Trials', route: '/experiments', Icon: PulseIcon },
+  { name: 'profile', label: 'Profile', route: '/profile', Icon: PersonIcon },
 ] as const;
 
 export default function TabsLayout() {
@@ -106,8 +113,10 @@ function InstrumentTabBar({ activeIndex }: { activeIndex: number }) {
               }}
               style={styles.tab}
             >
-              <View style={[styles.tabIndicator, active ? styles.tabIndicatorActive : null]} />
-              <Text variant="label" uppercase tone={active ? 'primary' : 'tertiary'}>
+              <View style={active ? styles.tabIconActive : styles.tabIcon}>
+                <tab.Icon color={active ? colors.signal : colors.textTertiary} />
+              </View>
+              <Text variant="label" tone={active ? 'signal' : 'tertiary'}>
                 {tab.label}
               </Text>
             </Pressable>
@@ -152,21 +161,29 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: space.sm,
-    gap: space.xs,
-    minHeight: 48,
+    paddingVertical: space.xs,
+    gap: 3,
+    minHeight: 52,
   },
-  tabIndicator: {
-    width: 18,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: 'transparent',
+  tabIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 40,
+    height: 26,
+    borderRadius: radius.pill,
   },
-  tabIndicatorActive: {
-    backgroundColor: colors.signal,
+  // The active glyph sits in a lit ring, the way the reference bar marks its
+  // engaged control — a glow, not a filled pill, so the bar stays porcelain.
+  tabIconActive: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 40,
+    height: 26,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(59,139,245,0.10)',
     shadowColor: colors.signal,
-    shadowOpacity: 0.7,
-    shadowRadius: 5,
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
     shadowOffset: { width: 0, height: 0 },
   },
   transport: {

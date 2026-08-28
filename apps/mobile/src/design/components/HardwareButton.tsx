@@ -134,14 +134,13 @@ export function HardwareButton({
           tone={
             inactive
               ? 'disabled'
-              : variant === 'primary'
-                ? 'primary'
-                : variant === 'danger'
-                  ? 'limit'
-                  : selected
-                    ? 'signal'
-                    : 'secondary'
+              : variant === 'danger'
+                ? 'limit'
+                : selected
+                  ? 'signal'
+                  : 'secondary'
           }
+          style={variant === 'primary' && !inactive ? styles.primaryLabel : undefined}
         >
           {loading ? 'Working' : label}
         </Text>
@@ -159,19 +158,19 @@ const SIZE_STYLE: Record<ButtonSize, ViewStyle> = {
 const VARIANT_STYLE: Record<ButtonVariant, ViewStyle> = {
   primary: {
     borderTopColor: 'rgba(255,255,255,0.55)',
-    borderBottomColor: 'rgba(8,86,78,0.55)',
+    borderBottomColor: 'rgba(24,86,168,0.55)',
   },
   secondary: {
     borderTopColor: 'rgba(255,255,255,0.95)',
-    borderBottomColor: 'rgba(83,95,112,0.32)',
+    borderBottomColor: 'rgba(122,136,158,0.26)',
   },
   ghost: {
     borderTopColor: 'rgba(255,255,255,0.7)',
-    borderBottomColor: 'rgba(83,95,112,0.20)',
+    borderBottomColor: 'rgba(122,136,158,0.16)',
   },
   danger: {
     borderTopColor: 'rgba(255,255,255,0.85)',
-    borderBottomColor: 'rgba(140,52,42,0.40)',
+    borderBottomColor: 'rgba(178,52,56,0.35)',
   },
 };
 
@@ -181,18 +180,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: space.sm,
-    borderRadius: radius.control,
+    borderRadius: radius.pill,
     overflow: 'hidden',
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    shadowColor: '#1D2430',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#33486A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 8,
     elevation: 3,
   },
   capLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  primaryLabel: { color: '#FFFFFF' },
   selected: {
     borderTopColor: colors.signal,
-    borderBottomColor: 'rgba(14,158,143,0.4)',
+    borderBottomColor: 'rgba(59,139,245,0.4)',
   },
   disabled: {
     opacity: 0.45,

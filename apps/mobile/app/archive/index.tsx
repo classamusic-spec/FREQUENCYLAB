@@ -214,12 +214,14 @@ export default function ArchiveScreen() {
       )}
 
       {userEntries.length === 0 && userSets.length === 0 ? (
-        <InstrumentPanel tone="recessed" label="Why so few Rife entries">
+        <InstrumentPanel tone="recessed" label="How the Rife material is held">
           <Text variant="bodySm" tone="secondary">
-            The published Rife frequency lists circulating today cannot be traced to a verifiable
-            primary document. Rather than print numbers with citations attached to them that would
-            not survive checking, this archive ships only what it can source — and gives you an
-            import path that records exactly where your own list came from.
+            Every number here is attributed to the era it is actually traceable to. The famous
+            audio values (727/728, 784, 880, 2008, 2128) are documented to the 1950s Crane-era
+            AZ-58 device — not to Rife&apos;s 1930s laboratory, whose papers record only radio
+            frequencies. The modern condition-to-frequency compilations (CAFL, ETDFL) cannot be
+            traced past their compilers, so they do not ship; import your own copy and it keeps
+            its own honest provenance.
           </Text>
         </InstrumentPanel>
       ) : null}

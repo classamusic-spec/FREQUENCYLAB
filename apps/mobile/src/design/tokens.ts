@@ -16,44 +16,43 @@ import { Platform, type TextStyle } from 'react-native';
  */
 
 const palette = {
-  // The instrument's case. A cool anodised light grey, stepped by real
-  // luminance so raised and recessed forms separate without any hue shift.
-  void: '#DDE2E9',
-  chassis: '#E6EAF0',
-  panelRecessed: '#D3D9E2',
-  panel: '#F4F6FA',
-  panelRaised: '#FBFCFE',
+  // The instrument's case. Porcelain white with a cool undertone, stepped by
+  // real luminance so raised and recessed forms separate without any hue shift.
+  void: '#EEF1F5',
+  chassis: '#F4F6F9',
+  panelRecessed: '#E6EAF0',
+  panel: '#FDFDFE',
+  panelRaised: '#FFFFFF',
   panelHigh: '#FFFFFF',
-  bezel: '#2B323C',
+  bezel: '#DCE1E8',
 
-  // Ink is engraved into metal, so it is near-black rather than pure black —
-  // a cut in aluminium never reads as ink on paper.
-  inkPrimary: '#141920',
-  inkSecondary: '#525C6A',
-  inkTertiary: '#7D8794',
-  inkDisabled: '#A8B0BC',
+  // Ink is printed onto porcelain, so it is near-black rather than pure black.
+  inkPrimary: '#171B21',
+  inkSecondary: '#5C6675',
+  inkTertiary: '#8B95A2',
+  inkDisabled: '#B9C1CC',
 
-  /** The single illumination colour, on the chassis. */
-  signal: '#0E9E8F',
-  signalDim: '#7FBFB7',
-  signalGlow: 'rgba(14, 158, 143, 0.18)',
+  /** The single illumination colour: instrument blue. */
+  signal: '#3B8BF5',
+  signalDim: '#A7C9F7',
+  signalGlow: 'rgba(59, 139, 245, 0.22)',
 
-  // Display glass and the light emitted through it. Readouts live here, and
-  // this is the one place the interface is genuinely dark.
-  display: '#0B0F14',
-  displayDeep: '#070A0E',
-  displayInk: '#E9F6F3',
-  displaySignal: '#35D6C4',
-  displayDim: 'rgba(233, 246, 243, 0.34)',
+  // Display wells. The readout areas are recessed porcelain now, not dark
+  // glass: values are printed in ink and lit in signal blue.
+  display: '#F1F4F8',
+  displayDeep: '#EAEEF3',
+  displayInk: '#171B21',
+  displaySignal: '#2E7FE8',
+  displayDim: 'rgba(23, 27, 33, 0.38)',
 
-  warning: '#C97A1E',
-  limit: '#C4483A',
-  experiment: '#A8517A',
-  evidenceStrong: '#0E9E8F',
-  evidencePromising: '#3D7EA6',
-  evidenceLimited: '#9A8340',
-  evidenceTraditional: '#6F6A82',
-  evidenceUnsupported: '#C4483A',
+  warning: '#D98600',
+  limit: '#E5484D',
+  experiment: '#8B5CF6',
+  evidenceStrong: '#1E9E6A',
+  evidencePromising: '#3B8BF5',
+  evidenceLimited: '#B98900',
+  evidenceTraditional: '#7A7594',
+  evidenceUnsupported: '#E5484D',
 } as const;
 
 export const colors = {
@@ -68,12 +67,12 @@ export const colors = {
   /** Top edge of a raised form, catching the light. */
   edgeLight: 'rgba(255, 255, 255, 0.95)',
   /** Underside of a raised form, in its own shadow. */
-  edgeDark: 'rgba(83, 95, 112, 0.28)',
-  hairline: 'rgba(90, 102, 120, 0.14)',
-  hairlineStrong: 'rgba(84, 96, 114, 0.26)',
-  engraving: 'rgba(72, 83, 99, 0.30)',
+  edgeDark: 'rgba(116, 130, 152, 0.20)',
+  hairline: 'rgba(96, 108, 128, 0.12)',
+  hairlineStrong: 'rgba(88, 100, 120, 0.22)',
+  engraving: 'rgba(70, 80, 99, 0.28)',
 
-  scrim: 'rgba(28, 34, 44, 0.44)',
+  scrim: 'rgba(30, 38, 50, 0.38)',
 
   text: palette.inkPrimary,
   textSecondary: palette.inkSecondary,
@@ -131,11 +130,11 @@ export const space = {
 } as const;
 
 export const radius = {
-  engraved: 3,
-  control: 8,
-  panel: 12,
-  card: 16,
-  sheet: 24,
+  engraved: 4,
+  control: 14,
+  panel: 18,
+  card: 22,
+  sheet: 30,
   pill: 999,
 } as const;
 
@@ -147,9 +146,10 @@ export const MIN_TOUCH_TARGET = 44;
 export const fonts = {
   /** Interface sans. Falls back to the platform face until fonts load. */
   sans: 'Inter_400Regular',
+  sansLight: 'Inter_300Light',
   sansMedium: 'Inter_500Medium',
   sansSemibold: 'Inter_600SemiBold',
-  /** Numeric readouts. Monospaced so digits do not shift as values change. */
+  /** Small technical readouts (DNA, fingerprints) stay monospaced. */
   mono: 'IBMPlexMono_400Regular',
   monoMedium: 'IBMPlexMono_500Medium',
   monoSemibold: 'IBMPlexMono_600SemiBold',
@@ -164,12 +164,12 @@ export const fonts = {
  * widely tracked, and never used for sentences.
  */
 export const type = {
-  hero: { fontFamily: fonts.monoLight, fontSize: 64, letterSpacing: -1.5, lineHeight: 68 },
-  readoutXl: { fontFamily: fonts.monoLight, fontSize: 44, letterSpacing: -0.8, lineHeight: 48 },
-  readoutLg: { fontFamily: fonts.mono, fontSize: 28, letterSpacing: -0.3, lineHeight: 32 },
-  readout: { fontFamily: fonts.mono, fontSize: 18, letterSpacing: 0, lineHeight: 22 },
-  readoutSm: { fontFamily: fonts.mono, fontSize: 13, letterSpacing: 0, lineHeight: 16 },
-  readoutXs: { fontFamily: fonts.mono, fontSize: 11, letterSpacing: 0.2, lineHeight: 14 },
+  hero: { fontFamily: fonts.sansLight, fontSize: 64, letterSpacing: -2, lineHeight: 68 },
+  readoutXl: { fontFamily: fonts.sansLight, fontSize: 46, letterSpacing: -1.2, lineHeight: 50 },
+  readoutLg: { fontFamily: fonts.sansLight, fontSize: 30, letterSpacing: -0.6, lineHeight: 34 },
+  readout: { fontFamily: fonts.sans, fontSize: 19, letterSpacing: -0.2, lineHeight: 24 },
+  readoutSm: { fontFamily: fonts.sansMedium, fontSize: 13, letterSpacing: 0, lineHeight: 17 },
+  readoutXs: { fontFamily: fonts.sansMedium, fontSize: 11, letterSpacing: 0.2, lineHeight: 14 },
 
   title: { fontFamily: fonts.sansSemibold, fontSize: 22, letterSpacing: -0.4, lineHeight: 28 },
   heading: { fontFamily: fonts.sansSemibold, fontSize: 17, letterSpacing: -0.2, lineHeight: 22 },

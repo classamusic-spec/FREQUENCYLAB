@@ -44,32 +44,32 @@ export const LIGHT = {
  * bright band near the top reads as light travelling across brushed metal.
  */
 export const SURFACES = {
-  /** The instrument's outer case — anodised, fine horizontal grain. */
-  chassis: ['#EDF0F5', '#E3E7EE', '#DCE1E9', '#E6EAF0'] as Ramp,
+  /** The instrument's outer case — porcelain white, faint cool grain. */
+  chassis: ['#F8FAFC', '#F4F6F9', '#EFF2F6', '#F5F7FA'] as Ramp,
   /** A raised module face sitting proud of the chassis. */
-  panel: ['#FBFCFD', '#F3F5F9', '#EAEEF4'] as Ramp,
+  panel: ['#FFFFFF', '#FDFDFE', '#F7F9FB'] as Ramp,
   /** A panel that is currently engaged or selected. */
-  panelActive: ['#FFFFFF', '#F7F9FC', '#EEF2F8'] as Ramp,
+  panelActive: ['#FFFFFF', '#FEFEFF', '#F9FBFD'] as Ramp,
   /** The floor of a milled recess — darker at the top where the rim shades it. */
-  well: ['#D8DDE5', '#E2E6ED', '#E8ECF2'] as Ramp,
+  well: ['#E4E8EE', '#ECEFF4', '#F2F4F8'] as Ramp,
   /** A deeper well, for display cutouts. */
-  wellDeep: ['#C6CDD8', '#D3D9E2', '#DCE1E9'] as Ramp,
-  /** Turned aluminium knob cap, lit from the top-left. */
-  knobCap: ['#FDFDFE', '#EFF2F6', '#DCE1E9', '#CCD3DD'] as Ramp,
+  wellDeep: ['#DDE2EA', '#E7EBF1', '#EFF2F6'] as Ramp,
+  /** Polished steel knob cap, lit from the top-left. */
+  knobCap: ['#FFFFFF', '#F6F8FA', '#E9EDF2', '#D9DFE7'] as Ramp,
   /** The knurled outer ring of a knob. */
-  knobRing: ['#D2D8E1', '#BFC7D2', '#AEB7C4', '#C6CDD7'] as Ramp,
+  knobRing: ['#E4E8EE', '#CFD6DE', '#BCC4CF', '#D8DDE5'] as Ramp,
   /** A tactile button cap at rest. */
-  buttonCap: ['#FCFDFE', '#F1F4F8', '#E2E7EF'] as Ramp,
+  buttonCap: ['#FFFFFF', '#FBFCFD', '#F2F5F8'] as Ramp,
   /** The same cap depressed — the highlight collapses and the face darkens. */
-  buttonCapPressed: ['#DCE1E9', '#E4E9F0', '#EDF1F6'] as Ramp,
+  buttonCapPressed: ['#E7EBF1', '#EEF1F5', '#F5F7FA'] as Ramp,
   /** A primary/engaged button, tinted with the accent. */
-  buttonPrimary: ['#1FC8B4', '#12AE9C', '#0C9587'] as Ramp,
-  /** Dark OLED glass, seen through a bezel. */
-  display: ['#0B0F14', '#0E141B', '#0A0E13'] as Ramp,
-  /** The reflection sheen laid over display glass. */
-  glass: ['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.03)', 'rgba(255,255,255,0)'] as Ramp,
-  /** Dark bezel ring framing a display. */
-  bezel: ['#4A525E', '#333A45', '#242A33', '#3B434F'] as Ramp,
+  buttonPrimary: ['#63A7FF', '#3B8BF5', '#2C79E0'] as Ramp,
+  /** A display well — recessed porcelain, no longer dark glass. */
+  display: ['#EDF0F5', '#F2F5F8', '#F7F9FB'] as Ramp,
+  /** The reflection sheen laid over a display well. */
+  glass: ['rgba(255,255,255,0.65)', 'rgba(255,255,255,0.12)', 'rgba(255,255,255,0)'] as Ramp,
+  /** Bright bezel ring framing a display well. */
+  bezel: ['#FFFFFF', '#F0F3F7', '#E2E7ED', '#EDF0F5'] as Ramp,
 } as const;
 
 /**
@@ -82,17 +82,17 @@ export const EDGES = {
   /** Top edge of a raised form, catching the light. */
   raisedTop: 'rgba(255,255,255,0.95)',
   /** Bottom edge of a raised form, in its own shadow. */
-  raisedBottom: 'rgba(83,95,112,0.28)',
+  raisedBottom: 'rgba(122,136,158,0.20)',
   /** Top of a recess — shaded by the rim above it. */
-  wellTop: 'rgba(72,83,99,0.30)',
+  wellTop: 'rgba(96,110,132,0.22)',
   /** Bottom lip of a recess, catching bounced light. */
-  wellBottom: 'rgba(255,255,255,0.85)',
+  wellBottom: 'rgba(255,255,255,0.9)',
   /** The seam where two surfaces meet. */
-  seam: 'rgba(96,107,124,0.20)',
+  seam: 'rgba(116,128,148,0.16)',
   /** A hairline scribed into the metal. */
-  scribe: 'rgba(90,102,120,0.16)',
+  scribe: 'rgba(104,116,136,0.14)',
   /** Inside a display bezel. */
-  bezelInner: 'rgba(0,0,0,0.55)',
+  bezelInner: 'rgba(112,126,148,0.22)',
 } as const;
 
 /**
@@ -106,41 +106,41 @@ export const EDGES = {
 export const SHADOW = {
   /** Wide, soft, low-opacity — the shadow a form casts across the case. */
   ambient: {
-    shadowColor: '#2A3140',
-    shadowOpacity: 0.16,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
+    shadowColor: '#39506E',
+    shadowOpacity: 0.10,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 7,
   },
   /** Tight and dark, immediately under the form. Sells the contact point. */
   contact: {
-    shadowColor: '#1D2430',
-    shadowOpacity: 0.22,
+    shadowColor: '#2B3C55',
+    shadowOpacity: 0.10,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
   /** A knob standing off the panel. */
   knob: {
-    shadowColor: '#232A36',
-    shadowOpacity: 0.30,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 7 },
+    shadowColor: '#33486A',
+    shadowOpacity: 0.22,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 12 },
     elevation: 10,
   },
   /** A pressed control — shadow collapses as the cap sinks. */
   pressed: {
-    shadowColor: '#1D2430',
-    shadowOpacity: 0.14,
+    shadowColor: '#2B3C55',
+    shadowOpacity: 0.08,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 },
     elevation: 1,
   },
   /** A sheet lifted over the whole instrument. */
   sheet: {
-    shadowColor: '#161C26',
-    shadowOpacity: 0.34,
-    shadowRadius: 40,
+    shadowColor: '#243248',
+    shadowOpacity: 0.24,
+    shadowRadius: 44,
     shadowOffset: { width: 0, height: -12 },
     elevation: 24,
   },
@@ -166,9 +166,9 @@ export const ENGRAVE = {
     textShadowOffset: { width: 0, height: -1 },
     textShadowRadius: 0,
   },
-  /** Illuminated text on dark display glass. */
+  /** Illuminated text in a display well. */
   glow: {
-    textShadowColor: 'rgba(53,214,196,0.55)',
+    textShadowColor: 'rgba(59,139,245,0.45)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 12,
   },

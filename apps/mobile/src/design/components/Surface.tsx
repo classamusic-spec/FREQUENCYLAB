@@ -81,11 +81,14 @@ export function Recessed({ children, style, cornerRadius = radius.control, ramp 
 }
 
 /**
- * A dark display cut into the panel behind a bezel.
+ * A display well cut into the panel.
  *
- * This is the only genuinely dark surface in the instrument, which is what
- * makes readouts read as *emitting* light rather than merely being coloured.
- * A diagonal sheen over the top sells the glass.
+ * No longer dark glass: the reference instrument is porcelain throughout, so a
+ * readout area is a shallow recess with a bright machined rim. What separates
+ * it from an ordinary recess is the depth of its shading and the fact that
+ * values inside it are set in ink and signal blue rather than engraved grey —
+ * the well is where the instrument *reports*, and it has to read as a
+ * different physical zone even without a dark fill.
  */
 export function DisplayGlass({
   children,
@@ -94,27 +97,35 @@ export function DisplayGlass({
   glare = true,
 }: SurfaceProps & { glare?: boolean }) {
   return (
-    <View style={[styles.bezelOuter, { borderRadius: cornerRadius + 3 }, style]}>
+    <View style={[styles.bezelOuter, { borderRadius: cornerRadius + 2 }, style]}>
       <LinearGradient
         colors={SURFACES.bezel}
         start={LIGHT.face.start}
         end={LIGHT.face.end}
-        style={[styles.bezelFill, { borderRadius: cornerRadius + 3 }]}
+        style={[styles.bezelFill, { borderRadius: cornerRadius + 2 }]}
       >
         <View style={[styles.glassInner, { borderRadius: cornerRadius }]}>
           <LinearGradient
             colors={SURFACES.display}
-            start={LIGHT.vertical.start}
-            end={LIGHT.vertical.end}
+            start={LIGHT.well.start}
+            end={LIGHT.well.end}
             style={[styles.fill, { borderRadius: cornerRadius }]}
           >
+            {/* The rim's shadow falling into the top of the well. */}
+            <LinearGradient
+              colors={['rgba(76,90,112,0.14)', 'rgba(76,90,112,0.03)', 'rgba(76,90,112,0)'] as const}
+              start={LIGHT.well.start}
+              end={{ x: 0.5, y: 0.5 }}
+              style={[StyleSheet.absoluteFill, { borderRadius: cornerRadius }]}
+              pointerEvents="none"
+            />
             {children}
             {glare ? (
               <LinearGradient
                 colors={SURFACES.glass}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 0.85, y: 1 }}
-                style={[StyleSheet.absoluteFill, { borderRadius: cornerRadius }]}
+                style={[StyleSheet.absoluteFill, { borderRadius: cornerRadius, opacity: 0.4 }]}
                 pointerEvents="none"
               />
             ) : null}
@@ -139,9 +150,9 @@ export function BrushedGrain({ opacity = 0.5 }: { opacity?: number }) {
       <Svg width="100%" height="100%">
         <Defs>
           <RadialGradient id="grain" cx="30%" cy="0%" r="90%">
-            <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.55" />
-            <Stop offset="0.55" stopColor="#FFFFFF" stopOpacity="0.06" />
-            <Stop offset="1" stopColor="#5D6B80" stopOpacity="0.10" />
+            <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.7" />
+            <Stop offset="0.55" stopColor="#FFFFFF" stopOpacity="0.08" />
+            <Stop offset="1" stopColor="#6B7C96" stopOpacity="0.06" />
           </RadialGradient>
         </Defs>
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#grain)" />
@@ -216,12 +227,12 @@ const styles = StyleSheet.create({
   },
   bezelOuter: {
     overflow: 'hidden',
-    shadowColor: '#232A36',
-    shadowOpacity: 0.26,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#33486A',
+    shadowOpacity: 0.10,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
   },
-  bezelFill: { padding: 3 },
+  bezelFill: { padding: 2 },
   glassInner: {
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,

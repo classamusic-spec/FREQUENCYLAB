@@ -15,21 +15,31 @@ import {
 } from '../src/design/components/Visualizers';
 import { SafetyBanner } from '../src/design/components/SafetyBanner';
 import { Label, Text } from '../src/design/components/Text';
-import { PrecisionValueDisplay } from '../src/design/components/PrecisionValueDisplay';
 import { DisplayGlass } from '../src/design/components/Surface';
+import {
+  ChevronIcon,
+  InfoIcon,
+  PauseIcon,
+  PlayIcon,
+  StereoRingsIcon,
+  StopIcon,
+  WaveformIcon,
+} from '../src/design/components/Icons';
 import { bandForFrequency, colors, radius, space } from '../src/design/tokens';
 import * as haptics from '../src/design/haptics';
 import { usePlayer, useScopeCapture } from '../src/state/player';
 import { usePreferences } from '../src/state/preferences';
+import { sessionController } from '../src/audio/sessionController';
 import { describeRoute } from '../src/audio/route';
 
 /**
  * The session player (§70).
  *
  * One number dominates the screen, because one number is what the session is:
- * the rate the sound is moving at. Everything else — carrier, stage, remaining
- * time, telemetry — is arranged around it in descending order of how often it
- * needs to be read. Detail is available on demand rather than always present.
+ * the rate the sound is moving at. It sits on the face of the dial, the dial's
+ * full-circle scale is the protocol timeline, and everything else — what the
+ * headphones are literally producing, the carrier, the remaining time, the
+ * transport — descends from it in the order the reference hardware arranges.
  */
 export default function SessionScreen() {
   const router = useRouter();
@@ -43,11 +53,12 @@ export default function SessionScreen() {
 
   const [showDetails, setShowDetails] = useState(false);
   const [showIntensity, setShowIntensity] = useState(false);
+  const [showScopes, setShowScopes] = useState(false);
   const [gain, setGain] = useState(preferences.comfortableOutputLevel);
 
   const playing = snapshot.state === 'playing';
   const paused = snapshot.state === 'paused';
-  const capture = useScopeCapture(showDetails ? 24 : 12, playing);
+  const capture = useScopeCapture(showDetails || showScopes ? 24 : 8, playing && (showDetails || showScopes));
   const telemetry = snapshot.telemetry;
 
   useEffect(() => {
@@ -80,6 +91,43 @@ export default function SessionScreen() {
       ? telemetry.stagePositionSec / telemetry.stageDurationSec
       : 0;
 
+  /**
+   * The mode read off the running stage's actual graph, not off a label:
+   * whatever node kind is generating the tone is what the row reports.
+   */
+  const mode = useMemo(() => {
+    const protocol = sessionController.currentProtocol;
+    const stage = protocol?.stages[telemetry?.stageIndex ?? 0];
+    const kinds = new Set(stage?.graph.nodes.map((node) => node.kind) ?? []);
+    if (kinds.has('binaural')) return 'Binaural';
+    if (kinds.has('monaural')) return 'Monaural';
+    if (kinds.has('isochronic')) return 'Isochronic';
+    if (kinds.has('oscillator')) return 'Tone';
+    return '—';
+  }, [telemetry?.stageIndex]);
+
+  const isPulse = telemetry ? telemetry.readouts['tone:pulse'] !== undefined : false;
+  // What each ear receives. Only a binaural pair actually differs between the
+  // ears; every other engine sends the same signal to both.
+  const leftHz = carrier;
+  const rightHz = mode === 'Binaural' ? carrier + beat : carrier;
+  const peakL = telemetry?.level.peakL ?? 0;
+  const peakR = telemetry?.level.peakR ?? 0;
+
+  const remaining = telemetry ? telemetry.durationSec - telemetry.positionSec : 0;
+
+  const toggleMute = () => {
+    haptics.engage();
+    if (gain > 0.001) {
+      setGain(0);
+      setMasterGain(0);
+    } else {
+      const restored = preferences.comfortableOutputLevel;
+      setGain(restored);
+      setMasterGain(restored);
+    }
+  };
+
   return (
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -88,16 +136,25 @@ export default function SessionScreen() {
             onPress={() => router.back()}
             accessibilityRole="button"
             accessibilityLabel="Back"
-            hitSlop={12}
+            style={styles.headerButton}
           >
-            <Label>Back</Label>
+            <ChevronIcon direction="down" color={colors.textSecondary} />
           </Pressable>
           <View style={styles.headerCentre}>
-            <Label>{snapshot.protocolName ?? 'Session'}</Label>
+            <Text variant="labelLg" uppercase style={styles.headerTitle}>
+              Frequency Lab
+            </Text>
+            <Label tone="tertiary">Player</Label>
           </View>
-          <Label tone={snapshot.backend.audible ? 'tertiary' : 'warning'}>
-            {describeRoute(snapshot.route)}
-          </Label>
+          <Pressable
+            onPress={() => setShowDetails((current) => !current)}
+            accessibilityRole="button"
+            accessibilityLabel="Session details"
+            accessibilityState={{ expanded: showDetails }}
+            style={styles.headerButton}
+          >
+            <InfoIcon color={showDetails ? colors.signal : colors.textSecondary} />
+          </Pressable>
         </View>
 
         {!snapshot.backend.audible ? (
@@ -135,56 +192,134 @@ export default function SessionScreen() {
           />
         </View>
 
-        <View style={styles.primaryReadouts}>
-          <PrecisionValueDisplay
-            plate
-            size="sm"
-            label="Carrier"
-            value={carrier}
-            unit="Hz"
-            precision={2}
-            integerDigits={3}
-            style={styles.readoutColumn}
-          />
-          <PrecisionValueDisplay
-            plate
-            size="sm"
-            label="Stage"
-            value={telemetry?.stageName ?? '—'}
-            style={styles.readoutColumn}
-          />
-          <PrecisionValueDisplay
-            plate
-            size="sm"
-            label="Remaining"
-            value={telemetry ? formatClock(telemetry.durationSec - telemetry.positionSec) : '--:--'}
-            tone="signal"
-            style={styles.readoutColumn}
-          />
-        </View>
-
-        <View style={styles.waveform}>
-          <Label style={styles.scopeLabel}>Output</Label>
-          <DisplayGlass cornerRadius={8}>
-            <Oscilloscope
-              samples={capture?.left ?? null}
-              samplesRight={capture?.right ?? null}
-              height={72}
-              label="Live output"
-            />
+        {/* What the number above actually is — a beat or a pulse rate. */}
+        <View style={styles.beatChipRow}>
+          <DisplayGlass cornerRadius={radius.control}>
+            <View style={styles.beatChip}>
+              <WaveformIcon size={18} color={colors.textSecondary} />
+              <View style={styles.beatChipText}>
+                <Label tone="tertiary">{isPulse ? 'Pulse rate' : `${mode} beat`}</Label>
+                <Text variant="readout" tone="displaySignal">
+                  {beat.toFixed(3)} Hz
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setShowDetails((current) => !current)}
+                accessibilityRole="button"
+                accessibilityLabel="What am I hearing?"
+                hitSlop={8}
+              >
+                <InfoIcon size={18} color={colors.textTertiary} />
+              </Pressable>
+            </View>
           </DisplayGlass>
         </View>
 
-        <View style={styles.waveform}>
-          <Label style={styles.scopeLabel}>Spectrum</Label>
-          <DisplayGlass cornerRadius={8}>
-            <SpectrumAnalyzer
-              bins={capture?.spectrum ?? null}
-              sampleRate={capture?.sampleRate}
-              height={96}
-            />
-          </DisplayGlass>
-        </View>
+        <InstrumentPanel tone="raised">
+          <View style={styles.carrierRow}>
+            <View>
+              <Label>Carrier</Label>
+              <Text variant="readoutLg" style={styles.carrierValue}>
+                {carrier.toFixed(3)} <Text variant="readoutSm" tone="tertiary">Hz</Text>
+              </Text>
+            </View>
+            <View style={styles.modeCell}>
+              <Label>Mode</Label>
+              <Text variant="readout" tone="secondary" style={styles.carrierValue}>
+                {mode}
+              </Text>
+            </View>
+          </View>
+        </InstrumentPanel>
+
+        <InstrumentPanel tone="recessed">
+          <View style={styles.earsRow}>
+            <View style={styles.earCell}>
+              <Label>Left</Label>
+              <Text variant="readout" style={styles.earValue}>
+                {leftHz.toFixed(3)} <Text variant="readoutXs" tone="tertiary">Hz</Text>
+              </Text>
+              <View style={styles.levelTrack}>
+                <View style={[styles.levelFill, { width: `${Math.round(Math.min(1, peakL) * 100)}%` }]} />
+              </View>
+            </View>
+            <View style={styles.earBadge}>
+              <StereoRingsIcon size={26} color={colors.signal} />
+            </View>
+            <View style={[styles.earCell, styles.earCellRight]}>
+              <Label>Right</Label>
+              <Text variant="readout" style={styles.earValue}>
+                {rightHz.toFixed(3)} <Text variant="readoutXs" tone="tertiary">Hz</Text>
+              </Text>
+              <View style={styles.levelTrack}>
+                <View style={[styles.levelFill, { width: `${Math.round(Math.min(1, peakR) * 100)}%` }]} />
+              </View>
+            </View>
+          </View>
+        </InstrumentPanel>
+
+        <InstrumentPanel tone="raised">
+          <View style={styles.timeHeader}>
+            <Label>Time remaining</Label>
+            <Label tone="tertiary">{telemetry?.stageName ?? ''}</Label>
+          </View>
+          <View style={styles.timeRow}>
+            <Text variant="readoutLg" tone="signal">
+              {telemetry ? formatClock(remaining) : '--:--'}
+            </Text>
+            <Text variant="readout" tone="tertiary">
+              {'  /  '}
+              {telemetry ? formatClock(telemetry.durationSec) : '--:--'}
+            </Text>
+          </View>
+          <View
+            style={styles.progressTrack}
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityValue={{ min: 0, max: 100, now: Math.round(progress * 100) }}
+          >
+            <View style={[styles.progressFill, { width: `${Math.max(1, progress * 100)}%` }]} />
+            <View style={[styles.progressThumb, { left: `${Math.max(1, progress * 100)}%` }]} />
+          </View>
+
+          <View style={styles.transportRow}>
+            <Pressable
+              onPress={async () => {
+                await stop();
+                router.back();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Stop the session"
+              style={styles.transportSmall}
+            >
+              <StopIcon size={20} color={colors.limit} />
+            </Pressable>
+
+            <Pressable
+              onPress={() => (paused ? void play() : void pause())}
+              accessibilityRole="button"
+              accessibilityLabel={paused ? 'Resume' : 'Pause'}
+              style={styles.transportMain}
+            >
+              <View style={styles.transportMainRing} pointerEvents="none" />
+              {paused ? (
+                <PlayIcon size={26} color={colors.signal} />
+              ) : (
+                <PauseIcon size={26} color={colors.signal} />
+              )}
+            </Pressable>
+
+            <Pressable
+              onPress={toggleMute}
+              accessibilityRole="button"
+              accessibilityLabel={gain > 0.001 ? 'Mute output' : 'Restore output level'}
+              accessibilityState={{ selected: gain <= 0.001 }}
+              style={styles.transportSmall}
+            >
+              <WaveformIcon size={20} color={gain > 0.001 ? colors.textSecondary : colors.warning} />
+            </Pressable>
+          </View>
+        </InstrumentPanel>
 
         {showIntensity ? (
           <InstrumentPanel tone="raised" label="Intensity">
@@ -220,6 +355,33 @@ export default function SessionScreen() {
           </InstrumentPanel>
         ) : null}
 
+        {showScopes ? (
+          <>
+            <View style={styles.waveform}>
+              <Label style={styles.scopeLabel}>Output</Label>
+              <DisplayGlass cornerRadius={radius.control}>
+                <Oscilloscope
+                  samples={capture?.left ?? null}
+                  samplesRight={capture?.right ?? null}
+                  height={72}
+                  label="Live output"
+                />
+              </DisplayGlass>
+            </View>
+
+            <View style={styles.waveform}>
+              <Label style={styles.scopeLabel}>Spectrum</Label>
+              <DisplayGlass cornerRadius={radius.control}>
+                <SpectrumAnalyzer
+                  bins={capture?.spectrum ?? null}
+                  sampleRate={capture?.sampleRate}
+                  height={96}
+                />
+              </DisplayGlass>
+            </View>
+          </>
+        ) : null}
+
         {showDetails ? (
           <InstrumentPanel tone="recessed" label="Instrument telemetry" bare>
             <View style={styles.telemetry}>
@@ -244,6 +406,7 @@ export default function SessionScreen() {
               <ModulationView envelope={modulationEnvelope(beat)} phase={stageProgress % 1} />
 
               <PanelDivider />
+              <PanelRow label="Output route" value={describeRoute(snapshot.route)} />
               <PanelRow label="Sample rate" value={`${telemetry?.sampleRate ?? 0} Hz`} />
               <PanelRow label="Block size" value={String(telemetry?.blockSize ?? 0)} />
               <PanelRow
@@ -262,33 +425,27 @@ export default function SessionScreen() {
         ) : null}
       </ScrollView>
 
-      <View style={styles.transport}>
-        <HardwareButton
-          label={paused ? 'Resume' : 'Pause'}
-          style={styles.transportButton}
-          selected={paused}
-          onPress={() => (paused ? void play() : void pause())}
-        />
-        <HardwareButton
-          label="Stop"
-          variant="danger"
-          style={styles.transportButton}
-          onPress={async () => {
-            await stop();
-            router.back();
-          }}
-        />
+      <View style={styles.footer}>
         <HardwareButton
           label="Intensity"
-          style={styles.transportButton}
+          size="sm"
+          style={styles.footerButton}
           selected={showIntensity}
           onPress={() => setShowIntensity((current) => !current)}
         />
         <HardwareButton
           label="Details"
-          style={styles.transportButton}
+          size="sm"
+          style={styles.footerButton}
           selected={showDetails}
           onPress={() => setShowDetails((current) => !current)}
+        />
+        <HardwareButton
+          label="Visualizer"
+          size="sm"
+          style={styles.footerButton}
+          selected={showScopes}
+          onPress={() => setShowScopes((current) => !current)}
         />
       </View>
     </View>
@@ -316,13 +473,159 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   content: { padding: space.xl, paddingTop: space.vast, paddingBottom: 140, gap: space.lg },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerCentre: { flex: 1, alignItems: 'center' },
+  headerButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceRaised,
+    shadowColor: '#33486A',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  headerCentre: { flex: 1, alignItems: 'center', gap: 2 },
+  headerTitle: { letterSpacing: 3 },
   banner: { marginTop: space.sm },
-  stage: { alignItems: 'center', marginTop: space.md },
-  primaryReadouts: { flexDirection: 'row', gap: space.xs },
-  readoutColumn: { flex: 1 },
-  waveform: { marginTop: space.xs, gap: space.xxs },
-  scopeLabel: { marginLeft: space.xxs },
+  stage: { alignItems: 'center', marginTop: space.xs },
+
+  beatChipRow: { alignItems: 'center', marginTop: -space.xs },
+  beatChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    minWidth: 230,
+  },
+  beatChipText: { flex: 1, alignItems: 'center', gap: 1 },
+
+  carrierRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  carrierValue: { marginTop: space.xxs },
+  modeCell: { alignItems: 'flex-end' },
+
+  earsRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  earCell: { flex: 1, gap: space.xxs },
+  earCellRight: { alignItems: 'flex-end' },
+  earValue: { marginTop: 1 },
+  earBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceRaised,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairlineStrong,
+    shadowColor: '#33486A',
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  levelTrack: {
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: 'rgba(96,110,132,0.18)',
+    overflow: 'hidden',
+    alignSelf: 'stretch',
+    marginTop: space.xs,
+  },
+  levelFill: { height: 3, borderRadius: 1.5, backgroundColor: colors.signal },
+
+  timeHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    marginTop: space.sm,
+  },
+  progressTrack: {
+    marginTop: space.md,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(96,110,132,0.18)',
+  },
+  progressFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: 2,
+    backgroundColor: colors.signal,
+  },
+  progressThumb: {
+    position: 'absolute',
+    top: -5,
+    width: 14,
+    height: 14,
+    marginLeft: -7,
+    borderRadius: 7,
+    backgroundColor: colors.surfaceHigh,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairlineStrong,
+    shadowColor: '#33486A',
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+
+  transportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.xxl,
+    marginTop: space.lg,
+  },
+  transportSmall: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceRaised,
+    borderTopWidth: 1,
+    borderTopColor: colors.edgeLight,
+    shadowColor: '#33486A',
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 4,
+  },
+  transportMain: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceHigh,
+    borderTopWidth: 1,
+    borderTopColor: colors.edgeLight,
+    shadowColor: '#33486A',
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 6,
+  },
+  // The engaged transport wears the illumination as a ring, like the dial.
+  transportMainRing: {
+    position: 'absolute',
+    top: 3,
+    left: 3,
+    right: 3,
+    bottom: 3,
+    borderRadius: 35,
+    borderWidth: 2,
+    borderColor: colors.signal,
+    shadowColor: colors.signal,
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+  },
+
   intensityRow: { flexDirection: 'row', gap: space.sm, marginTop: space.md },
   intensityStep: {
     flex: 1,
@@ -336,10 +639,13 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.signalDim,
   },
+  waveform: { marginTop: space.xs, gap: space.xxs },
+  scopeLabel: { marginLeft: space.xxs },
   telemetry: { padding: space.lg, gap: space.md },
   telemetryTop: { flexDirection: 'row', alignItems: 'center', gap: space.lg },
   meter: { flex: 1 },
-  transport: {
+
+  footer: {
     position: 'absolute',
     left: 0,
     right: 0,
@@ -352,5 +658,5 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.hairlineStrong,
   },
-  transportButton: { flex: 1 },
+  footerButton: { flex: 1 },
 });

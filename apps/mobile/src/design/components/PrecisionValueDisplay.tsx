@@ -22,16 +22,17 @@ export interface PrecisionValueDisplayProps {
 /**
  * A numeric readout.
  *
- * Values are always rendered with tabular figures and fixed integer padding, so
- * a live value changes without the layout shifting under it — `007.830` rather
- * than `7.83`. That padding is the difference between a readout and a label.
+ * Values render with tabular figures and fixed decimals, so a live value
+ * ticks without the layout shifting under it. Integer zero-padding was a
+ * habit of the old dark LCD; the porcelain instrument prints `7.830`, the
+ * way the reference hardware does.
  */
 export function PrecisionValueDisplay({
   label,
   value,
   unit,
   precision = 3,
-  integerDigits = 3,
+  integerDigits = 1,
   size = 'md',
   tone = 'primary',
   plate,

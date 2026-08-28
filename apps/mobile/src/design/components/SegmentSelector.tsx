@@ -65,7 +65,7 @@ export function SegmentSelector<T extends string>({
           style={styles.segmentLabel}
           variant={size === 'sm' ? 'label' : 'labelLg'}
           uppercase
-          tone={option.disabled ? 'disabled' : selected ? 'primary' : 'tertiary'}
+          tone={option.disabled ? 'disabled' : selected ? 'signal' : 'tertiary'}
         >
           {option.label}
         </Text>
@@ -108,13 +108,13 @@ const styles = StyleSheet.create({
   housing: {
     flexDirection: 'row',
     backgroundColor: colors.surfaceRecessed,
-    borderRadius: radius.control,
-    padding: 3,
-    gap: 3,
+    borderRadius: radius.pill,
+    padding: 4,
+    gap: 4,
     // A channel milled into the panel: shaded at the top by its own rim,
     // catching bounced light along the bottom lip.
     borderTopWidth: 1,
-    borderTopColor: 'rgba(72,83,99,0.32)',
+    borderTopColor: 'rgba(96,110,132,0.20)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.9)',
   },
@@ -122,18 +122,18 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: MIN_TOUCH_TARGET - 8,
-    paddingHorizontal: space.md,
-    borderRadius: radius.engraved + 2,
+    minHeight: MIN_TOUCH_TARGET - 6,
+    paddingHorizontal: space.lg,
+    borderRadius: radius.pill,
   },
   segmentFlex: { flex: 1 },
   segmentScroll: { minWidth: 76 },
   segmentSm: { minHeight: 30 },
   selected: {
-    shadowColor: '#1D2430',
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#33486A',
+    shadowOpacity: 0.16,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
     elevation: 3,
   },
   selectedCap: {
@@ -142,20 +142,20 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: radius.engraved + 2,
+    borderRadius: radius.pill,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.95)',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(83,95,112,0.24)',
+    borderBottomColor: 'rgba(122,136,158,0.22)',
   },
   segmentLabel: { zIndex: 1 },
   disabled: { opacity: 0.4 },
   indicator: {
     position: 'absolute',
-    bottom: 3,
-    width: 14,
-    height: 2,
-    borderRadius: 1,
+    bottom: 4,
+    width: 18,
+    height: 2.5,
+    borderRadius: 1.5,
     backgroundColor: colors.signal,
   },
 });

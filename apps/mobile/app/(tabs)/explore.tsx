@@ -126,7 +126,7 @@ export default function ExploreScreen() {
             precision={3}
             integerDigits={3}
             defaultValue={10}
-            caption={band ? `${band.label} range · ${band.low}–${band.high} Hz` : 'Outside the named bands'}
+            caption={band ? `${band.label} range` : 'Outside the named bands'}
             onChange={(value) => apply({ beatHz: value })}
             onRequestNumericEntry={() => setEntry('beat')}
           />

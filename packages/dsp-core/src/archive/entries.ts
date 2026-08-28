@@ -1,4 +1,5 @@
-import { playbackCompatibility } from './transforms.js';
+import { makeEntry, SEED_DATE } from './make.js';
+import { EXPANSION_ENTRIES, EXPANSION_SETS } from './expansion.js';
 import type { ArchiveEntry, ArchiveSet } from './types.js';
 
 /**
@@ -21,27 +22,9 @@ import type { ArchiveEntry, ArchiveSet } from './types.js';
  * rather than reconstructed from memory.
  */
 
-const SEED_DATE = '2026-01-01T00:00:00.000Z';
+const entry = makeEntry;
 
-function entry(
-  partial: Omit<ArchiveEntry, 'unit' | 'playback' | 'createdAt' | 'updatedAt' | 'changeLog' | 'sourceVersion' | 'evidenceVersion'> &
-    Partial<Pick<ArchiveEntry, 'sourceVersion' | 'evidenceVersion' | 'changeLog'>>,
-): ArchiveEntry {
-  return {
-    unit: 'Hz',
-    playback: playbackCompatibility(partial.frequency),
-    createdAt: SEED_DATE,
-    updatedAt: SEED_DATE,
-    sourceVersion: partial.sourceVersion ?? 1,
-    evidenceVersion: partial.evidenceVersion ?? 1,
-    changeLog: partial.changeLog ?? [
-      { version: 1, at: SEED_DATE, change: 'Record created.', scope: 'historical-record' },
-    ],
-    ...partial,
-  } as ArchiveEntry;
-}
-
-export const ARCHIVE_ENTRIES: ArchiveEntry[] = [
+const CORE_ENTRIES: ArchiveEntry[] = [
   // ── Historical Rife ────────────────────────────────────────────────────────
   entry({
     id: 'rife-context',
@@ -62,7 +45,7 @@ export const ARCHIVE_ENTRIES: ArchiveEntry[] = [
     summary:
       'An index record for the Rife material, not a frequency itself. It exists so the archive can state plainly what it does and does not hold.',
     archiveNote:
-      'FREQUENCY LAB ships no Rife frequency table. The circulating condition-to-frequency lists cannot be traced to a verifiable primary document from within this app, and publishing numbers with invented citations would be exactly the failure this archive is built to avoid. Import your own list instead: every row keeps the file it came from as its provenance, which is an honest chain. Whatever the numbers, note the physics below — it is the part that does not change.',
+      'FREQUENCY LAB ships no modern Rife treatment table: the circulating condition-to-frequency compilations (CAFL, ETDFL) cannot be traced past their modern compilers. What the archive does hold is every number that IS traceable — attributed to its real era. The famous audio values (727/728, 784, 880, 2008, 2128) are documented to the 1950s Crane-era AZ-58 device, not to Rife\'s 1930s laboratory; the 1930s lab papers record only radio frequencies, reaching us through unpublished manuscripts and modern transcription. Each record says which. For anything else, import your own list: every row keeps the file it came from as its provenance. Whatever the numbers, note the physics below — it is the part that does not change.',
     claims: [
       {
         claim:
@@ -82,7 +65,18 @@ export const ARCHIVE_ENTRIES: ArchiveEntry[] = [
     recommendedTransform: 'Not applicable — this record documents context rather than a value.',
     tags: ['rife', 'historical', 'context', 'unsupported'],
     aliases: ['Rife frequencies', 'Rife list'],
-    related: ['rife-beam-ray', 'solfeggio-528', 'schumann-783'],
+    related: ['rife-beam-ray', 'az58-728', 'rife-mor-bx', 'rife-cafl', 'rife-prosecutions'],
+    sourceVersion: 2,
+    changeLog: [
+      { version: 1, at: SEED_DATE, change: 'Record created; no Rife numbers were held.', scope: 'historical-record' },
+      {
+        version: 2,
+        at: SEED_DATE,
+        change:
+          'Documented-era records added to the archive: 1930s lab-paper RF claims (via modern transcription), the 1953 AZ-58 audio dial values, and the episode records around them. This index updated to say what is now held and how each chain runs.',
+        scope: 'historical-record',
+      },
+    ],
   }),
 
   entry({
@@ -141,7 +135,7 @@ export const ARCHIVE_ENTRIES: ArchiveEntry[] = [
     summary:
       'The lowest resonant mode of the Earth–ionosphere cavity, later measured. Established geophysics, and an electromagnetic phenomenon rather than a sound.',
     archiveNote:
-      'The resonance is real and well documented. Using 7.83 Hz as an audio modulation rate is an analogy, not a reproduction: headphones emit sound, not an atmospheric electromagnetic field. Treat it as a historically interesting number to experiment with, not as a mechanism.',
+      'The resonance is real and well documented: Schumann predicted the mode in 1952 (his lossless estimate was ~10 Hz), and Balser & Wagner first measured the spectrum in 1960 (Nature 188, 638–641), resolving five modes below 34 Hz — held here as related records. Using 7.83 Hz as an audio modulation rate is an analogy, not a reproduction: headphones emit sound, not an atmospheric electromagnetic field. Treat it as a historically interesting number to experiment with, not as a mechanism.',
     claims: [
       {
         claim:
@@ -154,7 +148,18 @@ export const ARCHIVE_ENTRIES: ArchiveEntry[] = [
     recommendedTransform: 'Binaural difference on a 220 Hz carrier — the value is far below audibility.',
     tags: ['schumann', '7.83', 'earth', 'historical'],
     aliases: ['Earth resonance', 'Schumann frequency'],
-    related: ['rife-context', 'assr-40'],
+    related: ['schumann-mode2', 'schumann-mode3', 'schumann-mode4', 'schumann-mode5'],
+    sourceVersion: 2,
+    changeLog: [
+      { version: 1, at: SEED_DATE, change: 'Record created.', scope: 'historical-record' },
+      {
+        version: 2,
+        at: SEED_DATE,
+        change:
+          'First-measurement citation added (Balser & Wagner 1960) and the four higher modes linked as related records.',
+        scope: 'historical-record',
+      },
+    ],
   }),
 
   // ── Traditional ────────────────────────────────────────────────────────────
@@ -177,19 +182,30 @@ export const ARCHIVE_ENTRIES: ArchiveEntry[] = [
     summary:
       'The best known of the modern Solfeggio set. Its origin is a 1990s publication, not a surviving historical tuning.',
     archiveNote:
-      'Frequently described as ancient. The medieval Guidonian solmisation syllables the set is named after describe relative pitch, not absolute frequencies — so the historical attribution does not hold, whatever one makes of the tones themselves.',
+      'Frequently described as ancient. The documented derivation is numerological: verse numbers from Numbers chapter 7 (14, 20, 26, 32, 38, 44) digit-reduce to 5-2-8, and the nine-tone set is the cyclic digit-permutations of 174, 285 and 396. The medieval Guidonian solmisation syllables the set is named after describe relative pitch, not absolute frequencies — so the historical attribution does not hold, whatever one makes of the tones themselves.',
     claims: [
       {
         claim: 'This frequency is widely claimed to repair DNA.',
         medical: true,
         currentEvidence:
-          'There is no evidence for this. It is not a mechanism recognised by molecular biology, and no clinical work supports it.',
+          'There is no evidence for this. It is not a mechanism recognised by molecular biology, and no clinical work supports it. The closest peer-reviewed study is a nine-person 2018 endocrine experiment in a low-tier venue — held here as its own research record — which establishes nothing about DNA.',
       },
     ],
     recommendedTransform: 'Direct tone — the value is already an audible pitch.',
     tags: ['solfeggio', '528', 'traditional'],
     aliases: ['MI 528', 'Love frequency'],
-    related: ['solfeggio-396', 'concert-a440'],
+    related: ['solfeggio-396', 'concert-a440', 'tone-528-study'],
+    evidenceVersion: 2,
+    changeLog: [
+      { version: 1, at: SEED_DATE, change: 'Record created.', scope: 'historical-record' },
+      {
+        version: 2,
+        at: SEED_DATE,
+        change:
+          'Evidence assessment expanded: the one small peer-reviewed study at this value is now cited and linked, without changing the assessment. Derivation of the set documented in the archive note.',
+        scope: 'evidence-assessment',
+      },
+    ],
   }),
 
   entry({
@@ -234,12 +250,13 @@ export const ARCHIVE_ENTRIES: ArchiveEntry[] = [
       title: 'ISO 16:1975 — Acoustics: Standard tuning frequency (Standard musical pitch)',
       author: 'International Organization for Standardization',
       year: 1975,
-      originalContext: 'The international standard fixing the tuning reference.',
+      originalContext:
+        'The chain runs: Scheibler\'s Stuttgart recommendation of 1834, the international conference at Broadcasting House, London, in May 1939, ISO Recommendation R 16 in 1955, and ISO 16:1975, still current.',
     },
     summary:
       'The international tuning reference. A committee decision so instruments made in different places play together.',
     archiveNote:
-      'Included as the reference point for the tuning debates elsewhere in this archive. Orchestras have historically tuned to a range of pitches; some still tune slightly higher.',
+      'Included as the reference point for the tuning debates elsewhere in this archive. A440 was a compromise between national standards, with no acoustic or biological significance over neighbouring values; orchestras have historically tuned across a wide band, and some still tune slightly higher.',
     claims: [
       {
         claim: 'Circulating material claims 440 Hz is harmful and that 432 Hz is more natural.',
@@ -251,40 +268,62 @@ export const ARCHIVE_ENTRIES: ArchiveEntry[] = [
     recommendedTransform: 'Direct tone.',
     tags: ['tuning', '440', 'music', 'reference'],
     aliases: ['A440', 'Concert A'],
-    related: ['concert-a432', 'solfeggio-528'],
+    related: ['concert-a432', 'pitch-a435', 'pitch-middle-c'],
+    sourceVersion: 2,
+    changeLog: [
+      { version: 1, at: SEED_DATE, change: 'Record created.', scope: 'historical-record' },
+      {
+        version: 2,
+        at: SEED_DATE,
+        change: 'Provenance chain completed back through the 1939 London conference to Scheibler (1834).',
+        scope: 'historical-record',
+      },
+    ],
   }),
 
   entry({
     id: 'concert-a432',
-    name: 'Alternative tuning A4 = 432',
+    name: 'A432 tuning',
     frequency: 432,
     category: 'traditional',
     signalRole: 'carrier',
     evidenceLevel: 'traditional',
-    verification: 'source-unclear',
+    verification: 'secondary-historical',
     source: {
-      title: 'Alternative-tuning advocacy (circulating material)',
-      author: 'Various',
-      year: null,
+      title: 'Tuning Sounds in Italy, 1750–1885',
+      author: 'E. Lockhart',
+      year: 2025,
       originalContext:
-        'Advocacy for tuning A4 to 432 Hz, often presented with historical or mathematical justifications.',
+        'The documented record: the Congresso dei Musicisti Italiani (Milan, June 1881) voted A=432 as the Italian diapason, and the Italian War Ministry prescribed it for military bands by decree of 25 August 1884 (Giornale Militare Ufficiale, Acts 153–154). Verdi\'s 1884 letter accepts 432 as a rounding of the French 435 for "mathematical exigencies", a difference he called almost imperceptible.',
+      reference: 'Nineteenth-Century Music Review 22/3, 344–360',
     },
     summary:
-      'A widely advocated alternative tuning reference. Held here as a separate record from A440 rather than as a correction to it.',
+      'A real, documented nineteenth-century Italian pitch standard — and a modern mythology that has nothing to do with that record.',
     archiveNote:
-      'The historical claims made for 432 Hz vary between sources and this record does not adjudicate them. It is kept distinct from the ISO reference precisely because the two are different propositions.',
+      'The ancient/cosmic framing attached to 432 today traces to a campaign begun in 1988, which actually argued for C=256 — a tuning that gives A≈430.54, not 432. The documented story is Verdi-era practical standardisation; Boito argued for 432 at the Vienna conference of 1885 and lost. Kept as a distinct record from A440 so the two can be compared by ear.',
     claims: [
       {
-        claim: 'Described as being in harmony with nature, or as mathematically superior.',
+        claim: 'Widely described online as an ancient, natural, or healing tuning suppressed in favour of A440.',
         medical: false,
         currentEvidence:
-          'No controlled evidence establishes a perceptual or physiological difference attributable to the tuning reference itself.',
+          'The documented origin is the 1881 Milan congress and an 1884 Italian military decree, not antiquity. No controlled evidence establishes a health difference between tunings a third of a semitone apart.',
       },
     ],
-    recommendedTransform: 'Direct tone. Compare against A440 to hear the difference for yourself.',
+    recommendedTransform: 'Direct tone — compare it against A440 by ear.',
     tags: ['tuning', '432', 'traditional'],
-    aliases: ['A432'],
-    related: ['concert-a440'],
+    aliases: ['Verdi tuning', "Verdi's A"],
+    related: ['concert-a440', 'pitch-a435', 'pitch-c256'],
+    sourceVersion: 2,
+    changeLog: [
+      { version: 1, at: SEED_DATE, change: 'Record created with the source marked unclear.', scope: 'historical-record' },
+      {
+        version: 2,
+        at: SEED_DATE,
+        change:
+          'Provenance established: Milan congress of June 1881 and Italian War Ministry decree of 25 August 1884, per Lockhart (2025). Verification upgraded from source-unclear to secondary-historical; the modern mythology is now documented separately from the historical record.',
+        scope: 'historical-record',
+      },
+    ],
   }),
 
   // ── Research ───────────────────────────────────────────────────────────────
@@ -358,7 +397,9 @@ export const ARCHIVE_ENTRIES: ArchiveEntry[] = [
 ];
 
 /** Grouped sets. Ships only where the grouping itself is documented (§12). */
-export const ARCHIVE_SETS: ArchiveSet[] = [
+export const ARCHIVE_ENTRIES: ArchiveEntry[] = [...CORE_ENTRIES, ...EXPANSION_ENTRIES];
+
+const CORE_SETS: ArchiveSet[] = [
   {
     id: 'set-solfeggio',
     name: 'Solfeggio set',
@@ -395,6 +436,8 @@ export const ARCHIVE_SETS: ArchiveSet[] = [
     version: 1,
   },
 ];
+
+export const ARCHIVE_SETS: ArchiveSet[] = [...CORE_SETS, ...EXPANSION_SETS];
 
 export function archiveEntry(id: string): ArchiveEntry | undefined {
   return ARCHIVE_ENTRIES.find((candidate) => candidate.id === id);

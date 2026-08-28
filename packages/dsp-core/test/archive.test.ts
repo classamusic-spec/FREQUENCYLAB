@@ -143,11 +143,31 @@ describe('shipped archive', () => {
     }
   });
 
-  it('states plainly that no Rife table ships', () => {
+  it('states plainly what Rife material ships and how it is attributed', () => {
     const context = archiveEntry('rife-context')!;
     expect(context.evidenceLevel).toBe('unsupported-medical-claim');
-    expect(context.archiveNote).toContain('ships no Rife frequency table');
+    // No modern treatment table; the era-attribution rule is stated on the index.
+    expect(context.archiveNote).toContain('ships no modern Rife treatment table');
+    expect(context.archiveNote).toContain('1950s Crane-era');
     expect(context.claims.some((claim) => claim.medical)).toBe(true);
+
+    // The famous audio numbers are attributed to the Crane era, never to the
+    // 1930s laboratory — the single most-copied provenance error in this space.
+    for (const id of ['az58-728', 'az58-784', 'az58-880', 'az58-2008', 'az58-2128']) {
+      const record = archiveEntry(id)!;
+      expect(record.verification, id).toBe('secondary-historical');
+      expect(record.evidenceLevel, id).toBe('unsupported-medical-claim');
+      expect(
+        `${record.summary} ${record.archiveNote ?? ''} ${record.source.originalContext ?? ''}`,
+        id,
+      ).toMatch(/1950s|1953|Crane/);
+    }
+
+    // The 1930s lab-paper values are RF, held at their actual magnitudes, and
+    // marked as reaching us through transcription rather than publication.
+    const bx = archiveEntry('rife-mor-bx')!;
+    expect(bx.frequency).toBeGreaterThan(1_000_000);
+    expect(bx.playback.directAudible).toBe(false);
   });
 
   it('never presents a context record as holding a frequency', () => {
@@ -164,8 +184,14 @@ describe('shipped archive', () => {
       const byRange = searchArchive(ARCHIVE_ENTRIES, { minHz: 0, maxHz: 1 });
       expect(byRange.map((result) => result.entry.id), entry.id).not.toContain(entry.id);
 
+      // A bare-number query keeps its text channel, so a context record may
+      // legitimately match on words in its summary — but never as a frequency.
       const byNumber = searchArchive(ARCHIVE_ENTRIES, parseQuery('0'));
-      expect(byNumber.map((result) => result.entry.id), entry.id).not.toContain(entry.id);
+      for (const result of byNumber) {
+        if (result.entry.id === entry.id) {
+          expect(result.reason, entry.id).not.toMatch(/frequency/i);
+        }
+      }
 
       // It stays findable the way someone would actually look for it.
       const byName = searchArchive(ARCHIVE_ENTRIES, { text: entry.name });
@@ -234,11 +260,18 @@ describe('search', () => {
   });
 
   it('returns every record holding a value, across sources', () => {
+    // The shipped archive itself holds 528 from two independent sources (the
+    // 1999 Solfeggio publication and a 2018 endocrine study); adding a third
+    // record surfaces all of them, none collapsed.
+    const shipped = entriesAtFrequency(ARCHIVE_ENTRIES, 528).map((entry) => entry.id);
+    expect(shipped).toContain('solfeggio-528');
+    expect(shipped).toContain('tone-528-study');
+
     const conflicting: ArchiveEntry[] = [
       { ...archiveEntry('solfeggio-528')!, id: 'other-528', source: { title: 'Another list' } },
       ...ARCHIVE_ENTRIES,
     ];
-    expect(entriesAtFrequency(conflicting, 528)).toHaveLength(2);
+    expect(entriesAtFrequency(conflicting, 528)).toHaveLength(shipped.length + 1);
   });
 
   it('flags near-duplicates rather than merging them', () => {
@@ -248,8 +281,9 @@ describe('search', () => {
     ];
     const near = nearDuplicates(drifted, 528);
     expect(near.map((entry) => entry.id)).toContain('drifted');
-    // Still distinct records: nothing was collapsed.
-    expect(entriesAtFrequency(drifted, 528)).toHaveLength(1);
+    // Still distinct records: the drifted value was flagged, not folded into
+    // the exact matches.
+    expect(entriesAtFrequency(drifted, 528).map((entry) => entry.id)).not.toContain('drifted');
   });
 
   it('preserves disagreement between sources instead of averaging', () => {

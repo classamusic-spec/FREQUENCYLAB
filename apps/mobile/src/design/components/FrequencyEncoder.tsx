@@ -3,8 +3,7 @@ import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import { KnobFace } from './KnobFace';
-import { DisplayGlass } from './Surface';
-import { clamp, formatHz } from '@frequencylab/dsp-core';
+import { clamp } from '@frequencylab/dsp-core';
 import { colors, radius, space } from '../tokens';
 import * as haptics from '../haptics';
 import { Label, Text } from './Text';
@@ -217,27 +216,44 @@ export function FrequencyEncoder({
   }, [defaultValue, disabled, locked, onChange, onCommit]);
 
 
+  const scaleLabels = useMemo(
+    () => labelStops(min, max, taper).map((stop) => ({
+      ...stop,
+      angle: START_ANGLE + toNormalised(stop.value, min, max, taper) * SWEEP,
+    })),
+    [max, min, taper],
+  );
+
+  // The value must live inside the cap: the cap radius is size/2 - 38, and a
+  // light-weight figure of N digits runs ≈ 0.52em per digit. Size against the
+  // widest realistic readout rather than the current one, so the type does not
+  // jump as the value crosses a digit boundary.
+  const capWidth = size - 100;
+  const valueSize = Math.min(46, capWidth / 4.4);
+
   return (
     <View style={[styles.container, style]} testID={testID}>
-      <DisplayGlass cornerRadius={12} style={[styles.readoutGlass, { width: size }]}>
-        <View style={styles.readoutInner}>
-          <Text variant="readoutXl" tone={disabled ? 'displayDim' : 'display'} style={styles.readoutValue}>
-            {formatHz(value, integerDigits, precision)}
-          </Text>
-          <View style={styles.readoutMeta}>
-            <Text variant="readoutXs" tone="displaySignal">
-              {unit}
+      <View style={[styles.knobStage, { width: size + LABEL_PAD * 2, height: size + LABEL_PAD * 2 }]}>
+        {/* Engraved figures around the dial, placed on the scale's own polar
+            geometry so they stay honest to where the ticks actually are. */}
+        {scaleLabels.map((stop) => {
+          const rad = (stop.angle * Math.PI) / 180;
+          const r = size / 2 + LABEL_PAD * 0.62;
+          const x = LABEL_PAD + size / 2 + r * Math.cos(rad);
+          const y = LABEL_PAD + size / 2 + r * Math.sin(rad);
+          return (
+            <Text
+              key={stop.label}
+              variant="readoutXs"
+              tone="tertiary"
+              style={[styles.scaleLabel, { left: x - 24, top: y - 8 }]}
+            >
+              {stop.label}
             </Text>
-            {caption ? (
-              <Text variant="caption" tone="displayDim" numberOfLines={1}>
-                {caption}
-              </Text>
-            ) : null}
-          </View>
-        </View>
-      </DisplayGlass>
+          );
+        })}
 
-      <View style={[styles.knobStage, { width: size, height: size }]}>
+        <View style={[styles.knobInset, { top: LABEL_PAD, left: LABEL_PAD, width: size, height: size }]}>
       <GestureDetector gesture={gesture}>
         <Pressable
           accessible
@@ -279,10 +295,38 @@ export function FrequencyEncoder({
             disabled={disabled}
             locked={locked}
             active={dragging}
+            showIndicator={false}
           />
+          {/* The readout lives on the cap itself, like the reference hardware:
+              the value is the face of the instrument, not a side panel. */}
+          <View style={styles.centre} pointerEvents="none">
+            <View style={styles.centreValueRow}>
+              <Text
+                variant="readoutXl"
+                tone={disabled ? 'disabled' : 'primary'}
+                numberOfLines={1}
+                style={{ fontSize: valueSize, lineHeight: valueSize + 6, letterSpacing: -valueSize * 0.03 }}
+              >
+                {centreFormat(value, precision)}
+              </Text>
+              <Text variant="readoutSm" tone="tertiary" style={styles.centreUnit}>
+                {unit}
+              </Text>
+            </View>
+            {caption ? (
+              <Label
+                tone="secondary"
+                numberOfLines={1}
+                style={[styles.centreCaption, { maxWidth: capWidth }]}
+              >
+                {caption}
+              </Label>
+            ) : null}
+          </View>
         </Pressable>
       </GestureDetector>
 
+        </View>
       </View>
 
       <Label style={styles.label}>{label}</Label>
@@ -342,14 +386,64 @@ function defaultStep(min: number, max: number, precision: number): number {
   return 1;
 }
 
-const styles = StyleSheet.create({
-  container: { alignItems: 'center', gap: space.md },
-  knobStage: { alignItems: 'center', justifyContent: 'center' },
+/** Margin around the dial reserved for the engraved scale figures. */
+const LABEL_PAD = 26;
 
-  readoutGlass: {},
-  readoutInner: { alignItems: 'center', paddingHorizontal: space.md, paddingVertical: space.md },
-  readoutValue: { marginBottom: 2 },
-  readoutMeta: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+/**
+ * The figures engraved around a dial.
+ *
+ * A log dial gets its decades (0.01, 0.1, 1, 10, 100) plus the half-decade
+ * below the top of the range when there is room — which is how the reference
+ * dial carries a 50 between its 10 and its 100. A linear dial gets ends and
+ * middle.
+ */
+function labelStops(
+  min: number,
+  max: number,
+  taper: EncoderTaper,
+): { value: number; label: string }[] {
+  const format = (v: number) => (v >= 1 ? String(Math.round(v)) : String(v));
+  if (taper !== 'log' || min <= 0) {
+    const mid = (min + max) / 2;
+    return [min, mid, max].map((v) => ({ value: v, label: format(v) }));
+  }
+  const stops: number[] = [];
+  for (let d = Math.ceil(Math.log10(min) - 1e-9); Math.pow(10, d) <= max * 1.0001; d++) {
+    const v = Math.pow(10, d);
+    if (v >= min * 0.9999) stops.push(v);
+  }
+  if (stops[0] > min * 1.01) stops.unshift(min);
+  const top = stops[stops.length - 1];
+  if (top < max * 0.999) stops.push(max);
+  else if (stops.length >= 2 && top / stops[stops.length - 2] === 10) {
+    stops.splice(stops.length - 1, 0, top / 2);
+  }
+  return stops.map((v) => ({ value: v, label: format(v) }));
+}
+
+/** The cap readout — never zero padded; a dial face shows the number itself. */
+function centreFormat(value: number, precision: number): string {
+  const decimals = value >= 1000 ? 0 : value >= 100 ? 1 : precision;
+  return value.toFixed(decimals);
+}
+
+const styles = StyleSheet.create({
+  container: { alignItems: 'center', gap: space.xs },
+  knobStage: { alignItems: 'center', justifyContent: 'center' },
+  knobInset: { position: 'absolute' },
+  scaleLabel: { position: 'absolute', width: 48, textAlign: 'center' },
+  centre: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centreValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  centreUnit: { marginBottom: 4 },
+  centreCaption: { marginTop: space.xs, letterSpacing: 2 },
   label: { marginTop: -space.xs },
   caption: {
     marginTop: space.hair,
