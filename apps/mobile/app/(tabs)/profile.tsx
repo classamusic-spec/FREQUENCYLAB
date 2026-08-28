@@ -206,6 +206,10 @@ export default function ProfileScreen() {
           label="Binaural default"
           value={preferences.defaultBinauralMode === 'centered' ? 'Centred' : 'Offset'}
         />
+        {/* Read-only mirror of what the note sheet sets. The control lives next
+            to the note you are typing, where a reference pitch means something;
+            here it is only worth being able to see. */}
+        <PanelRow label="Note reference" value={`A4 = ${preferences.noteReferenceHz} Hz`} />
         <PanelDivider />
         <View style={styles.buttonRow}>
           <HardwareButton

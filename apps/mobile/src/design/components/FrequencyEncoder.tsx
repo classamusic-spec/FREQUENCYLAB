@@ -112,6 +112,8 @@ export function FrequencyEncoder({
   const startNormalised = useRef(0);
   const lastDetentIndex = useRef(0);
   const lastAngle = useRef(0);
+  /** True once a touch has actually turned the dial. See `openEntry`. */
+  const turned = useRef(false);
   /**
    * True when the gesture began on the ring rather than on the knob cap.
    * A shared value, not a ref: the gesture callbacks are worklets running on
@@ -161,6 +163,7 @@ export function FrequencyEncoder({
    */
   const applyDelta = useCallback(
     (delta: number) => {
+      turned.current = true;
       emit(startNormalised.current + delta);
     },
     [emit],
@@ -182,6 +185,7 @@ export function FrequencyEncoder({
       if (delta > 180) delta -= 360;
       else if (delta < -180) delta += 360;
       lastAngle.current = degrees;
+      turned.current = true;
       startNormalised.current = clamp(startNormalised.current + delta / SWEEP, 0, 1);
       emit(startNormalised.current);
     },
@@ -190,6 +194,9 @@ export function FrequencyEncoder({
 
   const begin = useCallback(
     (x: number, y: number) => {
+      // Reset before the bail below, so a turn that ended on a disabled control
+      // cannot leave the flag set and swallow the next genuine tap.
+      turned.current = false;
       if (disabled || locked) return;
       haptics.beginGesture();
       startNormalised.current = normalised;
@@ -255,6 +262,21 @@ export function FrequencyEncoder({
     [applyAngle, applyDelta, begin, circularMode, disabled, finish, locked, size],
   );
   /* eslint-enable react-hooks/refs, react-hooks/immutability */
+
+  /**
+   * Opens the entry sheet, unless the finger just turned the dial.
+   *
+   * On the web build a drag also produces a click on the `Pressable` beneath
+   * the gesture detector, so every turn of the knob ended by throwing the
+   * numeric entry sheet over the value the user had just dialled in. The pan
+   * only activates past `minDistance`, so anything that reached `onUpdate` was
+   * a turn and not a tap; `begin` clears the flag at every touch-down, so the
+   * next real tap is unaffected.
+   */
+  const openEntry = useCallback(() => {
+    if (turned.current) return;
+    onRequestNumericEntry?.();
+  }, [onRequestNumericEntry]);
 
   const handleLongPress = useCallback(() => {
     if (disabled || locked || defaultValue === undefined) return;
@@ -366,7 +388,7 @@ export function FrequencyEncoder({
               onRequestNumericEntry?.();
             }
           }}
-          onPress={onRequestNumericEntry}
+          onPress={openEntry}
           onLongPress={handleLongPress}
           delayLongPress={600}
           style={StyleSheet.absoluteFill}
