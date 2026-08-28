@@ -151,14 +151,19 @@ export function ExperimentCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.panelRaised,
     borderRadius: radius.card,
     padding: space.lg,
     gap: space.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.edgeDark,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.95)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(83,95,112,0.22)',
+    shadowColor: '#2A3140',
+    shadowOpacity: 0.13,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
   cardCompact: { padding: space.md, gap: space.sm },
   cardHeader: {
@@ -191,10 +196,12 @@ const styles = StyleSheet.create({
   insightFooter: { gap: space.xs },
   nextStep: { fontStyle: 'italic' },
   progressTrack: {
-    height: 3,
+    height: 4,
     borderRadius: 2,
     backgroundColor: colors.surfaceRecessed,
     overflow: 'hidden',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(72,83,99,0.24)',
   },
   progressFill: { height: 3, backgroundColor: colors.signal },
 });

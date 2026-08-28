@@ -150,13 +150,31 @@ export default function ExploreScreen() {
 
       <InstrumentPanel tone="recessed" label="What is being generated">
         <View style={styles.channelRow}>
-          <PrecisionValueDisplay label="Left" value={channels.left} unit="Hz" precision={3} integerDigits={4} />
-          <PrecisionValueDisplay label="Right" value={channels.right} unit="Hz" precision={3} integerDigits={4} />
           <PrecisionValueDisplay
+            plate
+            size="sm"
+            label="Left"
+            value={channels.left}
+            unit="Hz"
+            precision={2}
+            integerDigits={3}
+          />
+          <PrecisionValueDisplay
+            plate
+            size="sm"
+            label="Right"
+            value={channels.right}
+            unit="Hz"
+            precision={2}
+            integerDigits={3}
+          />
+          <PrecisionValueDisplay
+            plate
+            size="sm"
             label="Difference"
             value={recipe.beatHz}
             unit="Hz"
-            precision={3}
+            precision={2}
             tone="signal"
           />
         </View>
@@ -394,7 +412,7 @@ const MOTION_RATE_PARAM: ParamDescriptor = {
 
 const styles = StyleSheet.create({
   encoderStage: { alignItems: 'center', paddingVertical: space.md },
-  channelRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  channelRow: { flexDirection: 'row', justifyContent: 'space-between', gap: space.xs },
   sliderPanel: { padding: space.lg, gap: space.lg },
   inlineRow: {
     flexDirection: 'row',

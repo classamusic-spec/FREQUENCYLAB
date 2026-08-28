@@ -57,14 +57,14 @@ export function Oscilloscope({
           y1={height / 2}
           x2={width}
           y2={height / 2}
-          stroke={colors.hairline}
+          stroke="rgba(233,246,243,0.14)"
           strokeWidth={StyleSheet.hairlineWidth * 2}
         />
         {paths?.right ? (
-          <Path d={paths.right} stroke={colors.signalDim} strokeWidth={1} fill="none" />
+          <Path d={paths.right} stroke="rgba(53,214,196,0.45)" strokeWidth={1} fill="none" />
         ) : null}
         {paths?.left ? (
-          <Path d={paths.left} stroke={colors.signal} strokeWidth={1.4} fill="none" />
+          <Path d={paths.left} stroke={colors.displaySignal} strokeWidth={1.4} fill="none" />
         ) : null}
       </Svg>
       {!paths ? <EmptyTrace label="No signal" /> : null}
@@ -114,7 +114,7 @@ export function SpectrumAnalyzer({
               y1={0}
               x2={x}
               y2={height}
-              stroke={colors.hairline}
+              stroke="rgba(233,246,243,0.10)"
               strokeWidth={StyleSheet.hairlineWidth}
             />
           );
@@ -127,7 +127,7 @@ export function SpectrumAnalyzer({
             width={bar.width}
             height={bar.height}
             rx={1}
-            fill={bar.height > height * 0.82 ? colors.warning : colors.signal}
+            fill={bar.height > height * 0.82 ? colors.warning : colors.displaySignal}
             opacity={0.9}
           />
         ))}
@@ -183,7 +183,7 @@ export function StereoVectorScope({
           cx={size / 2}
           cy={size / 2}
           r={size / 2 - 1}
-          stroke={colors.hairline}
+          stroke="rgba(233,246,243,0.14)"
           strokeWidth={StyleSheet.hairlineWidth * 2}
           fill={colors.surfaceRecessed}
         />
@@ -342,13 +342,9 @@ function useMeasuredWidth(): [number, (value: number) => void] {
 
 const styles = StyleSheet.create({
   frame: {
-    backgroundColor: colors.surfaceRecessed,
+    backgroundColor: 'transparent',
     borderRadius: radius.engraved,
     overflow: 'hidden',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.edgeDark,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.edgeLight,
     justifyContent: 'center',
   },
   vectorFrame: {

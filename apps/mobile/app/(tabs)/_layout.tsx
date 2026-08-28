@@ -2,7 +2,9 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatClock } from '@frequencylab/dsp-core';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius, space } from '../../src/design/tokens';
+import { LIGHT, SURFACES } from '../../src/design/materials';
 import { Label, Text } from '../../src/design/components/Text';
 import * as haptics from '../../src/design/haptics';
 import { usePlayer } from '../../src/state/player';
@@ -55,6 +57,14 @@ function InstrumentTabBar({ activeIndex }: { activeIndex: number }) {
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + space.xs }]}>
+      <LinearGradient
+        colors={SURFACES.panel}
+        start={LIGHT.vertical.start}
+        end={LIGHT.vertical.end}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+      <View style={styles.railEdge} pointerEvents="none" />
       {showTransport ? (
         <Pressable
           onPress={() => {
@@ -115,10 +125,24 @@ function formatBeat(telemetry: NonNullable<ReturnType<typeof usePlayer.getState>
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.chassis,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairlineStrong,
+    backgroundColor: colors.panel,
     paddingTop: space.xs,
+    shadowColor: '#1D2430',
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: -6 },
+    elevation: 16,
+  },
+  // The seam where the rail meets the case: a dark scribe with a lit lip.
+  railEdge: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: 'rgba(84,96,114,0.22)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.9)',
   },
   tabs: {
     flexDirection: 'row',
@@ -140,6 +164,10 @@ const styles = StyleSheet.create({
   },
   tabIndicatorActive: {
     backgroundColor: colors.signal,
+    shadowColor: colors.signal,
+    shadowOpacity: 0.7,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 0 },
   },
   transport: {
     flexDirection: 'row',

@@ -1,5 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, MIN_TOUCH_TARGET, radius, space } from '../tokens';
+import { LIGHT, SURFACES } from '../materials';
 import * as haptics from '../haptics';
 import { Text } from './Text';
 
@@ -60,12 +62,22 @@ export function SegmentSelector<T extends string>({
         ]}
       >
         <Text
+          style={styles.segmentLabel}
           variant={size === 'sm' ? 'label' : 'labelLg'}
           uppercase
           tone={option.disabled ? 'disabled' : selected ? 'primary' : 'tertiary'}
         >
           {option.label}
         </Text>
+        {selected ? (
+          <LinearGradient
+            colors={SURFACES.buttonCap}
+            start={LIGHT.face.start}
+            end={LIGHT.face.end}
+            style={styles.selectedCap}
+            pointerEvents="none"
+          />
+        ) : null}
         {selected ? <View style={styles.indicator} /> : null}
       </Pressable>
     );
@@ -99,12 +111,15 @@ const styles = StyleSheet.create({
     borderRadius: radius.control,
     padding: 3,
     gap: 3,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.edgeDark,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.edgeLight,
+    // A channel milled into the panel: shaded at the top by its own rim,
+    // catching bounced light along the bottom lip.
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(72,83,99,0.32)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.9)',
   },
   segment: {
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: MIN_TOUCH_TARGET - 8,
@@ -115,10 +130,25 @@ const styles = StyleSheet.create({
   segmentScroll: { minWidth: 76 },
   segmentSm: { minHeight: 30 },
   selected: {
-    backgroundColor: colors.surfaceRaised,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.edgeLight,
+    shadowColor: '#1D2430',
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
+  selectedCap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: radius.engraved + 2,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.95)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(83,95,112,0.24)',
+  },
+  segmentLabel: { zIndex: 1 },
   disabled: { opacity: 0.4 },
   indicator: {
     position: 'absolute',

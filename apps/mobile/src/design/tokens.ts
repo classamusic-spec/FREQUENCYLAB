@@ -16,34 +16,44 @@ import { Platform, type TextStyle } from 'react-native';
  */
 
 const palette = {
-  // Graphite stack. Each step is a real luminance change, so panels read as
-  // physical layers rather than as translucent cards.
-  void: '#08090B',
-  chassis: '#0C0E12',
-  panelRecessed: '#101318',
-  panel: '#141820',
-  panelRaised: '#1A1F28',
-  panelHigh: '#222835',
-  bezel: '#2C3340',
+  // The instrument's case. A cool anodised light grey, stepped by real
+  // luminance so raised and recessed forms separate without any hue shift.
+  void: '#DDE2E9',
+  chassis: '#E6EAF0',
+  panelRecessed: '#D3D9E2',
+  panel: '#F4F6FA',
+  panelRaised: '#FBFCFE',
+  panelHigh: '#FFFFFF',
+  bezel: '#2B323C',
 
-  inkPrimary: '#EDF1F5',
-  inkSecondary: '#96A0AD',
-  inkTertiary: '#5C6673',
-  inkDisabled: '#3A424D',
+  // Ink is engraved into metal, so it is near-black rather than pure black —
+  // a cut in aluminium never reads as ink on paper.
+  inkPrimary: '#141920',
+  inkSecondary: '#525C6A',
+  inkTertiary: '#7D8794',
+  inkDisabled: '#A8B0BC',
 
-  /** The single illumination colour. Used sparingly and never as a fill. */
-  signal: '#4DD6C1',
-  signalDim: '#2A7A6E',
-  signalGlow: 'rgba(77, 214, 193, 0.22)',
+  /** The single illumination colour, on the chassis. */
+  signal: '#0E9E8F',
+  signalDim: '#7FBFB7',
+  signalGlow: 'rgba(14, 158, 143, 0.18)',
 
-  warning: '#E5A45C',
-  limit: '#E0705C',
-  experiment: '#C86F8C',
-  evidenceStrong: '#5FC7B0',
-  evidencePromising: '#8FB3D9',
-  evidenceLimited: '#C4B58E',
-  evidenceTraditional: '#9A93A8',
-  evidenceUnsupported: '#E0705C',
+  // Display glass and the light emitted through it. Readouts live here, and
+  // this is the one place the interface is genuinely dark.
+  display: '#0B0F14',
+  displayDeep: '#070A0E',
+  displayInk: '#E9F6F3',
+  displaySignal: '#35D6C4',
+  displayDim: 'rgba(233, 246, 243, 0.34)',
+
+  warning: '#C97A1E',
+  limit: '#C4483A',
+  experiment: '#A8517A',
+  evidenceStrong: '#0E9E8F',
+  evidencePromising: '#3D7EA6',
+  evidenceLimited: '#9A8340',
+  evidenceTraditional: '#6F6A82',
+  evidenceUnsupported: '#C4483A',
 } as const;
 
 export const colors = {
@@ -55,15 +65,15 @@ export const colors = {
   surfaceRaised: palette.panelRaised,
   surfaceHigh: palette.panelHigh,
 
-  /** Top edge of a raised element catching light. */
-  edgeLight: 'rgba(255, 255, 255, 0.07)',
-  /** Bottom edge of a recessed element. */
-  edgeDark: 'rgba(0, 0, 0, 0.55)',
-  hairline: 'rgba(255, 255, 255, 0.055)',
-  hairlineStrong: 'rgba(255, 255, 255, 0.10)',
-  engraving: 'rgba(0, 0, 0, 0.45)',
+  /** Top edge of a raised form, catching the light. */
+  edgeLight: 'rgba(255, 255, 255, 0.95)',
+  /** Underside of a raised form, in its own shadow. */
+  edgeDark: 'rgba(83, 95, 112, 0.28)',
+  hairline: 'rgba(90, 102, 120, 0.14)',
+  hairlineStrong: 'rgba(84, 96, 114, 0.26)',
+  engraving: 'rgba(72, 83, 99, 0.30)',
 
-  scrim: 'rgba(6, 7, 9, 0.82)',
+  scrim: 'rgba(28, 34, 44, 0.44)',
 
   text: palette.inkPrimary,
   textSecondary: palette.inkSecondary,
@@ -153,30 +163,30 @@ export const shadows = {
   /** A panel sitting proud of the chassis. */
   raised: Platform.select({
     ios: {
-      shadowColor: '#000',
-      shadowOpacity: 0.55,
-      shadowRadius: 14,
-      shadowOffset: { width: 0, height: 6 },
+      shadowColor: '#2A3140',
+      shadowOpacity: 0.16,
+      shadowRadius: 20,
+      shadowOffset: { width: 0, height: 10 },
     },
-    default: { elevation: 6 },
+    default: { elevation: 8 },
   }) as object,
   control: Platform.select({
     ios: {
-      shadowColor: '#000',
-      shadowOpacity: 0.45,
+      shadowColor: '#1D2430',
+      shadowOpacity: 0.2,
       shadowRadius: 6,
-      shadowOffset: { width: 0, height: 2 },
+      shadowOffset: { width: 0, height: 3 },
     },
-    default: { elevation: 3 },
+    default: { elevation: 4 },
   }) as object,
   sheet: Platform.select({
     ios: {
-      shadowColor: '#000',
-      shadowOpacity: 0.7,
-      shadowRadius: 28,
-      shadowOffset: { width: 0, height: -8 },
+      shadowColor: '#161C26',
+      shadowOpacity: 0.34,
+      shadowRadius: 40,
+      shadowOffset: { width: 0, height: -12 },
     },
-    default: { elevation: 18 },
+    default: { elevation: 24 },
   }) as object,
 } as const;
 

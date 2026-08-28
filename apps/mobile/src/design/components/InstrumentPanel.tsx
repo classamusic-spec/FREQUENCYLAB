@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View, type ViewProps, type ViewStyle } from 'react-native';
-import { colors, radius, shadows, space } from '../tokens';
+import { radius, space } from '../tokens';
+import { SURFACES } from '../materials';
+import { DisplayGlass, Raised, Recessed } from './Surface';
 import { Label, Text } from './Text';
 
-export type PanelTone = 'recessed' | 'flat' | 'raised' | 'high';
+export type PanelTone = 'recessed' | 'flat' | 'raised' | 'high' | 'display';
 
 export interface InstrumentPanelProps extends ViewProps {
   tone?: PanelTone;
@@ -33,8 +35,8 @@ export function InstrumentPanel({
   children,
   ...rest
 }: InstrumentPanelProps) {
-  return (
-    <View style={[styles.base, TONE_STYLE[tone], bare ? null : styles.padded, style]} {...rest}>
+  const body = (
+    <View style={bare ? undefined : styles.padded}>
       {(label || headerRight) && (
         <View style={[styles.header, bare ? styles.headerInset : null]}>
           {label ? <Label>{label}</Label> : <View />}
@@ -43,6 +45,33 @@ export function InstrumentPanel({
       )}
       {children}
     </View>
+  );
+
+  // Each tone is a different physical form, not a different colour: a module
+  // face bolted to the case, a well milled into it, or a glass cutout.
+  if (tone === 'recessed') {
+    return (
+      <Recessed cornerRadius={radius.panel} style={style} {...rest}>
+        {body}
+      </Recessed>
+    );
+  }
+  if (tone === 'display') {
+    return (
+      <DisplayGlass cornerRadius={radius.panel} style={style} {...rest}>
+        {body}
+      </DisplayGlass>
+    );
+  }
+  return (
+    <Raised
+      cornerRadius={radius.panel}
+      ramp={tone === 'high' || tone === 'raised' ? SURFACES.panelActive : SURFACES.panel}
+      style={style}
+      {...rest}
+    >
+      {body}
+    </Raised>
   );
 }
 
@@ -73,38 +102,9 @@ export function PanelRow({
   );
 }
 
-const TONE_STYLE: Record<PanelTone, ViewStyle> = {
-  recessed: {
-    backgroundColor: colors.surfaceRecessed,
-    borderTopColor: colors.edgeDark,
-    borderBottomColor: colors.edgeLight,
-  },
-  flat: {
-    backgroundColor: colors.surface,
-    borderTopColor: colors.hairline,
-    borderBottomColor: colors.edgeDark,
-  },
-  raised: {
-    backgroundColor: colors.surfaceRaised,
-    borderTopColor: colors.edgeLight,
-    borderBottomColor: colors.edgeDark,
-    ...(shadows.raised as ViewStyle),
-  },
-  high: {
-    backgroundColor: colors.surfaceHigh,
-    borderTopColor: colors.edgeLight,
-    borderBottomColor: colors.edgeDark,
-    ...(shadows.control as ViewStyle),
-  },
-};
+
 
 const styles = StyleSheet.create({
-  base: {
-    borderRadius: radius.panel,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
-  },
   padded: {
     padding: space.lg,
   },
@@ -120,8 +120,10 @@ const styles = StyleSheet.create({
     paddingTop: space.md,
   },
   divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.hairline,
+    height: 1,
+    backgroundColor: 'rgba(84,96,114,0.20)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.75)',
     marginVertical: space.md,
   },
   row: {

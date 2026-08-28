@@ -2,7 +2,8 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
-import Svg, { Circle, G, Line, Path } from 'react-native-svg';
+import { KnobFace } from './KnobFace';
+import { DisplayGlass } from './Surface';
 import { clamp, formatHz } from '@frequencylab/dsp-core';
 import { colors, radius, space } from '../tokens';
 import * as haptics from '../haptics';
@@ -215,11 +216,28 @@ export function FrequencyEncoder({
     onCommit?.(defaultValue);
   }, [defaultValue, disabled, locked, onChange, onCommit]);
 
-  const geometry = useMemo(() => buildGeometry(size), [size]);
-  const angle = START_ANGLE + normalised * SWEEP;
 
   return (
-    <View style={[styles.container, { width: size, height: size }, style]} testID={testID}>
+    <View style={[styles.container, style]} testID={testID}>
+      <DisplayGlass cornerRadius={12} style={[styles.readoutGlass, { width: size }]}>
+        <View style={styles.readoutInner}>
+          <Text variant="readoutXl" tone={disabled ? 'displayDim' : 'display'} style={styles.readoutValue}>
+            {formatHz(value, integerDigits, precision)}
+          </Text>
+          <View style={styles.readoutMeta}>
+            <Text variant="readoutXs" tone="displaySignal">
+              {unit}
+            </Text>
+            {caption ? (
+              <Text variant="caption" tone="displayDim" numberOfLines={1}>
+                {caption}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      </DisplayGlass>
+
+      <View style={[styles.knobStage, { width: size, height: size }]}>
       <GestureDetector gesture={gesture}>
         <Pressable
           accessible
@@ -252,98 +270,22 @@ export function FrequencyEncoder({
           delayLongPress={600}
           style={StyleSheet.absoluteFill}
         >
-          <Svg width={size} height={size}>
-            {/* Bezel: the machined outer ring. */}
-            <Circle
-              cx={geometry.centre}
-              cy={geometry.centre}
-              r={geometry.bezelRadius}
-              fill={colors.chassis}
-              stroke={colors.bezel}
-              strokeWidth={1}
-            />
-
-            {/* Engraved scale. Every fifth tick is longer and brighter. */}
-            <G>
-              {geometry.ticks.map((tick, index) => (
-                <Line
-                  key={index}
-                  x1={tick.x1}
-                  y1={tick.y1}
-                  x2={tick.x2}
-                  y2={tick.y2}
-                  stroke={tick.major ? colors.textTertiary : colors.hairlineStrong}
-                  strokeWidth={tick.major ? 1.4 : 1}
-                  strokeLinecap="round"
-                />
-              ))}
-            </G>
-
-            {/* Track and illuminated arc. */}
-            <Path
-              d={arcPath(geometry.centre, geometry.trackRadius, START_ANGLE, START_ANGLE + SWEEP)}
-              stroke={colors.surfaceRecessed}
-              strokeWidth={geometry.trackWidth}
-              strokeLinecap="round"
-              fill="none"
-            />
-            {normalised > 0.001 ? (
-              <Path
-                d={arcPath(geometry.centre, geometry.trackRadius, START_ANGLE, angle)}
-                stroke={locked ? colors.textTertiary : colors.signal}
-                strokeWidth={geometry.trackWidth}
-                strokeLinecap="round"
-                fill="none"
-                opacity={disabled ? 0.3 : dragging ? 1 : 0.85}
-              />
-            ) : null}
-
-            {/* Knob face: concentric edges suggest a turned aluminium cap. */}
-            <Circle
-              cx={geometry.centre}
-              cy={geometry.centre}
-              r={geometry.knobRadius}
-              fill={colors.surfaceRaised}
-              stroke={colors.edgeLight}
-              strokeWidth={StyleSheet.hairlineWidth * 2}
-            />
-            <Circle
-              cx={geometry.centre}
-              cy={geometry.centre}
-              r={geometry.knobRadius - 8}
-              fill={colors.surface}
-              stroke={colors.engraving}
-              strokeWidth={1}
-            />
-
-            {/* Indicator: the line milled into the cap. */}
-            <Line
-              x1={polar(geometry.centre, geometry.knobRadius - 26, angle).x}
-              y1={polar(geometry.centre, geometry.knobRadius - 26, angle).y}
-              x2={polar(geometry.centre, geometry.knobRadius - 6, angle).x}
-              y2={polar(geometry.centre, geometry.knobRadius - 6, angle).y}
-              stroke={locked ? colors.textTertiary : colors.signal}
-              strokeWidth={2.5}
-              strokeLinecap="round"
-            />
-          </Svg>
+          <KnobFace
+            size={size}
+            normalised={normalised}
+            startAngle={START_ANGLE}
+            sweep={SWEEP}
+            accent={colors.signal}
+            disabled={disabled}
+            locked={locked}
+            active={dragging}
+          />
         </Pressable>
       </GestureDetector>
 
-      <View pointerEvents="none" style={styles.readout}>
-        <Text variant="readoutXl" tone={disabled ? 'disabled' : 'primary'}>
-          {formatHz(value, integerDigits, precision)}
-        </Text>
-        <Text variant="readoutXs" tone="tertiary" style={styles.unit}>
-          {unit}
-        </Text>
-        <Label style={styles.label}>{label}</Label>
-        {caption ? (
-          <Text variant="caption" tone="secondary" style={styles.caption}>
-            {caption}
-          </Text>
-        ) : null}
       </View>
+
+      <Label style={styles.label}>{label}</Label>
 
       {onToggleLock ? (
         <Pressable
@@ -364,48 +306,9 @@ export function FrequencyEncoder({
   );
 }
 
-interface Geometry {
-  centre: number;
-  bezelRadius: number;
-  trackRadius: number;
-  trackWidth: number;
-  knobRadius: number;
-  ticks: { x1: number; y1: number; x2: number; y2: number; major: boolean }[];
-}
 
-function buildGeometry(size: number): Geometry {
-  const centre = size / 2;
-  const bezelRadius = centre - 1;
-  const tickOuter = bezelRadius - 5;
-  const trackWidth = 5;
-  const trackRadius = bezelRadius - 20;
-  const knobRadius = trackRadius - 16;
 
-  const ticks: Geometry['ticks'] = [];
-  const count = 41;
-  for (let i = 0; i < count; i++) {
-    const angle = START_ANGLE + (i / (count - 1)) * SWEEP;
-    const major = i % 5 === 0;
-    const inner = tickOuter - (major ? 9 : 5);
-    const outer = polar(centre, tickOuter, angle);
-    const innerPoint = polar(centre, inner, angle);
-    ticks.push({ x1: innerPoint.x, y1: innerPoint.y, x2: outer.x, y2: outer.y, major });
-  }
 
-  return { centre, bezelRadius, trackRadius, trackWidth, knobRadius, ticks };
-}
-
-function polar(centre: number, r: number, degrees: number): { x: number; y: number } {
-  const radians = (degrees * Math.PI) / 180;
-  return { x: centre + r * Math.cos(radians), y: centre + r * Math.sin(radians) };
-}
-
-function arcPath(centre: number, r: number, fromDeg: number, toDeg: number): string {
-  const start = polar(centre, r, fromDeg);
-  const end = polar(centre, r, toDeg);
-  const largeArc = Math.abs(toDeg - fromDeg) > 180 ? 1 : 0;
-  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`;
-}
 
 /** Maps a value onto 0..1 travel, logarithmically for frequency controls. */
 export function toNormalised(value: number, min: number, max: number, taper: EncoderTaper): number {
@@ -440,21 +343,14 @@ function defaultStep(min: number, max: number, precision: number): number {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  readout: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  unit: {
-    marginTop: -2,
-  },
-  label: {
-    marginTop: space.sm,
-  },
+  container: { alignItems: 'center', gap: space.md },
+  knobStage: { alignItems: 'center', justifyContent: 'center' },
+
+  readoutGlass: {},
+  readoutInner: { alignItems: 'center', paddingHorizontal: space.md, paddingVertical: space.md },
+  readoutValue: { marginBottom: 2 },
+  readoutMeta: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  label: { marginTop: -space.xs },
   caption: {
     marginTop: space.hair,
   },

@@ -1,6 +1,7 @@
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 import { formatHz } from '@frequencylab/dsp-core';
-import { colors, radius, space } from '../tokens';
+import { radius, space } from '../tokens';
+import { DisplayGlass } from './Surface';
 import { Label, Text } from './Text';
 
 export interface PrecisionValueDisplayProps {
@@ -40,8 +41,30 @@ export function PrecisionValueDisplay({
   const text = typeof value === 'string' ? value : formatHz(value, integerDigits, precision);
   const variant = size === 'lg' ? 'readoutLg' : size === 'sm' ? 'readoutSm' : 'readout';
 
+  // A plated value is a real display cut into the panel: the label stays
+  // engraved on the metal, and only the number is illuminated behind glass.
+  if (plate) {
+    return (
+      <View style={[{ alignItems: ALIGN[align] }, style]}>
+        <Label style={styles.plateLabel}>{label}</Label>
+        <DisplayGlass cornerRadius={radius.engraved + 2}>
+          <View style={styles.plateInner}>
+            <Text variant={variant} tone={tone === 'signal' ? 'displaySignal' : 'display'}>
+              {text}
+            </Text>
+            {unit ? (
+              <Text variant="readoutXs" tone="displayDim" style={styles.unit}>
+                {unit}
+              </Text>
+            ) : null}
+          </View>
+        </DisplayGlass>
+      </View>
+    );
+  }
+
   return (
-    <View style={[plate ? styles.plate : null, { alignItems: ALIGN[align] }, style]}>
+    <View style={[{ alignItems: ALIGN[align] }, style]}>
       <Label>{label}</Label>
       <View style={styles.valueRow}>
         <Text variant={variant} tone={tone}>
@@ -60,15 +83,13 @@ export function PrecisionValueDisplay({
 const ALIGN = { left: 'flex-start', center: 'center', right: 'flex-end' } as const;
 
 const styles = StyleSheet.create({
-  plate: {
-    backgroundColor: colors.surfaceRecessed,
-    borderRadius: radius.engraved,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.edgeDark,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.edgeLight,
+  plateLabel: { marginBottom: space.xxs },
+  plateInner: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: space.xxs,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
   },
   valueRow: {
     flexDirection: 'row',

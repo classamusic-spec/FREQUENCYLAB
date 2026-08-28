@@ -2,10 +2,16 @@
 
 ## The target
 
-A precision instrument rendered in software. Anodised graphite, engraved
-markings, recessed panels, one illumination colour. The interface should feel
-expensive because of proportion, spacing, hairlines and restraint — not because
-things glow.
+A precision instrument rendered in software — literally. The interface is
+skeuomorphic: machined aluminium panels, milled wells, turned knob caps, glass
+displays cut into the case. It should read as a photograph of a device you
+could pick up.
+
+The rule that makes that work is in `materials.ts`: **one light source**, above
+and slightly left. Every highlight sits on the top-left edge of a form and
+every shadow falls bottom-right. A single control lit from the wrong side
+destroys the illusion for the whole screen, so no component is allowed its own
+lighting.
 
 The explicit non-goals: generic SaaS, bootstrap dashboards, ordinary meditation
 apps, neon cyberpunk, cheap sci-fi HUDs, template glassmorphism, cluttered audio
@@ -13,20 +19,38 @@ plugins.
 
 ## Material language
 
-A surface is defined by three things at once: its fill, a light hairline on the
-edge that would catch light, and a dark hairline on the edge that would fall
-into shadow. That is what makes `recessed` read as milled *into* the chassis and
-`raised` as sitting proud of it — without a single gradient or blur.
+Three physical forms, in `Surface.tsx`. Which one a component uses is a
+statement about what it *is*, not how it should be coloured.
 
-```
-raised     fill #1A1F28   top rgba(255,255,255,.07)   bottom rgba(0,0,0,.55)   + shadow
-flat       fill #141820   top rgba(255,255,255,.055)  bottom rgba(0,0,0,.55)
-recessed   fill #101318   top rgba(0,0,0,.55)         bottom rgba(255,255,255,.07)
-```
+| Form | Physics |
+|---|---|
+| `Raised` | Lit top edge, occluded bottom edge, ambient **and** contact shadow. Two nested views, because RN allows one shadow each — the pair is what separates an object *resting on* the case from one floating above it. |
+| `Recessed` | The inverse: the rim shades the top of the well, light bounces onto the bottom lip, and there is deliberately **no** drop shadow. A hole does not cast one. |
+| `DisplayGlass` | A dark cutout behind a bezel, with a diagonal sheen. The only genuinely dark surface in the instrument, which is what makes readouts read as *emitting* light rather than merely being coloured. |
 
-The graphite stack — `#08090B` void, `#0C0E12` chassis, `#101318`, `#141820`,
-`#1A1F28`, `#222835`, `#2C3340` bezel — separates surfaces by luminance only.
-Never by hue.
+Supporting details: `BrushedGrain` (a near-threshold anodised grain — most of
+what separates "metal" from "grey rectangle", but it has to stay barely visible
+or it becomes texture for its own sake) and `Screw` (used at most one per
+corner of a major module; screws everywhere is the fastest way to make
+skeuomorphism look like a novelty).
+
+Engraving is a one-pixel effect: text cut into metal is darker than the surface
+with a bright lip on its **lower** edge, where the far wall of the cut catches
+the light. Raised text is the inverse.
+
+### The knob
+
+`KnobFace` is drawn as concentric physical parts, outside in — the same order a
+real encoder is assembled, which is what keeps the shading agreeing with
+itself: a scribed scale ring with ticks, an illuminated arc sunk in a dark
+channel, a knurled collar whose serrations are lit only on the flank facing the
+light, a turned cap with machining rings and a tight specular offset up-left,
+and an indicator milled into the cap so it has both a shadow wall and a lit
+lip.
+
+The value does **not** sit on the cap. It has its own LCD panel above the knob,
+the way a bench signal generator is laid out — the number gets room to breathe
+and the cap stays clean.
 
 ## Colour
 

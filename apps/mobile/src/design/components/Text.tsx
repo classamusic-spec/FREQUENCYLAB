@@ -2,7 +2,18 @@ import { StyleSheet, Text as RNText, type TextProps as RNTextProps, type TextSty
 import { colors, tabularNums, type } from '../tokens';
 
 type Variant = keyof typeof type;
-type Tone = 'primary' | 'secondary' | 'tertiary' | 'signal' | 'warning' | 'limit' | 'disabled';
+type Tone =
+  | 'primary'
+  | 'secondary'
+  | 'tertiary'
+  | 'signal'
+  | 'warning'
+  | 'limit'
+  | 'disabled'
+  /** Illuminated text on dark display glass. */
+  | 'display'
+  | 'displayDim'
+  | 'displaySignal';
 
 export interface TextProps extends RNTextProps {
   variant?: Variant;
@@ -20,6 +31,9 @@ const TONE_COLOR: Record<Tone, string> = {
   warning: colors.warning,
   limit: colors.limit,
   disabled: colors.textDisabled,
+  display: colors.displayInk,
+  displayDim: colors.displayDim,
+  displaySignal: colors.displaySignal,
 };
 
 const MONO_VARIANTS = new Set<Variant>([

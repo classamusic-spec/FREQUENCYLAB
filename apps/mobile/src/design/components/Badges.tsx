@@ -4,6 +4,7 @@ import { EVIDENCE_LABELS, type EvidenceLevel } from '@frequencylab/dsp-core';
 import { colors, evidenceColors, radius, space } from '../tokens';
 import * as haptics from '../haptics';
 import { Label, Text } from './Text';
+import { DisplayGlass } from './Surface';
 
 export interface EvidenceBadgeProps {
   level: EvidenceLevel;
@@ -73,12 +74,16 @@ export function DnaChip({ human, fingerprint, onPress, style }: DnaChipProps) {
       accessibilityRole="button"
       accessibilityLabel={`Protocol DNA ${human}`}
       accessibilityHint={fingerprint ? 'Long press to copy the full fingerprint.' : undefined}
-      style={[styles.dna, style]}
+      style={style}
     >
-      <Label tone="tertiary">DNA</Label>
-      <Text variant="readoutXs" tone="signal" numberOfLines={1}>
-        {human}
-      </Text>
+      <DisplayGlass cornerRadius={radius.engraved + 1}>
+        <View style={styles.dna}>
+          <Label tone="displayDim">DNA</Label>
+          <Text variant="readoutXs" tone="displaySignal" numberOfLines={1}>
+            {human}
+          </Text>
+        </View>
+      </DisplayGlass>
     </Pressable>
   );
 }
@@ -119,11 +124,6 @@ const styles = StyleSheet.create({
     gap: space.sm,
     paddingHorizontal: space.sm,
     paddingVertical: space.xs,
-    borderRadius: radius.engraved,
-    backgroundColor: colors.surfaceRecessed,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
-    alignSelf: 'flex-start',
   },
   tag: {
     paddingHorizontal: space.sm,

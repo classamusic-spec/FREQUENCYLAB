@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { LIGHT, SURFACES } from '../materials';
+import { BrushedGrain } from './Surface';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, layout, space } from '../tokens';
 import { Label, Text } from './Text';
@@ -22,24 +25,41 @@ export function Screen({ children, scroll = true, bottomInset = 0, contentStyle,
     paddingBottom: insets.bottom + bottomInset + space.xxxl,
   };
 
+  const chassis = (
+    <>
+      <LinearGradient
+        colors={SURFACES.chassis}
+        start={LIGHT.vertical.start}
+        end={LIGHT.vertical.end}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+      <BrushedGrain opacity={0.45} />
+    </>
+  );
+
   if (!scroll) {
     return (
-      <View testID={testID} style={[styles.root, padding, style]}>
-        {children}
+      <View testID={testID} style={[styles.root, style]}>
+        {chassis}
+        <View style={[styles.plain, padding]}>{children}</View>
       </View>
     );
   }
 
   return (
-    <ScrollView
-      testID={testID}
-      style={[styles.root, style]}
-      contentContainerStyle={[styles.content, padding, contentStyle]}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-    >
-      {children}
-    </ScrollView>
+    <View style={[styles.root, style]}>
+      {chassis}
+      <ScrollView
+        testID={testID}
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, padding, contentStyle]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {children}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -105,10 +125,9 @@ export function EmptyState({
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+  root: { flex: 1, backgroundColor: colors.background },
+  scroll: { flex: 1 },
+  plain: { flex: 1, paddingHorizontal: layout.screenPadding },
   content: {
     paddingHorizontal: layout.screenPadding,
     gap: space.lg,

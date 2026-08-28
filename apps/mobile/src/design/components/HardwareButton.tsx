@@ -5,8 +5,11 @@ import Animated, {
   useSharedValue,
   withTiming,
   Easing,
+  interpolate,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, MIN_TOUCH_TARGET, motion, radius, space } from '../tokens';
+import { LIGHT, SURFACES } from '../materials';
 import * as haptics from '../haptics';
 import { useReducedMotion } from '../useReducedMotion';
 import { Text } from './Text';
@@ -54,12 +57,22 @@ export function HardwareButton({
   const inactive = disabled || loading;
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: reducedMotion ? 1 : 1 - pressed.value * 0.015 }],
-    opacity: 1 - pressed.value * 0.12,
+    // A real cap travels into its housing rather than shrinking. The shadow
+    // collapses with it, which is what sells the depression.
+    transform: [{ translateY: reducedMotion ? 0 : pressed.value * 1.5 }],
+    shadowOpacity: interpolate(pressed.value, [0, 1], [0.20, 0.06]),
+    shadowRadius: interpolate(pressed.value, [0, 1], [6, 2]),
   }));
 
-  // Plain functions rather than callbacks: they write to a Reanimated shared
-  // value, which must not be captured as a hook dependency.
+  const capStyle = useAnimatedStyle(() => ({ opacity: 1 - pressed.value }));
+
+  /*
+   * Writing a Reanimated shared value from a press handler is the idiomatic way
+   * to drive an animation off the render path; `react-hooks/immutability`
+   * cannot tell it apart from a render-phase mutation, which is what it guards
+   * against. Scoped to these two handlers only.
+   */
+  /* eslint-disable react-hooks/immutability */
   const handlePressIn = () => {
     pressed.value = withTiming(1, { duration: motion.instant, easing: Easing.out(Easing.quad) });
   };
@@ -67,6 +80,8 @@ export function HardwareButton({
   const handlePressOut = () => {
     pressed.value = withTiming(0, { duration: motion.quick, easing: Easing.out(Easing.quad) });
   };
+
+  /* eslint-enable react-hooks/immutability */
 
   const handlePress = () => {
     if (inactive) return;
@@ -97,6 +112,21 @@ export function HardwareButton({
           animatedStyle,
         ]}
       >
+        <LinearGradient
+          colors={variant === 'primary' ? SURFACES.buttonPrimary : SURFACES.buttonCapPressed}
+          start={LIGHT.face.start}
+          end={LIGHT.face.end}
+          style={styles.capLayer}
+          pointerEvents="none"
+        />
+        <Animated.View style={[styles.capLayer, capStyle]} pointerEvents="none">
+          <LinearGradient
+            colors={variant === 'primary' ? SURFACES.buttonPrimary : SURFACES.buttonCap}
+            start={LIGHT.face.start}
+            end={LIGHT.face.end}
+            style={styles.capLayer}
+          />
+        </Animated.View>
         {icon ? <View style={styles.icon}>{icon}</View> : null}
         <Text
           variant={size === 'sm' ? 'label' : 'labelLg'}
@@ -128,27 +158,20 @@ const SIZE_STYLE: Record<ButtonSize, ViewStyle> = {
 
 const VARIANT_STYLE: Record<ButtonVariant, ViewStyle> = {
   primary: {
-    backgroundColor: colors.surfaceHigh,
-    borderColor: colors.signalDim,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.signal,
+    borderTopColor: 'rgba(255,255,255,0.55)',
+    borderBottomColor: 'rgba(8,86,78,0.55)',
   },
   secondary: {
-    backgroundColor: colors.surfaceRaised,
-    borderTopColor: colors.edgeLight,
-    borderBottomColor: colors.edgeDark,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.95)',
+    borderBottomColor: 'rgba(83,95,112,0.32)',
   },
   ghost: {
-    backgroundColor: 'transparent',
-    borderColor: colors.hairline,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.7)',
+    borderBottomColor: 'rgba(83,95,112,0.20)',
   },
   danger: {
-    backgroundColor: colors.surfaceRaised,
-    borderColor: 'rgba(224, 112, 92, 0.35)',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.85)',
+    borderBottomColor: 'rgba(140,52,42,0.40)',
   },
 };
 
@@ -159,11 +182,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: space.sm,
     borderRadius: radius.control,
+    overflow: 'hidden',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    shadowColor: '#1D2430',
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
+  capLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   selected: {
-    backgroundColor: colors.surfaceHigh,
-    borderColor: colors.signalDim,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.signal,
+    borderBottomColor: 'rgba(14,158,143,0.4)',
   },
   disabled: {
     opacity: 0.45,

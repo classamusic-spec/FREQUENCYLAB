@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { formatClock, formatHz } from '@frequencylab/dsp-core';
+import { formatClock } from '@frequencylab/dsp-core';
 import { InstrumentPanel, PanelDivider, PanelRow } from '../src/design/components/InstrumentPanel';
 import { SessionRing } from '../src/design/components/SessionRing';
 import { HardwareButton } from '../src/design/components/HardwareButton';
@@ -15,6 +15,8 @@ import {
 } from '../src/design/components/Visualizers';
 import { SafetyBanner } from '../src/design/components/SafetyBanner';
 import { Label, Text } from '../src/design/components/Text';
+import { PrecisionValueDisplay } from '../src/design/components/PrecisionValueDisplay';
+import { DisplayGlass } from '../src/design/components/Surface';
 import { bandForFrequency, colors, radius, space } from '../src/design/tokens';
 import * as haptics from '../src/design/haptics';
 import { usePlayer, useScopeCapture } from '../src/state/player';
@@ -134,29 +136,54 @@ export default function SessionScreen() {
         </View>
 
         <View style={styles.primaryReadouts}>
-          <View style={styles.readoutColumn}>
-            <Label>Carrier</Label>
-            <Text variant="readoutLg">{formatHz(carrier, 3, 3)}</Text>
-          </View>
-          <View style={styles.readoutColumn}>
-            <Label>Stage</Label>
-            <Text variant="readoutLg">{telemetry?.stageName ?? '—'}</Text>
-          </View>
-          <View style={styles.readoutColumn}>
-            <Label>Remaining</Label>
-            <Text variant="readoutLg">
-              {telemetry ? formatClock(telemetry.durationSec - telemetry.positionSec) : '--:--'}
-            </Text>
-          </View>
+          <PrecisionValueDisplay
+            plate
+            size="sm"
+            label="Carrier"
+            value={carrier}
+            unit="Hz"
+            precision={2}
+            integerDigits={3}
+            style={styles.readoutColumn}
+          />
+          <PrecisionValueDisplay
+            plate
+            size="sm"
+            label="Stage"
+            value={telemetry?.stageName ?? '—'}
+            style={styles.readoutColumn}
+          />
+          <PrecisionValueDisplay
+            plate
+            size="sm"
+            label="Remaining"
+            value={telemetry ? formatClock(telemetry.durationSec - telemetry.positionSec) : '--:--'}
+            tone="signal"
+            style={styles.readoutColumn}
+          />
         </View>
 
         <View style={styles.waveform}>
-          <Oscilloscope
-            samples={capture?.left ?? null}
-            samplesRight={capture?.right ?? null}
-            height={72}
-            label="Live output"
-          />
+          <Label style={styles.scopeLabel}>Output</Label>
+          <DisplayGlass cornerRadius={8}>
+            <Oscilloscope
+              samples={capture?.left ?? null}
+              samplesRight={capture?.right ?? null}
+              height={72}
+              label="Live output"
+            />
+          </DisplayGlass>
+        </View>
+
+        <View style={styles.waveform}>
+          <Label style={styles.scopeLabel}>Spectrum</Label>
+          <DisplayGlass cornerRadius={8}>
+            <SpectrumAnalyzer
+              bins={capture?.spectrum ?? null}
+              sampleRate={capture?.sampleRate}
+              height={96}
+            />
+          </DisplayGlass>
         </View>
 
         {showIntensity ? (
@@ -292,15 +319,10 @@ const styles = StyleSheet.create({
   headerCentre: { flex: 1, alignItems: 'center' },
   banner: { marginTop: space.sm },
   stage: { alignItems: 'center', marginTop: space.md },
-  primaryReadouts: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: space.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
-  },
-  readoutColumn: { gap: space.xxs, flex: 1 },
-  waveform: { marginTop: space.xs },
+  primaryReadouts: { flexDirection: 'row', gap: space.xs },
+  readoutColumn: { flex: 1 },
+  waveform: { marginTop: space.xs, gap: space.xxs },
+  scopeLabel: { marginLeft: space.xxs },
   intensityRow: { flexDirection: 'row', gap: space.sm, marginTop: space.md },
   intensityStep: {
     flex: 1,
