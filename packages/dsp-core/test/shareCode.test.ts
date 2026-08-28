@@ -14,6 +14,8 @@ import {
   parseShareCode,
   protocolFingerprint,
   shareCheck,
+  FACTORY_PRESETS,
+  presetToProtocol,
   type Protocol,
 } from '../src/index.js';
 
@@ -264,5 +266,129 @@ describe('share codes', () => {
     // form excludes the name — two people building the same chain should get
     // the same code.
     expect(shareCheck({ ...calm, name: 'Something else', id: 'other' })).toBe(shareCheck(calm));
+  });
+});
+
+describe('share codes across the whole engine', () => {
+  /*
+   * The grammar started life knowing three engines, because those were the
+   * three the stage builder had. The stock preset library brought five more —
+   * a plain tone, a harmonic stack, FM, centred binaural, and a noise bed with
+   * no tone module in it at all — and 46 of the 72 factory presets could not be
+   * written as a code at all. That is not a small gap: a bare 528 Hz tone is
+   * about the most shareable thing in the library, and the card's fallback copy
+   * would have told its owner the protocol "uses custom routing", which is
+   * false. These assert the grammar covers what the builder can build.
+   */
+  it('writes and reads back every factory preset', () => {
+    const compiled = FACTORY_PRESETS.map((preset) => ({ preset, built: presetToProtocol(preset) }));
+    for (const { preset, built } of compiled) {
+      if (!built.ok) continue;
+      const code = encodeShareCode(built.protocol);
+      expect(code, `${preset.id} (${preset.representation.kind}) has no share code`).not.toBeNull();
+
+      const reread = parseShareCode(code!);
+      expect(reread.ok, `${preset.id} does not parse back`).toBe(true);
+      if (!reread.ok) continue;
+      expect(protocolFingerprint(reread.protocol), `${preset.id} round-trips to a different sound`)
+        .toBe(protocolFingerprint(built.protocol));
+    }
+  });
+
+  /*
+   * The reason centred binaural gets its own letter rather than a flag. A 6 Hz
+   * beat on 220 Hz is 220/226 offset and 217/223 centred — different sounds, so
+   * different codes. If both wrote `EB`, one would be readable as the other.
+   */
+  it('does not let a centred binaural read as an offset one', () => {
+    const make = (binauralMode: 'offset' | 'centered') =>
+      createProtocol({
+        id: `mode-${binauralMode}`,
+        name: 'Mode',
+        intent: 'explore',
+        master: DEFAULT_MASTER,
+        stages: [
+          buildStage({
+            id: 'stage-1',
+            name: 'A',
+            durationSec: 600,
+            engine: 'binaural',
+            binauralMode,
+            carrierHz: 220,
+            beatHz: 6,
+            amplitude: 0.36,
+            crossfadeSec: 0,
+          }),
+        ],
+      });
+
+    const offset = encodeShareCode(make('offset'));
+    const centered = encodeShareCode(make('centered'));
+    expect(offset).not.toBeNull();
+    expect(centered).not.toBeNull();
+    expect(centered).not.toBe(offset);
+    expect(centered).toContain('EC');
+
+    const back = parseShareCode(centered!);
+    expect(back.ok).toBe(true);
+    if (back.ok) {
+      expect(protocolFingerprint(back.protocol)).toBe(protocolFingerprint(make('centered')));
+      expect(protocolFingerprint(back.protocol)).not.toBe(protocolFingerprint(make('offset')));
+    }
+  });
+
+  it('leaves out the tokens an engine has no use for', () => {
+    const tone = createProtocol({
+      id: 'plain-tone',
+      name: 'Tone',
+      intent: 'explore',
+      master: DEFAULT_MASTER,
+      stages: [
+        buildStage({
+          id: 'stage-1',
+          name: 'A',
+          durationSec: 900,
+          engine: 'tone',
+          carrierHz: 528,
+          beatHz: 0,
+          amplitude: 0.36,
+          crossfadeSec: 0,
+        }),
+      ],
+    });
+    const toneCode = encodeShareCode(tone);
+    // A tone has a pitch and no rate: `B0` would read as a beat somebody chose.
+    expect(toneCode).toContain('C528');
+    expect(toneCode).not.toMatch(/\bB\d/);
+
+    const bed = createProtocol({
+      id: 'noise-bed',
+      name: 'Bed',
+      intent: 'explore',
+      master: DEFAULT_MASTER,
+      stages: [
+        buildStage({
+          id: 'stage-1',
+          name: 'A',
+          durationSec: 1800,
+          engine: 'none',
+          carrierHz: 0,
+          beatHz: 0,
+          amplitude: 0,
+          noise: { color: 'pink', level: 0.25 },
+          crossfadeSec: 0,
+        }),
+      ],
+    });
+    const bedCode = encodeShareCode(bed);
+    // A bed with no tone module carries neither a carrier nor a beat.
+    expect(bedCode).toContain('EO');
+    expect(bedCode).toContain('NP');
+    expect(bedCode).not.toMatch(/\bC\d/);
+    expect(bedCode).not.toMatch(/\bB\d/);
+
+    const reread = parseShareCode(bedCode!);
+    expect(reread.ok).toBe(true);
+    if (reread.ok) expect(protocolFingerprint(reread.protocol)).toBe(protocolFingerprint(bed));
   });
 });

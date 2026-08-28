@@ -1,4 +1,5 @@
 import { buildStandardGraph, createProtocol } from '../protocol/builders.js';
+import { defaultParams } from '../graph/descriptors.js';
 import { makeNode } from '../graph/factory.js';
 import { OUTPUT_NODE_ID, type RoutingGraph } from '../graph/types.js';
 import { MAX_TONE_HZ } from '../math/constants.js';
@@ -47,6 +48,12 @@ const PROVENANCE_NOTICE =
  * Each transform maps to a genuinely different signal chain — a direct tone is
  * an oscillator, a binaural difference is two tones, an AM rate is a modulated
  * carrier. Nothing is approximated by reusing the wrong engine.
+ *
+ * The switch is exhaustive on purpose. It used to end in a `default` that fell
+ * back to a plain tone, which meant any transform added to the translator would
+ * quietly be auditioned as something else — the silent substitution the
+ * translator exists to prevent, reappearing one module downstream. A new kind
+ * now fails to compile here until it has a chain of its own.
  */
 export function graphForTransform(spec: ArchiveStageSpec): RoutingGraph {
   const { transform } = spec;
@@ -87,11 +94,76 @@ export function graphForTransform(spec: ArchiveStageSpec): RoutingGraph {
         amplitude,
         noise: spec.noise,
       });
+    case 'binaural-centered':
+      return buildStandardGraph({
+        engine: 'binaural',
+        binauralMode: 'centered',
+        carrierHz: carrier,
+        beatHz: transform.playbackHz,
+        amplitude,
+        noise: spec.noise,
+      });
+    case 'monaural-beat':
+      return buildStandardGraph({
+        engine: 'monaural',
+        carrierHz: carrier,
+        beatHz: transform.playbackHz,
+        amplitude,
+        noise: spec.noise,
+      });
+    case 'fm-rate':
+      return buildStandardGraph({
+        engine: 'fm',
+        carrierHz: carrier,
+        beatHz: transform.playbackHz,
+        // The swing the transform stated, not a fresh one: the chain has to
+        // produce the signal the user was shown before they pressed play.
+        fm: { deviationHz: transform.deviationHz },
+        amplitude,
+        noise: spec.noise,
+      });
+    case 'stereo-motion-rate':
+      return buildStandardGraph({
+        engine: 'tone',
+        carrierHz: carrier,
+        beatHz: 0,
+        amplitude,
+        motion: { rateHz: transform.playbackHz, depth: defaultParams('stereoMotion').depth },
+        noise: spec.noise,
+      });
+    case 'noise-modulation-rate': {
+      // Here the bed *is* the signal, so one is always present. Absent an
+      // explicit choice the noise module's own defaults stand rather than a
+      // second set of numbers kept in this file.
+      const bed = spec.noise ?? { color: 'pink' as const, level: defaultParams('noise').level };
+      return buildStandardGraph({
+        engine: 'none',
+        carrierHz: carrier,
+        beatHz: 0,
+        amplitude,
+        noise: bed,
+        // Full depth: the transform's whole statement is that the bed's level
+        // rises and falls at this rate, and a shallower one would understate it.
+        am: { rateHz: transform.playbackHz, depth: 1 },
+      });
+    }
+    case 'harmonic-stack':
+      return buildStandardGraph({
+        engine: 'harmonic',
+        carrierHz: transform.playbackHz,
+        beatHz: 0,
+        amplitude,
+        noise: spec.noise,
+      });
     case 'direct':
     case 'octave-down':
     case 'octave-up':
-    default:
+    case 'subharmonic':
       return directToneGraph(transform.playbackHz, amplitude, spec.noise);
+    default: {
+      const exhaustive: never = transform.kind;
+      throw new Error(`No signal chain for transform "${String(exhaustive)}".`);
+    }
   }
 }
 

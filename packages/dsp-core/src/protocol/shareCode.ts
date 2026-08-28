@@ -1,7 +1,7 @@
 import type { CurveKind } from '../math/curves.js';
 import type { NoiseColor } from '../dsp/noise.js';
 import type { Waveform } from '../dsp/oscillator.js';
-import { buildStage, createProtocol, type StimulationEngine } from './builders.js';
+import { buildStage, createProtocol, type ChainEngine } from './builders.js';
 import { protocolFingerprint } from './dna.js';
 import { base32Encode, sha256Bytes, utf8Encode } from './sha256.js';
 import { DEFAULT_MASTER, type Protocol, type ProtocolStage } from './schema.js';
@@ -44,7 +44,11 @@ export const SHARE_CODE_VERSION = 1;
 /** The construction arguments for one stage, recovered from its graph. */
 export interface ShareStage {
   durationSec: number;
-  engine: StimulationEngine;
+  engine: ChainEngine;
+  /** Centred splits the beat either side of the carrier; offset puts it on one ear. */
+  binauralMode?: 'offset' | 'centered';
+  /** Swing and index, when the FM engine is tuned away from the module's own defaults. */
+  fm?: { deviationHz?: number; depth?: number };
   carrierHz: number;
   beatHz: number;
   amplitude: number;
@@ -71,16 +75,56 @@ export interface ShareShape {
 
 const NOISE_LETTER: Record<NoiseColor, string> = { white: 'W', pink: 'P', brown: 'B' };
 const NOISE_FROM_LETTER: Record<string, NoiseColor> = { W: 'white', P: 'pink', B: 'brown' };
-const ENGINE_LETTER: Record<StimulationEngine, string> = {
-  binaural: 'B',
-  monaural: 'M',
-  isochronic: 'I',
-};
-const ENGINE_FROM_LETTER: Record<string, StimulationEngine> = {
-  B: 'binaural',
-  M: 'monaural',
-  I: 'isochronic',
-};
+/**
+ * Engine letters.
+ *
+ * Centred binaural gets its own letter rather than a separate flag, because it
+ * is a different sound rather than a variant of one: a 6 Hz beat on a 220 Hz
+ * carrier is 220/226 offset and 217/223 centred. Writing them as one engine
+ * plus a modifier would let a code be read as the wrong pair, and the whole
+ * point of the format is that a person can check it by eye.
+ *
+ * `O` is a chain with no tone module in it at all — a noise bed, on its own or
+ * carrying a modulation. It reads as "only noise", and there is no carrier or
+ * rate token beside it because there is no tone for one to describe.
+ */
+interface EngineSpelling {
+  engine: ChainEngine;
+  binauralMode?: 'offset' | 'centered';
+}
+
+const ENGINE_LETTERS: Array<[string, EngineSpelling]> = [
+  ['B', { engine: 'binaural', binauralMode: 'offset' }],
+  ['C', { engine: 'binaural', binauralMode: 'centered' }],
+  ['M', { engine: 'monaural' }],
+  ['I', { engine: 'isochronic' }],
+  ['T', { engine: 'tone' }],
+  ['F', { engine: 'fm' }],
+  ['H', { engine: 'harmonic' }],
+  ['O', { engine: 'none' }],
+];
+
+const ENGINE_FROM_LETTER: Record<string, EngineSpelling> = Object.fromEntries(ENGINE_LETTERS);
+
+function engineLetter(stage: ShareStage): string {
+  if (stage.engine === 'binaural') return stage.binauralMode === 'centered' ? 'C' : 'B';
+  const found = ENGINE_LETTERS.find(([, spelling]) => spelling.engine === stage.engine);
+  return found ? found[0] : '';
+}
+
+/** True when the engine has a rate to run at, so a beat token means something. */
+function hasRate(engine: ChainEngine): boolean {
+  return engine === 'binaural' || engine === 'monaural' || engine === 'isochronic' || engine === 'fm';
+}
+
+/** True when the engine has a tone module, so a carrier token means something. */
+function hasTone(engine: ChainEngine): boolean {
+  return engine !== 'none';
+}
+
+function sameEngine(a: ShareStage, b: ShareStage): boolean {
+  return engineLetter(a) === engineLetter(b);
+}
 const WAVE_LETTER: Record<string, string> = { sine: 'S', triangle: 'T', square: 'Q', saw: 'W' };
 const WAVE_FROM_LETTER: Record<string, Waveform> = {
   S: 'sine',
@@ -123,30 +167,58 @@ export function readStandardStage(stage: ProtocolStage): ShareStage | null {
   const byId = new Map(nodes.map((node) => [node.id, node]));
 
   const tone = byId.get('tone');
-  if (!tone) return null;
 
-  const engine = (
-    { binaural: 'binaural', monaural: 'monaural', isochronic: 'isochronic' } as const
-  )[tone.kind as StimulationEngine];
+  /*
+   * Which node kind sits in the tone slot *is* the engine. A chain with no tone
+   * node is the `none` engine — a noise bed on its own, or one carrying a
+   * modulation — rather than an unreadable graph: the builder omits the module
+   * entirely instead of leaving a silent one in place, so its absence is a fact
+   * about the stage and not a gap in it.
+   */
+  const engine: ChainEngine | undefined = tone
+    ? (
+        {
+          binaural: 'binaural',
+          monaural: 'monaural',
+          isochronic: 'isochronic',
+          oscillator: 'tone',
+          fm: 'fm',
+          harmonic: 'harmonic',
+        } as const
+      )[tone.kind as 'binaural' | 'monaural' | 'isochronic' | 'oscillator' | 'fm' | 'harmonic']
+    : 'none';
   if (!engine) return null;
 
   const am = byId.get('am');
   const noise = byId.get('noise');
   const motion = byId.get('motion');
 
-  const waveformOption = tone.options.waveform ?? 'sine';
+  // The harmonic stack has no waveform of its own — it *is* its partials — so
+  // it reports the default rather than a control it does not have.
+  const waveformOption = tone?.options.waveform ?? 'sine';
   if (!WAVE_LETTER[waveformOption]) return null;
 
-  const beatKey = engine === 'isochronic' ? 'pulse' : 'beat';
+  // Each engine keeps its pitch and its rate under its own parameter names.
+  const carrierKey = engine === 'tone' ? 'frequency' : engine === 'harmonic' ? 'fundamental' : 'carrier';
+  const beatKey = engine === 'isochronic' ? 'pulse' : engine === 'fm' ? 'modFrequency' : 'beat';
   const shape: ShareStage = {
     durationSec: stage.durationSec,
     crossfadeSec: stage.crossfadeSec,
     engine,
-    carrierHz: tone.params.carrier ?? 0,
-    beatHz: tone.params[beatKey] ?? 0,
-    amplitude: tone.params.amplitude ?? DEFAULT_AMPLITUDE,
+    carrierHz: tone?.params[carrierKey] ?? 0,
+    beatHz: hasRate(engine) ? (tone?.params[beatKey] ?? 0) : 0,
+    amplitude: tone?.params.amplitude ?? DEFAULT_AMPLITUDE,
     waveform: waveformOption as Waveform,
   };
+  if (engine === 'binaural') {
+    shape.binauralMode = tone?.options.mode === 'centered' ? 'centered' : 'offset';
+  }
+  if (engine === 'fm') {
+    const fm: { deviationHz?: number; depth?: number } = {};
+    if (tone?.params.deviation !== undefined) fm.deviationHz = tone.params.deviation;
+    if (tone?.params.depth !== undefined) fm.depth = tone.params.depth;
+    if (fm.deviationHz !== undefined || fm.depth !== undefined) shape.fm = fm;
+  }
 
   if (noise) {
     const color = noise.options.color as NoiseColor | undefined;
@@ -155,7 +227,7 @@ export function readStandardStage(stage: ProtocolStage): ShareStage | null {
   }
   if (am) shape.am = { rateHz: am.params.modFrequency ?? 0, depth: am.params.depth ?? 0 };
   if (motion) shape.motion = { rateHz: motion.params.rate ?? 0, depth: motion.params.depth ?? 0 };
-  if (engine === 'isochronic') {
+  if (engine === 'isochronic' && tone) {
     const iso = {
       duty: tone.params.duty ?? DEFAULT_ISO.duty,
       depth: tone.params.depth ?? DEFAULT_ISO.depth,
@@ -174,8 +246,8 @@ export function readStandardStage(stage: ProtocolStage): ShareStage | null {
   for (const lane of stage.automation) {
     if (lane.points.length !== 2) return null;
     const [from, to] = lane.points;
-    if (lane.target === `tone:${beatKey}`) shape.beatToHz = to.value;
-    else if (lane.target === 'tone:carrier') shape.carrierToHz = to.value;
+    if (hasRate(engine) && lane.target === `tone:${beatKey}`) shape.beatToHz = to.value;
+    else if (lane.target === `tone:${carrierKey}`) shape.carrierToHz = to.value;
     else if (lane.target === 'noise:level') shape.noiseToLevel = to.value;
     else return null;
 
@@ -237,8 +309,10 @@ export function encodeShareCode(protocol: Protocol): string | null {
 
   const first = shape.stages[0];
   const globals: string[] = [];
-  if (first.engine !== 'binaural') globals.push(`E${ENGINE_LETTER[first.engine]}`);
-  globals.push(`C${num(first.carrierHz)}`);
+  // Offset binaural is the unmarked case, so the commonest code carries no
+  // engine token at all.
+  if (engineLetter(first) !== 'B') globals.push(`E${engineLetter(first)}`);
+  if (hasTone(first.engine)) globals.push(`C${num(first.carrierHz)}`);
   if (first.waveform !== 'sine') globals.push(`W${WAVE_LETTER[first.waveform]}`);
   if (first.noise) globals.push(`N${NOISE_LETTER[first.noise.color]}${pct(first.noise.level)}`);
   if (first.am) globals.push(`A${num(first.am.rateHz)}@${pct(first.am.depth)}`);
@@ -251,11 +325,13 @@ export function encodeShareCode(protocol: Protocol): string | null {
 
   const segments = shape.stages.map((stage, index) => {
     const tokens: string[] = [duration(stage.durationSec)];
-    tokens.push(`B${range(stage.beatHz, stage.beatToHz)}`);
+    // A plain tone, a harmonic stack and a bare noise bed have no rate, so they
+    // carry no beat token. `B0` would read as a beat somebody chose.
+    if (hasRate(stage.engine)) tokens.push(`B${range(stage.beatHz, stage.beatToHz)}`);
 
     // Only what differs from the first stage is repeated.
     if (index > 0) {
-      if (stage.engine !== first.engine) tokens.push(`E${ENGINE_LETTER[stage.engine]}`);
+      if (!sameEngine(stage, first)) tokens.push(`E${engineLetter(stage)}`);
       if (stage.waveform !== first.waveform) tokens.push(`W${WAVE_LETTER[stage.waveform]}`);
       if (!near(stage.amplitude, first.amplitude)) tokens.push(`V${pct(stage.amplitude)}`);
       if (!sameNoise(stage.noise, first.noise)) {
@@ -272,7 +348,10 @@ export function encodeShareCode(protocol: Protocol): string | null {
       }
     }
 
-    if (stage.carrierToHz !== undefined || !near(stage.carrierHz, first.carrierHz)) {
+    if (
+      hasTone(stage.engine) &&
+      (stage.carrierToHz !== undefined || !near(stage.carrierHz, first.carrierHz))
+    ) {
       tokens.push(`C${range(stage.carrierHz, stage.carrierToHz)}`);
     }
     if (stage.sweepCurve) tokens.push(`K${CURVE_LETTER[stage.sweepCurve]}`);
@@ -356,7 +435,13 @@ export function parseShareCode(
     return { ok: false, error: 'A share code needs at least one stage, written after a “|”.' };
   }
 
-  const globals: TokenBag = { carrierHz: 220, engine: 'binaural', waveform: 'sine', amplitude: DEFAULT_AMPLITUDE };
+  const globals: TokenBag = {
+    carrierHz: 220,
+    engine: 'binaural',
+    binauralMode: 'offset',
+    waveform: 'sine',
+    amplitude: DEFAULT_AMPLITUDE,
+  };
   let masterGain = DEFAULT_MASTER.gain;
   let fadeInSec = DEFAULT_MASTER.fadeInSec;
   let fadeOutSec = DEFAULT_MASTER.fadeOutSec;
@@ -407,8 +492,14 @@ export function parseShareCode(
     if (!(durationSec > 0)) {
       return { ok: false, error: `Stage ${index + 1} has a length of zero.` };
     }
+    // Only the engines that run at a rate need one. A plain tone, a harmonic
+    // stack and a bare noise bed are complete without a beat, and demanding
+    // `B0` from them would be asking for a number nobody chose.
     if (bag.beatHz === undefined) {
-      return { ok: false, error: `Stage ${index + 1} has no beat — add for example “B10”.` };
+      if (hasRate(bag.engine)) {
+        return { ok: false, error: `Stage ${index + 1} has no beat — add for example “B10”.` };
+      }
+      bag.beatHz = 0;
     }
 
     stages.push(
@@ -418,6 +509,8 @@ export function parseShareCode(
         durationSec,
         crossfadeSec: bag.crossfadeSec ?? (index === 0 ? 0 : DEFAULT_CROSSFADE_SEC),
         engine: bag.engine,
+        binauralMode: bag.binauralMode,
+        fm: bag.fm,
         carrierHz: bag.carrierHz,
         beatHz: bag.beatHz,
         amplitude: bag.amplitude,
@@ -448,7 +541,9 @@ export function parseShareCode(
 }
 
 interface TokenBag {
-  engine: StimulationEngine;
+  engine: ChainEngine;
+  binauralMode?: 'offset' | 'centered';
+  fm?: { deviationHz?: number; depth?: number };
   carrierHz: number;
   waveform: Waveform;
   amplitude: number;
@@ -468,8 +563,10 @@ interface TokenBag {
 function applyToken(token: string, bag: TokenBag): string | undefined {
   const upper = token.toUpperCase();
 
-  if (/^E[BMI]$/.test(upper)) {
-    bag.engine = ENGINE_FROM_LETTER[upper[1]];
+  if (/^E[BCMITFHO]$/.test(upper)) {
+    const spelling = ENGINE_FROM_LETTER[upper[1]];
+    bag.engine = spelling.engine;
+    bag.binauralMode = spelling.binauralMode;
     return undefined;
   }
   if (/^W[STQW]$/.test(upper)) {

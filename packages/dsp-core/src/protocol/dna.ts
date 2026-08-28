@@ -52,7 +52,13 @@ export function humanDna(protocol: Protocol): string {
     if (beat !== undefined) segments.push(`B${trim(beat)}`);
   }
 
-  const carrierSource = beatSource ?? byKind('am')[0] ?? byKind('fm')[0] ?? byKind('oscillator')[0];
+  // An AM module fed by something else is an insert, and its own carrier
+  // parameter is unused — reading it would print a carrier for a signal that
+  // has none, which a modulated noise bed does not.
+  const amGenerator = byKind('am').find(
+    (node) => !first.graph.connections.some((connection) => connection.to === node.id),
+  );
+  const carrierSource = beatSource ?? amGenerator ?? byKind('fm')[0] ?? byKind('oscillator')[0];
   if (carrierSource) {
     const carrier =
       carrierSource.params.carrier ?? carrierSource.params.frequency ?? carrierSource.params.fundamental;

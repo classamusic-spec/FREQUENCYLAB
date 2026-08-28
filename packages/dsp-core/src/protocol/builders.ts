@@ -29,9 +29,30 @@ export const MOTION_NODE = 'motion';
 
 export type StimulationEngine = 'binaural' | 'monaural' | 'isochronic';
 
+/**
+ * Everything that can sit at the head of the chain.
+ *
+ * The three stimulation engines produce a beat or a pulse. The rest are not
+ * stimulation at all: `tone` is a single pitch, `fm` swings that pitch,
+ * `harmonic` stacks partials over it, and `none` starts the chain at the noise
+ * bed, for a configuration that is a noise bed and nothing else.
+ *
+ * They exist because a preset naming a plain 528 Hz tone has to compile to a
+ * plain tone. Building one as a binaural pair at zero beat would put two tones
+ * in the output where the preset names one, and the whole point of compiling
+ * every surface through these builders (§80) is that what comes out is what was
+ * asked for.
+ */
+export type ChainEngine = StimulationEngine | 'tone' | 'fm' | 'harmonic' | 'none';
+
 export interface ChainOptions {
-  engine: StimulationEngine;
+  engine: ChainEngine;
   carrierHz: number;
+  /**
+   * Rate for the engines that have one. `tone`, `harmonic` and `none` have no
+   * rate to run at and ignore it; pass 0 rather than a number that would read
+   * as a beat nobody asked for.
+   */
   beatHz: number;
   /** Linear amplitude of the tone module, 0..1. */
   amplitude: number;
@@ -48,6 +69,11 @@ export interface ChainOptions {
     rateHz: number;
     depth: number;
     shape?: EnvelopeShape;
+  };
+  /** Swing and index for the FM engine. */
+  fm?: {
+    deviationHz?: number;
+    depth?: number;
   };
   motion?: {
     rateHz: number;
@@ -69,8 +95,16 @@ export interface ChainOptions {
  *         │         ├─> MIX ─> [MOTION] ─> OUTPUT
  *   NOISE ┴─────────┘
  *
+ * The AM module is an insert on whatever the chain's source is: the tone module
+ * where there is one, and the noise bed where the bed is the whole signal. It is
+ * the same modulator either way, so a modulated noise bed gets the modulation
+ * rate range every other modulation in the product has, rather than the noise
+ * module's own slow breathing control, which only reaches a few hertz.
+ *
  * Optional modules are omitted entirely rather than left at zero, so the
- * signal-flow view and the DNA both describe exactly what is running.
+ * signal-flow view and the DNA both describe exactly what is running. The same
+ * reasoning covers the `none` engine: a noise-only chain has no tone module in
+ * it, rather than a silent one that the graph would still claim was there.
  */
 export function buildStandardGraph(options: ChainOptions): RoutingGraph {
   const nodes = [];
@@ -103,7 +137,7 @@ export function buildStandardGraph(options: ChainOptions): RoutingGraph {
         { position: { x: 80, y: 80 } },
       ),
     );
-  } else {
+  } else if (options.engine === 'isochronic') {
     const iso = options.isochronic ?? {};
     nodes.push(
       makeNode(
@@ -122,11 +156,55 @@ export function buildStandardGraph(options: ChainOptions): RoutingGraph {
         { position: { x: 80, y: 80 } },
       ),
     );
+  } else if (options.engine === 'tone') {
+    nodes.push(
+      makeNode(
+        TONE_NODE,
+        'oscillator',
+        { frequency: options.carrierHz, amplitude },
+        { waveform: options.waveform ?? 'sine' },
+        { position: { x: 80, y: 80 } },
+      ),
+    );
+  } else if (options.engine === 'fm') {
+    const fm = options.fm ?? {};
+    nodes.push(
+      makeNode(
+        TONE_NODE,
+        'fm',
+        {
+          carrier: options.carrierHz,
+          modFrequency: options.beatHz,
+          amplitude,
+          // Swing and index fall back to the module's own defaults rather than
+          // to numbers repeated here, so the two cannot come to disagree.
+          ...(fm.deviationHz === undefined ? {} : { deviation: fm.deviationHz }),
+          ...(fm.depth === undefined ? {} : { depth: clamp(fm.depth, 0, 1) }),
+        },
+        { waveform: options.waveform ?? 'sine' },
+        { position: { x: 80, y: 80 } },
+      ),
+    );
+  } else if (options.engine === 'harmonic') {
+    nodes.push(
+      makeNode(
+        TONE_NODE,
+        'harmonic',
+        { fundamental: options.carrierHz, amplitude },
+        {},
+        { position: { x: 80, y: 80 } },
+      ),
+    );
   }
 
-  let toneOutlet = TONE_NODE;
+  // `none` puts no tone module in the graph at all, so nothing feeds the mixer
+  // from the tone side and the AM insert sits on the noise bed instead.
+  let toneOutlet: string | null = options.engine === 'none' ? null : TONE_NODE;
+  const hasNoise = options.noise !== undefined && options.noise.level > 0;
+  let noiseOutlet = NOISE_NODE;
+  const amSource = toneOutlet ?? (hasNoise ? NOISE_NODE : null);
 
-  if (options.am && options.am.depth > 0) {
+  if (amSource !== null && options.am && options.am.depth > 0) {
     nodes.push(
       makeNode(
         AM_NODE,
@@ -141,8 +219,12 @@ export function buildStandardGraph(options: ChainOptions): RoutingGraph {
         { position: { x: 260, y: 80 } },
       ),
     );
-    connections.push({ from: TONE_NODE, to: AM_NODE });
-    toneOutlet = AM_NODE;
+    connections.push({ from: amSource, to: AM_NODE });
+    if (toneOutlet !== null) {
+      toneOutlet = AM_NODE;
+    } else {
+      noiseOutlet = AM_NODE;
+    }
   }
 
   if (options.noise && options.noise.level > 0) {
@@ -162,9 +244,9 @@ export function buildStandardGraph(options: ChainOptions): RoutingGraph {
   }
 
   nodes.push(makeNode(MIX_NODE, 'mixer', { gain: 1 }, {}, { position: { x: 440, y: 160 } }));
-  connections.push({ from: toneOutlet, to: MIX_NODE });
-  if (options.noise && options.noise.level > 0) {
-    connections.push({ from: NOISE_NODE, to: MIX_NODE });
+  if (toneOutlet !== null) connections.push({ from: toneOutlet, to: MIX_NODE });
+  if (hasNoise) {
+    connections.push({ from: noiseOutlet, to: MIX_NODE });
   }
 
   if (options.motion && options.motion.depth > 0) {
@@ -203,14 +285,37 @@ export interface StageOptions extends ChainOptions {
   sweepCurve?: CurveSpec;
 }
 
+/**
+ * The parameter a beat sweep drives, per engine.
+ *
+ * Null where the engine has no rate: a plain tone and a harmonic stack have a
+ * pitch and nothing else. A lane pointing at a parameter its node does not have
+ * is a validation error rather than a silent no-op, so the lane is not built.
+ */
+function beatParamFor(engine: ChainEngine): string | null {
+  if (engine === 'isochronic') return 'pulse';
+  if (engine === 'fm') return 'modFrequency';
+  if (engine === 'binaural' || engine === 'monaural') return 'beat';
+  return null;
+}
+
+/** The parameter a carrier sweep drives, per engine. */
+function carrierParamFor(engine: ChainEngine): string | null {
+  if (engine === 'tone') return 'frequency';
+  if (engine === 'harmonic') return 'fundamental';
+  if (engine === 'none') return null;
+  return 'carrier';
+}
+
 /** Builds a stage, turning any `*To` value into a real automation lane. */
 export function buildStage(options: StageOptions): ProtocolStage {
   const graph = buildStandardGraph(options);
   const automation: AutomationLane[] = [];
   const curve = options.sweepCurve ?? { kind: 'smooth' };
-  const beatParam = options.engine === 'isochronic' ? 'pulse' : 'beat';
+  const beatParam = beatParamFor(options.engine);
+  const carrierParam = carrierParamFor(options.engine);
 
-  if (options.beatToHz !== undefined && options.beatToHz !== options.beatHz) {
+  if (beatParam !== null && options.beatToHz !== undefined && options.beatToHz !== options.beatHz) {
     automation.push(
       makeSweepLane(
         `${options.id}-beat`,
@@ -223,11 +328,15 @@ export function buildStage(options: StageOptions): ProtocolStage {
       ),
     );
   }
-  if (options.carrierToHz !== undefined && options.carrierToHz !== options.carrierHz) {
+  if (
+    carrierParam !== null &&
+    options.carrierToHz !== undefined &&
+    options.carrierToHz !== options.carrierHz
+  ) {
     automation.push(
       makeSweepLane(
         `${options.id}-carrier`,
-        `${TONE_NODE}:carrier`,
+        `${TONE_NODE}:${carrierParam}`,
         options.carrierHz,
         options.carrierToHz,
         options.durationSec,
