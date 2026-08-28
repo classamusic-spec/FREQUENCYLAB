@@ -4,13 +4,17 @@ import {
   JUST_INTERVALS,
   SHARP_NAMES,
   centsBetween,
+  formatCents,
+  formatNote,
   frequencyToNote,
   harmonicIntervals,
   intervalsFrom,
   justInterval,
+  nearestNoteFrequency,
   noteTable,
   noteToFrequency,
   ratioToCents,
+  spellNote,
 } from '../src/index.js';
 
 describe('12-TET note names', () => {
@@ -129,6 +133,81 @@ describe('frequency to note', () => {
         expect(back.exactHz).toBeCloseTo(entry.hz, 10);
       }
     }
+  });
+});
+
+describe('snapping to the grid', () => {
+  it('pulls a frequency onto the note it is nearest', () => {
+    expect(nearestNoteFrequency(444)).toBe(440);
+    expect(nearestNoteFrequency(432)).toBe(440);
+    expect(nearestNoteFrequency(220.4)).toBe(220);
+    // 226.5 Hz is past the midpoint between A3 and A#3, so it lands on A#3.
+    expect(nearestNoteFrequency(226.5)).toBeCloseTo(noteToFrequency('A#3')!, 10);
+  });
+
+  it('steps by whole notes from wherever it started', () => {
+    expect(nearestNoteFrequency(440, 12)).toBeCloseTo(880, 10);
+    expect(nearestNoteFrequency(440, -12)).toBeCloseTo(220, 10);
+    expect(nearestNoteFrequency(440, 1)).toBeCloseTo(noteToFrequency('A#4')!, 10);
+    // An off-grid input is rounded first, so one step is always one note.
+    expect(nearestNoteFrequency(444, -1)).toBeCloseTo(noteToFrequency('G#4')!, 10);
+  });
+
+  it('snaps against whatever reference it is given', () => {
+    expect(nearestNoteFrequency(430, 0, { referenceHz: 432 })).toBe(432);
+    expect(nearestNoteFrequency(430, 0, { referenceHz: 415 })).toBeCloseTo(
+      noteToFrequency('A#4', { referenceHz: 415 })!,
+      10,
+    );
+  });
+
+  it('has nothing to snap to off the pitch axis', () => {
+    expect(nearestNoteFrequency(0)).toBeNull();
+    expect(nearestNoteFrequency(-440)).toBeNull();
+    expect(nearestNoteFrequency(Number.NaN)).toBeNull();
+    expect(nearestNoteFrequency(440, Number.NaN)).toBeNull();
+    expect(nearestNoteFrequency(440, 0, { referenceHz: 0 })).toBeNull();
+  });
+
+  it('is idempotent, so a held control cannot drift', () => {
+    const once = nearestNoteFrequency(311.9)!;
+    expect(nearestNoteFrequency(once)).toBeCloseTo(once, 10);
+  });
+});
+
+describe('written form', () => {
+  it('writes a match in scientific pitch notation', () => {
+    expect(formatNote(frequencyToNote(440)!)).toBe('A4');
+    expect(formatNote(frequencyToNote(147.5)!)).toBe('D3');
+    expect(formatNote({ name: 'C#', octave: 3 })).toBe('C#3');
+    expect(formatNote({ name: 'C', octave: -1 })).toBe('C-1');
+  });
+
+  it('always signs the cents it prints', () => {
+    expect(formatCents(12)).toBe('+12¢');
+    expect(formatCents(-3)).toBe('-3¢');
+    expect(formatCents(-31.767)).toBe('-32¢');
+    expect(formatCents(49.5)).toBe('+50¢');
+  });
+
+  it('prints nothing rather than zero inside a cent', () => {
+    // A readout flicking between "+0¢" and "-0¢" reports noise as information.
+    expect(formatCents(0)).toBeNull();
+    expect(formatCents(0.9)).toBeNull();
+    expect(formatCents(-0.9)).toBeNull();
+    expect(formatCents(Number.NaN)).toBeNull();
+    // The boundary is a whole cent, so nothing can ever round to a printed zero.
+    expect(formatCents(1)).toBe('+1¢');
+    expect(formatCents(-1)).toBe('-1¢');
+  });
+
+  it('spells a note the way it would be said aloud', () => {
+    expect(spellNote(frequencyToNote(440)!)).toBe('A 4');
+    expect(spellNote(frequencyToNote(noteToFrequency('C#3')!)!)).toBe('C sharp 3');
+    expect(spellNote(frequencyToNote(444)!)).toBe('A 4, 16 cents sharp');
+    expect(spellNote(frequencyToNote(432)!)).toBe('A 4, 32 cents flat');
+    // Same threshold as the printed form: inside a cent, the note is the note.
+    expect(spellNote(frequencyToNote(440.2)!)).toBe('A 4');
   });
 });
 

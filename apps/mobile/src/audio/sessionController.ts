@@ -1,6 +1,7 @@
 import {
   DEFAULT_BLOCK_SIZE,
   Fft,
+  SLEEP_TIMER_FADE_SEC,
   SessionRenderer,
   hannWindow,
   routeChangeAction,
@@ -33,7 +34,23 @@ export type PlaybackState =
   | 'completed'
   | 'error';
 
-export type StopReason = 'user' | 'completed' | 'routeLost' | 'error' | 'replaced';
+export type StopReason = 'user' | 'completed' | 'routeLost' | 'error' | 'replaced' | 'sleepTimer';
+
+/**
+ * An armed sleep timer.
+ *
+ * `endsAt` is wall-clock rather than a countdown because a countdown is only as
+ * good as the thing decrementing it: JS timers are throttled in a backgrounded
+ * app and stop entirely while the device sleeps, and a re-render must not be
+ * able to move the deadline. A timestamp is re-read against `Date.now()` from
+ * whatever clock happens to be running — see `checkSleepTimer`.
+ */
+export interface SleepTimerState {
+  /** Epoch milliseconds at which the stop fade begins. */
+  endsAt: number;
+  /** The preset the user chose, in minutes, for the label. */
+  minutes: number;
+}
 
 export interface ControllerSnapshot {
   state: PlaybackState;
@@ -44,6 +61,8 @@ export interface ControllerSnapshot {
   route: OutputRoute;
   /** Set when playback stopped for a reason worth showing the user. */
   notice?: string;
+  /** The armed sleep timer, if any. Undefined means the session runs its course. */
+  sleepTimer?: SleepTimerState;
   error?: string;
   /** Wall-clock seconds of audio actually played, excluding pauses. */
   playedSec: number;
@@ -62,6 +81,12 @@ type Listener = (snapshot: ControllerSnapshot) => void;
 
 const SCOPE_FRAMES = 2048;
 const FFT_SIZE = 2048;
+
+/**
+ * Fade applied to an ordinary stop, in seconds, and the floor for every other
+ * stop: §28 allows a stop to be gentler than this, never sharper.
+ */
+const STOP_FADE_SEC = 0.45;
 
 /**
  * Owns playback for the whole app.
@@ -89,6 +114,15 @@ export class SessionController implements RenderSource {
   private peakGainReductionDb = 0;
   private stopReason: StopReason | null = null;
   private pendingStop: StopReason | null = null;
+
+  // Sleep timer. Held here rather than in the store because playback outlives
+  // the component tree: navigating away from the session screen, or a re-render
+  // storm, must not disturb an armed timer.
+  private sleepTimerEndsAt: number | null = null;
+  private sleepTimerMinutes = 0;
+  /** Latched the moment the deadline passes, so expiry can only happen once. */
+  private sleepTimerFiring = false;
+  private sleepTimerBackstop: ReturnType<typeof setTimeout> | null = null;
 
   // Visualiser tap. Written from the render path; read from the UI thread.
   // A torn read shows one stale sample in a scope trace, which is invisible,
@@ -133,6 +167,10 @@ export class SessionController implements RenderSource {
       },
       route: this.route,
       notice: this.notice,
+      sleepTimer:
+        this.sleepTimerEndsAt === null
+          ? undefined
+          : { endsAt: this.sleepTimerEndsAt, minutes: this.sleepTimerMinutes },
       error: this.error,
       playedSec: this.playedFrames / (this.renderer?.sampleRate ?? 48000),
       pauseCount: this.pauseCount,
@@ -286,7 +324,19 @@ export class SessionController implements RenderSource {
     this.emit();
   }
 
-  async stop(reason: StopReason = 'user', notice?: string): Promise<void> {
+  /**
+   * Stops playback over a fade.
+   *
+   * `fadeSec` only ever lengthens the fade: it is floored at the manual-stop
+   * fade so no caller can make a stop sharper than the one the user hears when
+   * they press the button (§28). The sleep timer is the caller that lengthens
+   * it, because nobody is awake to expect that stop.
+   */
+  async stop(
+    reason: StopReason = 'user',
+    notice?: string,
+    fadeSec: number = STOP_FADE_SEC,
+  ): Promise<void> {
     // 'completed' is already torn down; stopping again would produce a second
     // session record for the same playback.
     if (this.state === 'idle' || this.state === 'stopping' || this.state === 'completed') return;
@@ -295,9 +345,92 @@ export class SessionController implements RenderSource {
     this.pendingStop = reason;
     this.emit();
 
-    this.renderer?.beginStopFade(0.45);
-    await delay(500);
+    const fade = Math.max(STOP_FADE_SEC, fadeSec);
+    this.renderer?.beginStopFade(fade);
+    // Rendered is not the same as heard: a backend plays out of a look-ahead
+    // window, so tearing down when the *renderer* reaches silence would cut off
+    // the quietest part of the fade before it left the speaker.
+    const lookaheadMs = (this.backend?.stats().outputLatencySec ?? 0) * 1000;
+    await delay(fade * 1000 + lookaheadMs + 60);
     await this.teardown(reason);
+  }
+
+  /**
+   * Arms the sleep timer: the session fades out and stops `minutes` from now.
+   *
+   * Arming again replaces the deadline rather than stacking on it, and passing
+   * anything that is not a positive number disarms — "end of session" is a
+   * choice the picker can make like any other.
+   */
+  armSleepTimer(minutes: number): void {
+    if (!(minutes > 0)) {
+      this.cancelSleepTimer();
+      return;
+    }
+    this.sleepTimerEndsAt = Date.now() + minutes * 60_000;
+    this.sleepTimerMinutes = minutes;
+    this.sleepTimerFiring = false;
+    this.scheduleSleepTimerBackstop();
+    this.emit();
+  }
+
+  /** Disarms the timer. The session goes back to running its full course. */
+  cancelSleepTimer(): void {
+    if (this.sleepTimerEndsAt === null) return;
+    this.clearSleepTimer();
+    this.emit();
+  }
+
+  private clearSleepTimer(): void {
+    this.sleepTimerEndsAt = null;
+    this.sleepTimerMinutes = 0;
+    this.sleepTimerFiring = false;
+    if (this.sleepTimerBackstop) clearTimeout(this.sleepTimerBackstop);
+    this.sleepTimerBackstop = null;
+  }
+
+  /**
+   * Fires the sleep timer if its deadline has passed. Returns true once, on the
+   * call that fires it.
+   *
+   * Called from the render path and from the telemetry tick — whichever clock
+   * is running. The render path is the one that matters on a backgrounded
+   * phone: the audio callback keeps pulling blocks long after JS timers have
+   * been throttled to a crawl, and reading a timestamp costs nothing per block.
+   */
+  private checkSleepTimer(): boolean {
+    if (this.sleepTimerEndsAt === null || this.sleepTimerFiring) return false;
+    if (Date.now() < this.sleepTimerEndsAt) return false;
+    // Latched before anything asynchronous happens, so a deadline that has
+    // passed can only ever start one stop.
+    this.sleepTimerFiring = true;
+    // Off the render path: `render` must not await, and stopping is a fade
+    // followed by a teardown.
+    setTimeout(() => {
+      this.clearSleepTimer();
+      void this.stop('sleepTimer', undefined, SLEEP_TIMER_FADE_SEC);
+    }, 0);
+    return true;
+  }
+
+  /**
+   * A timer that decides only *when to look*, never what the answer is.
+   *
+   * It covers the one case the render path cannot: a paused session renders
+   * nothing, so the deadline would otherwise go unnoticed until playback
+   * resumed. Because it re-reads the deadline against the wall clock, a firing
+   * that the platform delayed, coalesced or moved early costs nothing — it
+   * either stops the session or schedules another look.
+   */
+  private scheduleSleepTimerBackstop(): void {
+    if (this.sleepTimerBackstop) clearTimeout(this.sleepTimerBackstop);
+    this.sleepTimerBackstop = null;
+    if (this.sleepTimerEndsAt === null) return;
+    const ms = Math.max(0, this.sleepTimerEndsAt - Date.now());
+    this.sleepTimerBackstop = setTimeout(() => {
+      this.sleepTimerBackstop = null;
+      if (!this.checkSleepTimer() && !this.sleepTimerFiring) this.scheduleSleepTimerBackstop();
+    }, ms);
   }
 
   /** Disposes the current backend, tolerating a backend that never started. */
@@ -316,6 +449,10 @@ export class SessionController implements RenderSource {
 
   private async teardown(reason: StopReason): Promise<void> {
     this.stopTelemetry();
+    // A timer belongs to the playback that armed it. A protocol that reached
+    // its own end, or a stop by hand, disarms it here — so there is no armed
+    // deadline left to fire into whatever plays next.
+    this.clearSleepTimer();
     this.detachSystemListeners();
     await this.disposeBackend();
     this.stopReason = reason;
@@ -346,6 +483,11 @@ export class SessionController implements RenderSource {
     return this.stopReason;
   }
 
+  /** Why the stop currently in progress was requested, while it is fading. */
+  get pendingStopReason(): StopReason | null {
+    return this.pendingStop;
+  }
+
   /** RenderSource: called from the backend, never from React. */
   render(left: Float32Array, right: Float32Array, frames: number): void {
     const renderer = this.renderer;
@@ -357,6 +499,7 @@ export class SessionController implements RenderSource {
 
     renderer.render(left, right, frames);
     if (this.state === 'playing') this.playedFrames += frames;
+    if (this.sleepTimerEndsAt !== null) this.checkSleepTimer();
 
     // Visualiser tap.
     for (let i = 0; i < frames; i++) {
@@ -416,6 +559,7 @@ export class SessionController implements RenderSource {
   private startTelemetry(): void {
     if (this.telemetryTimer) return;
     this.telemetryTimer = setInterval(() => {
+      this.checkSleepTimer();
       const telemetry = this.renderer?.telemetry();
       if (telemetry) {
         this.peakGainReductionDb = Math.max(this.peakGainReductionDb, telemetry.gainReductionDb);

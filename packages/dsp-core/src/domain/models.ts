@@ -1,3 +1,4 @@
+import { DEFAULT_REFERENCE_HZ } from '../music/theory.js';
 import type { Protocol } from '../protocol/schema.js';
 
 /**
@@ -24,6 +25,14 @@ export interface UserPreferences {
   onboardingCompletedAt?: string;
   calibrationCompletedAt?: string;
   defaultBinauralMode: 'offset' | 'centered';
+  /**
+   * Frequency of A4 that note names are read against, in Hz.
+   *
+   * Only ever a naming convention: it changes which note a frequency is called,
+   * never what is generated. 440 is the ISO 16 standard; 432 and the Baroque
+   * 415 are alternative reference pitches a user may prefer to read in.
+   */
+  noteReferenceHz: number;
   dspDebugEnabled: boolean;
 }
 
@@ -37,6 +46,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   analyticsEnabled: true,
   theme: 'dark',
   defaultBinauralMode: 'offset',
+  noteReferenceHz: DEFAULT_REFERENCE_HZ,
   dspDebugEnabled: false,
 };
 

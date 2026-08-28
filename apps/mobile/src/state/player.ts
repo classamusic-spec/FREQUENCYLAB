@@ -35,6 +35,12 @@ interface PlayerState {
    * session, and with it every insight and experiment result that ratings feed.
    */
   lastCompletedSessionId?: string | null;
+  /**
+   * Set when the sleep timer ended this playback, so the session screen can
+   * leave the way it does after a stop by hand rather than sitting on a frozen
+   * player. Cleared when the next protocol is loaded.
+   */
+  sleepTimerStopped: boolean;
   attach: () => () => void;
   loadAndPlay: (
     protocol: Protocol,
@@ -49,6 +55,8 @@ interface PlayerState {
   stop: () => Promise<void>;
   seek: (seconds: number) => void;
   setMasterGain: (value: number) => void;
+  armSleepTimer: (minutes: number) => void;
+  cancelSleepTimer: () => void;
 }
 
 /**
@@ -61,6 +69,7 @@ interface PlayerState {
 export const usePlayer = create<PlayerState>((set, get) => ({
   snapshot: sessionController.snapshot(),
   recorded: false,
+  sleepTimerStopped: false,
 
   attach: () => {
     let previousState = sessionController.playbackState;
@@ -76,18 +85,55 @@ export const usePlayer = create<PlayerState>((set, get) => ({
           // would sit on a finished session with nowhere to go.
           .catch(() => set({ lastCompletedSessionId: null }));
       }
+
+      /*
+       * The sleep timer stops the session from outside React, so the record it
+       * leaves behind has to be written here too.
+       *
+       * It is written on the transition *into* the fade rather than after the
+       * teardown: at this point the backend is still running, so the snapshot
+       * still carries this session's underrun count and buffer stats, which a
+       * disposed backend no longer reports. The state is emitted repeatedly
+       * while the fade runs, hence the latch.
+       */
+      if (
+        snapshot.state === 'stopping' &&
+        sessionController.pendingStopReason === 'sleepTimer' &&
+        !get().sleepTimerStopped
+      ) {
+        set({ sleepTimerStopped: true });
+        if (!get().recorded) {
+          set({ recorded: true });
+          // `stoppedByUser`, because that is what happened: the user asked for
+          // this stop when they armed the timer. The protocol did not finish.
+          void writeSessionRecord(snapshot, 'stoppedByUser', get().experimentContext)
+            .then((session) => set({ lastCompletedSessionId: session ? session.id : null }))
+            .catch(() => set({ lastCompletedSessionId: null }));
+        }
+      }
+
       previousState = snapshot.state;
     });
   },
 
   loadAndPlay: async (protocol, options = {}) => {
-    set({ experimentContext: options.experiment, lastCompletedSessionId: undefined, recorded: false });
+    set({
+      experimentContext: options.experiment,
+      lastCompletedSessionId: undefined,
+      recorded: false,
+      sleepTimerStopped: false,
+    });
     await sessionController.load(protocol, { masterGain: options.masterGain });
     await sessionController.play();
   },
 
   load: async (protocol, masterGain) => {
-    set({ experimentContext: undefined, lastCompletedSessionId: undefined, recorded: false });
+    set({
+      experimentContext: undefined,
+      lastCompletedSessionId: undefined,
+      recorded: false,
+      sleepTimerStopped: false,
+    });
     await sessionController.load(protocol, { masterGain });
   },
 
@@ -109,6 +155,11 @@ export const usePlayer = create<PlayerState>((set, get) => ({
 
   seek: (seconds) => sessionController.seek(seconds),
   setMasterGain: (value) => sessionController.setMasterGain(value),
+
+  // The timer itself lives in the controller, next to the playback it ends.
+  // These are the two ways the interface is allowed to touch it.
+  armSleepTimer: (minutes) => sessionController.armSleepTimer(minutes),
+  cancelSleepTimer: () => sessionController.cancelSleepTimer(),
 }));
 
 /**

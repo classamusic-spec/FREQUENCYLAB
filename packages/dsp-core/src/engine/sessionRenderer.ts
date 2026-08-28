@@ -86,6 +86,19 @@ const FADE_STATS_TAU_SEC = 0.04;
 const MIN_FADE_CORRECTION = 0.5;
 const MAX_FADE_CORRECTION = 4;
 
+/**
+ * Fade applied when a sleep timer stops a session, in seconds.
+ *
+ * It lives beside the renderer rather than in the app because it is an
+ * audio-safety figure and not a preference: §28 says a session never cuts into
+ * someone's ears, and this is the one stop nobody is awake to anticipate. Six
+ * seconds reads as the sound receding rather than being switched off, and is
+ * still short enough that a listener who is awake is not left waiting for
+ * silence. Callers pass it to `beginStopFade`; nothing may stop *faster* than a
+ * manual stop, which is an order of magnitude quicker than this.
+ */
+export const SLEEP_TIMER_FADE_SEC = 6;
+
 export class SessionRenderer {
   readonly sampleRate: number;
   readonly blockSize: number;
