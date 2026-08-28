@@ -3,7 +3,15 @@ import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import { KnobFace } from './KnobFace';
-import { clamp } from '@frequencylab/dsp-core';
+import {
+  DEFAULT_REFERENCE_HZ,
+  clamp,
+  formatCents,
+  formatNote,
+  frequencyToNote,
+  nearestNoteFrequency,
+  spellNote,
+} from '@frequencylab/dsp-core';
 import { colors, radius, space } from '../tokens';
 import * as haptics from '../haptics';
 import { Label, Text } from './Text';
@@ -22,6 +30,12 @@ import { Label, Text } from './Text';
  *
  * Haptic detents fire on step boundaries and are rate limited in `haptics.ts`,
  * so a fast sweep produces a texture rather than a buzz.
+ *
+ * When the value is a pitch — a carrier, a fundamental — `showNote` adds the
+ * nearest note underneath the figure, and `snapToNote` turns the step detent
+ * into a note detent. Both are opt-in because most frequencies in this app are
+ * not pitches at all: a 7.83 Hz beat or a 0.5 Hz movement rate has no note, and
+ * printing one beside it would be an invented fact rather than a translation.
  */
 
 export type EncoderTaper = 'linear' | 'log';
@@ -49,6 +63,17 @@ export interface FrequencyEncoderProps {
   defaultValue?: number;
   /** Secondary caption under the value — usually the band name. */
   caption?: string;
+  /**
+   * Names the nearest 12-TET note under the figure. Set this only where the
+   * value really is an audible pitch.
+   */
+  showNote?: boolean;
+  /** Frequency of A4 the note names are read against. */
+  referenceHz?: number;
+  /** Makes the detent land on note frequencies instead of `step`. */
+  snapToNote?: boolean;
+  /** Shows the snap toggle. Omit and snapping cannot be turned off from here. */
+  onToggleSnapToNote?: () => void;
   onRequestNumericEntry?: () => void;
   style?: ViewStyle;
   testID?: string;
@@ -75,6 +100,10 @@ export function FrequencyEncoder({
   onToggleLock,
   defaultValue,
   caption,
+  showNote,
+  referenceHz = DEFAULT_REFERENCE_HZ,
+  snapToNote,
+  onToggleSnapToNote,
   onRequestNumericEntry,
   style,
   testID,
@@ -93,18 +122,33 @@ export function FrequencyEncoder({
   const normalised = toNormalised(value, min, max, taper);
   const effectiveStep = step ?? defaultStep(min, max, precision);
 
+  /**
+   * Turns a position along the dial into the value it commits.
+   *
+   * Snapping replaces the `step` grid with the 12-TET grid — the same
+   * substitution a hardware encoder makes when its detent ring is swapped, and
+   * for the same reason: the detents should sit where the useful values are.
+   * The detent index becomes the note rather than the step, so the haptic fires
+   * once per semitone instead of once per hundredth of a hertz.
+   */
   const emit = useCallback(
     (nextNormalised: number) => {
       const raw = fromNormalised(clamp(nextNormalised, 0, 1), min, max, taper);
-      const quantised = quantise(raw, effectiveStep, min, max);
-      const detentIndex = Math.round(quantised / effectiveStep);
+      const note = snapToNote ? noteWithin(raw, min, max, referenceHz) : null;
+      // Rounded to the readout's own precision, so the number stored is exactly
+      // the number printed. The residue that costs is under a twentieth of a
+      // cent, which is two orders of magnitude below anything audible.
+      const quantised =
+        note === null ? quantise(raw, effectiveStep, min, max) : round(note, precision);
+      const detentIndex =
+        note === null ? Math.round(quantised / effectiveStep) : Math.round(semitoneIndex(quantised, referenceHz));
       if (detentIndex !== lastDetentIndex.current) {
         lastDetentIndex.current = detentIndex;
         haptics.detent();
       }
       onChange(quantised);
     },
-    [effectiveStep, max, min, onChange, taper],
+    [effectiveStep, max, min, onChange, precision, referenceHz, snapToNote, taper],
   );
 
   /**
@@ -147,13 +191,15 @@ export function FrequencyEncoder({
       if (disabled || locked) return;
       haptics.beginGesture();
       startNormalised.current = normalised;
-      lastDetentIndex.current = Math.round(value / effectiveStep);
+      lastDetentIndex.current = snapToNote
+        ? Math.round(semitoneIndex(value, referenceHz))
+        : Math.round(value / effectiveStep);
 
       const centre = size / 2;
       lastAngle.current = (Math.atan2(y - centre, x - centre) * 180) / Math.PI;
       setDragging(true);
     },
-    [disabled, effectiveStep, locked, normalised, size, value],
+    [disabled, effectiveStep, locked, normalised, referenceHz, size, snapToNote, value],
   );
 
   const finish = useCallback(() => {
@@ -216,6 +262,17 @@ export function FrequencyEncoder({
   }, [defaultValue, disabled, locked, onChange, onCommit]);
 
 
+  /**
+   * The value located on the tempered grid. Null whenever there is nothing
+   * honest to say — the readout is off, or the frequency has no place on a
+   * logarithmic pitch axis.
+   */
+  const note = useMemo(
+    () => (showNote ? frequencyToNote(value, { referenceHz }) : null),
+    [referenceHz, showNote, value],
+  );
+  const noteCents = note ? formatCents(note.centsOff) : null;
+
   const scaleLabels = useMemo(
     () => labelStops(min, max, taper).map((stop) => ({
       ...stop,
@@ -263,9 +320,18 @@ export function FrequencyEncoder({
             min,
             max,
             now: Number(value.toFixed(precision)),
-            text: `${value.toFixed(precision)} ${unit}`,
+            // The note is spelled out rather than printed: a screen reader
+            // makes nothing of "C#3 +12¢", so the spoken form says it the way
+            // a musician would (§50).
+            text: note
+              ? `${value.toFixed(precision)} ${unit}, ${spellNote(note)}`
+              : `${value.toFixed(precision)} ${unit}`,
           }}
-          accessibilityHint="Double tap to type an exact value. Swipe up or down to adjust."
+          accessibilityHint={
+            snapToNote
+              ? 'Double tap to type an exact value or a note name. Swipe up or down to move by semitones.'
+              : 'Double tap to type an exact value. Swipe up or down to adjust.'
+          }
           accessibilityActions={[
             { name: 'increment' },
             { name: 'decrement' },
@@ -273,10 +339,18 @@ export function FrequencyEncoder({
           ]}
           onAccessibilityAction={(event) => {
             if (disabled || locked) return;
-            if (event.nativeEvent.actionName === 'increment') {
-              onChange(quantise(value + effectiveStep, effectiveStep, min, max));
-            } else if (event.nativeEvent.actionName === 'decrement') {
-              onChange(quantise(value - effectiveStep, effectiveStep, min, max));
+            const direction = event.nativeEvent.actionName === 'increment' ? 1 : -1;
+            if (event.nativeEvent.actionName !== 'activate') {
+              // With snapping on, one accessibility step is one note — the same
+              // grid the finger feels, so the two paths cannot disagree.
+              const stepped = snapToNote
+                ? noteWithin(value, min, max, referenceHz, direction)
+                : null;
+              onChange(
+                stepped === null
+                  ? quantise(value + direction * effectiveStep, effectiveStep, min, max)
+                  : round(stepped, precision),
+              );
             } else {
               onRequestNumericEntry?.();
             }
@@ -313,6 +387,22 @@ export function FrequencyEncoder({
                 {unit}
               </Text>
             </View>
+            {/* The note sits directly under the figure, in the illumination
+                colour, because it is the same value said a second way — not a
+                second value. Cents are set beside it in engraved grey so the
+                eye reads "D3" first and "how far off" only if it cares. */}
+            {note ? (
+              <View style={styles.centreNoteRow}>
+                <Text variant="readoutSm" tone={disabled ? 'disabled' : 'signal'}>
+                  {formatNote(note)}
+                </Text>
+                {noteCents ? (
+                  <Text variant="readoutXs" tone="tertiary">
+                    {noteCents}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
             {caption ? (
               <Label
                 tone="secondary"
@@ -330,6 +420,28 @@ export function FrequencyEncoder({
       </View>
 
       <Label style={styles.label}>{label}</Label>
+
+      {/* The way out of the detent, sitting on the panel next to the lock:
+          snapping is right for playing a note and wrong for hunting a beat, so
+          it has to be one tap either way rather than a setting elsewhere. */}
+      {onToggleSnapToNote ? (
+        <Pressable
+          onPress={() => {
+            haptics.engage();
+            onToggleSnapToNote();
+          }}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: !!snapToNote }}
+          accessibilityLabel={`Snap ${label} to notes`}
+          accessibilityHint="Settles the encoder on exact note frequencies."
+          style={styles.snap}
+          hitSlop={12}
+        >
+          <Label tone={snapToNote ? 'signal' : 'tertiary'}>
+            {snapToNote ? 'Notes ON' : 'Notes'}
+          </Label>
+        </Pressable>
+      ) : null}
 
       {onToggleLock ? (
         <Pressable
@@ -368,6 +480,40 @@ export function fromNormalised(t: number, min: number, max: number, taper: Encod
     return min * Math.pow(max / min, t);
   }
   return min + t * (max - min);
+}
+
+/**
+ * The note `semitones` away from the one nearest `hz`, kept inside the range.
+ *
+ * Rounding onto the grid can push a value at either end of the dial a fraction
+ * of a semitone outside it, so the result is walked one note back inside rather
+ * than clamped — a clamped value would sit between notes, which is the one
+ * thing a note detent must never produce. `clamp` remains as a floor for a
+ * range narrower than a semitone, where no note fits at all.
+ */
+function noteWithin(
+  hz: number,
+  min: number,
+  max: number,
+  referenceHz: number,
+  semitones = 0,
+): number | null {
+  const snapped = nearestNoteFrequency(hz, semitones, { referenceHz });
+  if (snapped === null) return null;
+  if (snapped < min) return clamp(nearestNoteFrequency(snapped, 1, { referenceHz }) ?? min, min, max);
+  if (snapped > max) return clamp(nearestNoteFrequency(snapped, -1, { referenceHz }) ?? max, min, max);
+  return snapped;
+}
+
+/** Position on the semitone grid, used as the detent index while snapping. */
+function semitoneIndex(hz: number, referenceHz: number): number {
+  const match = frequencyToNote(hz, { referenceHz });
+  return match ? Math.round(12 * Math.log2(match.exactHz / referenceHz)) : 0;
+}
+
+/** Trims floating point residue so the stored value is the printed value. */
+function round(value: number, decimals: number): number {
+  return Number(value.toFixed(Math.max(0, decimals)));
 }
 
 function quantise(value: number, step: number, min: number, max: number): number {
@@ -443,10 +589,27 @@ const styles = StyleSheet.create({
   },
   centreValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
   centreUnit: { marginBottom: 4 },
+  centreNoteRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: space.xxs,
+    marginTop: space.hair,
+  },
   centreCaption: { marginTop: space.xs, letterSpacing: 2 },
   label: { marginTop: -space.xs },
   caption: {
     marginTop: space.hair,
+  },
+  snap: {
+    position: 'absolute',
+    bottom: -4,
+    left: 6,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xxs,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+    backgroundColor: colors.surfaceRecessed,
   },
   lock: {
     position: 'absolute',
