@@ -52,11 +52,13 @@ export * from './engine/wav.js';
 export * from './domain/models.js';
 export * from './analysis/stats.js';
 export * from './analysis/experiments.js';
+export * from './analysis/experimentTemplates.js';
 export * from './analysis/insights.js';
 export * from './analysis/history.js';
 export * from './library/types.js';
 export * from './library/entries.js';
 export * from './protocol/presets.js';
+export * from './protocol/factoryProtocols.js';
 export * from './safety/safety.js';
 export * from './ai/designer.js';
 
