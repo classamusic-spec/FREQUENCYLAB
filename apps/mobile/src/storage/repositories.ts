@@ -3,6 +3,8 @@ import {
   buildPresets,
   migrateProtocol,
   type AiRequest,
+  type ArchiveEntry,
+  type ArchiveSet,
   type Experiment,
   type Favorite,
   type Protocol,
@@ -127,4 +129,54 @@ export async function buildExport(appVersion: string): Promise<DataExport> {
     app: { name: 'FREQUENCY LAB', version: appVersion },
     records: await readAll(),
   };
+}
+
+/**
+ * Archive records the user owns.
+ *
+ * Only user-held material is persisted: imported collections, personal notes,
+ * favourites and any corrections. The entries that ship with the app are code,
+ * not data, so an app update can improve a source note without a migration and
+ * without ever overwriting something the user imported.
+ */
+
+export async function loadArchiveEntries(): Promise<ArchiveEntry[]> {
+  return readValue<ArchiveEntry[]>(StorageKeys.archiveEntries, []);
+}
+
+export async function saveArchiveEntries(entries: ArchiveEntry[]): Promise<void> {
+  await writeValue(StorageKeys.archiveEntries, entries);
+}
+
+export async function loadArchiveSets(): Promise<ArchiveSet[]> {
+  return readValue<ArchiveSet[]>(StorageKeys.archiveSets, []);
+}
+
+export async function saveArchiveSets(sets: ArchiveSet[]): Promise<void> {
+  await writeValue(StorageKeys.archiveSets, sets);
+}
+
+/** Free-text notes, keyed by entry id. Kept apart from the record itself. */
+export async function loadArchiveNotes(): Promise<Record<string, string>> {
+  return readValue<Record<string, string>>(StorageKeys.archiveNotes, {});
+}
+
+export async function saveArchiveNotes(notes: Record<string, string>): Promise<void> {
+  await writeValue(StorageKeys.archiveNotes, notes);
+}
+
+export async function loadArchiveFavorites(): Promise<string[]> {
+  return readValue<string[]>(StorageKeys.archiveFavorites, []);
+}
+
+export async function saveArchiveFavorites(ids: string[]): Promise<void> {
+  await writeValue(StorageKeys.archiveFavorites, ids);
+}
+
+export async function loadArchiveAcknowledgedAt(): Promise<string | null> {
+  return readValue<string | null>(StorageKeys.archiveAcknowledgedAt, null);
+}
+
+export async function saveArchiveAcknowledgedAt(at: string): Promise<void> {
+  await writeValue(StorageKeys.archiveAcknowledgedAt, at);
 }

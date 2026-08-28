@@ -150,6 +150,39 @@ describe('shipped archive', () => {
     expect(context.claims.some((claim) => claim.medical)).toBe(true);
   });
 
+  it('never presents a context record as holding a frequency', () => {
+    const context = ARCHIVE_ENTRIES.filter((entry) => entry.contextOnly);
+    expect(context.length).toBeGreaterThan(0);
+
+    for (const entry of context) {
+      // The placeholder zero must not be reachable as a value: not by an exact
+      // lookup, not as a near-duplicate of anything, and not through a numeric
+      // or range search.
+      expect(entriesAtFrequency(ARCHIVE_ENTRIES, entry.frequency), entry.id).not.toContain(entry);
+      expect(nearDuplicates(ARCHIVE_ENTRIES, 0.001), entry.id).not.toContain(entry);
+
+      const byRange = searchArchive(ARCHIVE_ENTRIES, { minHz: 0, maxHz: 1 });
+      expect(byRange.map((result) => result.entry.id), entry.id).not.toContain(entry.id);
+
+      const byNumber = searchArchive(ARCHIVE_ENTRIES, parseQuery('0'));
+      expect(byNumber.map((result) => result.entry.id), entry.id).not.toContain(entry.id);
+
+      // It stays findable the way someone would actually look for it.
+      const byName = searchArchive(ARCHIVE_ENTRIES, { text: entry.name });
+      expect(byName.map((result) => result.entry.id), entry.id).toContain(entry.id);
+    }
+  });
+
+  it('excludes context records from source disagreements', () => {
+    // Every context record shares the same placeholder zero, which is not a
+    // value they agree or disagree about.
+    for (const disagreement of findDisagreements(ARCHIVE_ENTRIES)) {
+      for (const record of disagreement.records) {
+        expect(archiveEntry(record.entryId)?.contextOnly ?? false).toBe(false);
+      }
+    }
+  });
+
   it('keeps set membership pointing at entries that exist', () => {
     for (const set of ARCHIVE_SETS) {
       for (const id of set.entryIds) {
@@ -273,10 +306,16 @@ describe('import', () => {
       'parasite cleanse',
       'treatment for arthritis',
       'destroys bacteria',
+      // The most common claim attached to these lists, and the one that reads
+      // most like a neutral description rather than a treatment instruction.
+      'said to repair DNA',
+      'repairs cellular damage',
     ]) {
       expect(detectMedicalLanguage(text), text).toBe(true);
     }
-    expect(detectMedicalLanguage('alpha range tone')).toBe(false);
+    for (const text of ['alpha range tone', 'concert pitch reference', '40 Hz modulation rate']) {
+      expect(detectMedicalLanguage(text), text).toBe(false);
+    }
   });
 
   it('reports rows it cannot parse instead of guessing', () => {

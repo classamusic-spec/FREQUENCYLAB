@@ -89,6 +89,32 @@ export const evidenceColors = {
   unsupported: palette.evidenceUnsupported,
 } as const;
 
+/**
+ * The archive's ratings, on the same ramp.
+ *
+ * The archive rates two independent things — how well sourced a record is, and
+ * how well supported the effect is — so it needs two scales. They share this
+ * palette so a user reads them the same way, but they are never combined into a
+ * single score: a perfectly documented historical claim is still a claim.
+ */
+export const archiveEvidenceColors = {
+  'research-supported': palette.evidenceStrong,
+  preliminary: palette.evidencePromising,
+  historical: palette.evidenceTraditional,
+  traditional: palette.evidenceTraditional,
+  experimental: palette.evidenceLimited,
+  'unsupported-medical-claim': palette.evidenceUnsupported,
+} as const;
+
+export const verificationColors = {
+  'primary-historical': palette.evidenceStrong,
+  'secondary-historical': palette.evidencePromising,
+  'modern-compilation': palette.evidenceLimited,
+  'community-submitted': palette.evidenceLimited,
+  'source-unclear': palette.evidenceTraditional,
+  unverified: palette.inkTertiary,
+} as const;
+
 /** 4-point base scale. Panels align to it; nothing uses an arbitrary margin. */
 export const space = {
   hair: 2,

@@ -184,6 +184,7 @@ export default function ProfileScreen() {
 
       <SectionHeader label="Library" />
       <HardwareButton label="Frequency library" onPress={() => router.push('/library')} />
+      <HardwareButton label="Historical archive" onPress={() => router.push('/archive')} />
       <HardwareButton label="AI protocol designer" onPress={() => router.push('/ai')} />
       <HardwareButton label="Import Protocol DNA" variant="ghost" onPress={() => router.push('/dna-import')} />
 

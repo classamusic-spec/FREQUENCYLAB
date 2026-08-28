@@ -150,6 +150,14 @@ export interface ArchiveEntry {
   name: string;
   /** The value exactly as the source gives it. Never rounded, never adjusted. */
   frequency: number;
+  /**
+   * True when the record documents an episode, a system or the archive's own
+   * scope rather than a frequency. Such a record carries no value: its
+   * `frequency` is zero as a placeholder, and the UI must show that it holds no
+   * number rather than displaying a 0 Hz readout, which would be a value the
+   * archive does not actually hold.
+   */
+  contextOnly?: boolean;
   unit: 'Hz';
   category: ArchiveCategory;
   signalRole: SignalRole;

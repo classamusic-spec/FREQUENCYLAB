@@ -23,6 +23,7 @@ import { usePreferences } from '../src/state/preferences';
 import { useProtocolLibrary } from '../src/state/library';
 import { useHistory } from '../src/state/history';
 import { useExperiments } from '../src/state/experiments';
+import { useArchive } from '../src/state/archive';
 import { usePlayerAttachment } from '../src/state/player';
 import { PreflightSheet } from '../src/design/components/PreflightSheet';
 
@@ -45,6 +46,7 @@ export default function RootLayout() {
   const hydrateProtocols = useProtocolLibrary((state) => state.hydrate);
   const hydrateHistory = useHistory((state) => state.hydrate);
   const hydrateExperiments = useExperiments((state) => state.hydrate);
+  const hydrateArchive = useArchive((state) => state.hydrate);
   const preferences = usePreferences((state) => state.preferences);
   const router = useRouter();
 
@@ -56,8 +58,9 @@ export default function RootLayout() {
       hydrateProtocols(),
       hydrateHistory(),
       hydrateExperiments(),
+      hydrateArchive(),
     ]).finally(() => setHydrated(true));
-  }, [hydrateExperiments, hydrateHistory, hydratePreferences, hydrateProtocols]);
+  }, [hydrateArchive, hydrateExperiments, hydrateHistory, hydratePreferences, hydrateProtocols]);
 
   const ready = fontsLoaded && hydrated;
 
@@ -94,6 +97,10 @@ export default function RootLayout() {
           <Stack.Screen name="calibration" options={{ presentation: 'modal' }} />
           <Stack.Screen name="diagnostics" options={{ presentation: 'modal' }} />
           <Stack.Screen name="ai" options={{ presentation: 'modal' }} />
+          {/* The scope notice is a modal so it reads as an interruption the
+              first time and as a reference afterwards, rather than becoming a
+              screen the user has to navigate back out of. */}
+          <Stack.Screen name="archive/scope" options={{ presentation: 'modal' }} />
         </Stack>
         {/* Rendered once at the root so every path into playback passes the
             output-route and safety checks, not just the ones that remembered to. */}

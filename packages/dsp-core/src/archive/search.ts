@@ -72,7 +72,12 @@ export function searchArchive(
     if (query.directAudibleOnly && !entry.playback.directAudible) continue;
     if (query.tags?.length && !query.tags.some((tag) => entry.tags.includes(tag))) continue;
 
+    // A context record carries a placeholder zero rather than a frequency, so it
+    // can never satisfy a question about values. It stays findable by name,
+    // alias, source and text — which is how someone actually looks for it.
+    const holdsValue = !entry.contextOnly;
     const inRange =
+      holdsValue &&
       (query.minHz === undefined || entry.frequency >= query.minHz) &&
       (query.maxHz === undefined || entry.frequency <= query.maxHz);
 
@@ -86,7 +91,11 @@ export function searchArchive(
     let score = 0;
     let reason = '';
 
-    if (Number.isFinite(numeric) && Math.abs(entry.frequency - numeric) < EXACT_HZ_EPSILON) {
+    if (
+      holdsValue &&
+      Number.isFinite(numeric) &&
+      Math.abs(entry.frequency - numeric) < EXACT_HZ_EPSILON
+    ) {
       score = 100;
       reason = 'Exact frequency match';
     } else if (inRange && query.minHz !== undefined) {
@@ -118,12 +127,20 @@ export function searchArchive(
   return results.sort((a, b) => b.score - a.score || a.entry.frequency - b.entry.frequency);
 }
 
-/** Every record holding this exact value, across sources (§7). */
+/**
+ * Every record holding this exact value, across sources (§7).
+ *
+ * Context records are excluded. They carry a placeholder zero rather than a
+ * frequency, and returning them here would present records that hold no value
+ * as sources that recorded the same one.
+ */
 export function entriesAtFrequency(
   entries: readonly ArchiveEntry[],
   hz: number,
 ): ArchiveEntry[] {
-  return entries.filter((entry) => Math.abs(entry.frequency - hz) < EXACT_HZ_EPSILON);
+  return entries.filter(
+    (entry) => !entry.contextOnly && Math.abs(entry.frequency - hz) < EXACT_HZ_EPSILON,
+  );
 }
 
 /**
@@ -141,6 +158,7 @@ export function nearDuplicates(
   const window = Math.max(0.01, hz * ratio);
   return entries.filter(
     (entry) =>
+      !entry.contextOnly &&
       Math.abs(entry.frequency - hz) > EXACT_HZ_EPSILON &&
       Math.abs(entry.frequency - hz) <= window,
   );
@@ -156,6 +174,7 @@ export function nearDuplicates(
 export function findDisagreements(entries: readonly ArchiveEntry[]): SourceDisagreement[] {
   const byLabel = new Map<string, ArchiveEntry[]>();
   for (const entry of entries) {
+    if (entry.contextOnly) continue;
     for (const label of [entry.name, ...entry.aliases]) {
       const key = label.trim().toLowerCase();
       const list = byLabel.get(key) ?? [];

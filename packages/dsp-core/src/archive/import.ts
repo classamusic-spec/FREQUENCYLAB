@@ -65,6 +65,8 @@ const MEDICAL_PATTERNS: RegExp[] = [
   /\b(diabetes|arthritis|asthma|hepatitis|hiv|lyme|migraine|tinnitus)\b/i,
   /\b(depression|anxiety disorder|bipolar|schizophreni)/i,
   /\b(detox|immune boost|regenerat)/i,
+  /\b(dna|rna|stem cell)\b/i,
+  /\b(repair|restore|rebuild)s?\b.{0,24}\b(cell|tissue|nerve|organ|bone|gene)/i,
 ];
 
 export function detectMedicalLanguage(text: string): boolean {

@@ -22,6 +22,11 @@ export const StorageKeys = {
   favorites: 'favorites',
   stagePresets: 'stage-presets',
   migrations: 'migrations',
+  archiveEntries: 'archive-entries',
+  archiveSets: 'archive-sets',
+  archiveNotes: 'archive-notes',
+  archiveFavorites: 'archive-favorites',
+  archiveAcknowledgedAt: 'archive-acknowledged-at',
 } as const;
 
 export type StorageKey = (typeof StorageKeys)[keyof typeof StorageKeys];

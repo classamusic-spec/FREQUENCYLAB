@@ -1,7 +1,21 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { EVIDENCE_LABELS, type EvidenceLevel } from '@frequencylab/dsp-core';
-import { colors, evidenceColors, radius, space } from '../tokens';
+import {
+  ARCHIVE_EVIDENCE_LABELS,
+  EVIDENCE_LABELS,
+  VERIFICATION_LABELS,
+  type ArchiveEvidenceLevel,
+  type EvidenceLevel,
+  type VerificationStatus,
+} from '@frequencylab/dsp-core';
+import {
+  archiveEvidenceColors,
+  colors,
+  evidenceColors,
+  radius,
+  space,
+  verificationColors,
+} from '../tokens';
 import * as haptics from '../haptics';
 import { Label, Text } from './Text';
 import { DisplayGlass } from './Surface';
@@ -41,6 +55,78 @@ const SHORT_LABELS: Record<EvidenceLevel, string> = {
   limited: 'Limited',
   traditional: 'Traditional',
   unsupported: 'Unsupported',
+};
+
+/**
+ * The archive's two ratings (§4, §5).
+ *
+ * They are rendered as two separate badges, never merged, because they answer
+ * different questions. `VerificationBadge` says how well the *provenance* holds
+ * up — whether the number can be traced to a document. `ArchiveEvidenceBadge`
+ * says what the *evidence* supports. A record can be impeccably sourced to a
+ * 1930s pamphlet and still carry no evidence at all, and a user has to be able
+ * to see both facts at once to read the archive honestly.
+ */
+export function VerificationBadge({
+  status,
+  style,
+}: {
+  status: VerificationStatus;
+  style?: ViewStyle;
+}) {
+  const color = verificationColors[status];
+  return (
+    <View
+      style={[styles.badge, { borderColor: withAlpha(color, 0.4) }, style]}
+      accessible
+      accessibilityLabel={`Source: ${VERIFICATION_LABELS[status]}`}
+    >
+      <View style={[styles.dot, { backgroundColor: color }]} />
+      <Text variant="label" uppercase tone="secondary">
+        {VERIFICATION_SHORT[status]}
+      </Text>
+    </View>
+  );
+}
+
+const VERIFICATION_SHORT: Record<VerificationStatus, string> = {
+  'primary-historical': 'Primary source',
+  'secondary-historical': 'Secondary source',
+  'modern-compilation': 'Compilation',
+  'community-submitted': 'Submitted',
+  'source-unclear': 'Source unclear',
+  unverified: 'Unverified',
+};
+
+export function ArchiveEvidenceBadge({
+  level,
+  style,
+}: {
+  level: ArchiveEvidenceLevel;
+  style?: ViewStyle;
+}) {
+  const color = archiveEvidenceColors[level];
+  return (
+    <View
+      style={[styles.badge, { borderColor: withAlpha(color, 0.4) }, style]}
+      accessible
+      accessibilityLabel={`Evidence: ${ARCHIVE_EVIDENCE_LABELS[level]}`}
+    >
+      <View style={[styles.dot, { backgroundColor: color }]} />
+      <Text variant="label" uppercase tone="secondary">
+        {ARCHIVE_EVIDENCE_SHORT[level]}
+      </Text>
+    </View>
+  );
+}
+
+const ARCHIVE_EVIDENCE_SHORT: Record<ArchiveEvidenceLevel, string> = {
+  'research-supported': 'Research-supported',
+  preliminary: 'Preliminary',
+  historical: 'Historical',
+  traditional: 'Traditional',
+  experimental: 'Experimental',
+  'unsupported-medical-claim': 'Claim unsupported',
 };
 
 export interface DnaChipProps {
