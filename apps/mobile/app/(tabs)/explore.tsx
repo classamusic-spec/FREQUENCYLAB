@@ -52,10 +52,19 @@ export default function ExploreScreen() {
   const snapshot = usePlayer((state) => state.snapshot);
   const stop = usePlayer((state) => state.stop);
   const preferences = usePreferences((state) => state.preferences);
+  const updatePreferences = usePreferences((state) => state.update);
   const saveProtocol = useProtocolLibrary((state) => state.save);
 
   const [target, setTarget] = useState<EncoderTarget>('beat');
   const [entry, setEntry] = useState<EncoderTarget | null>(null);
+  /**
+   * Whether the carrier encoder settles on note frequencies.
+   *
+   * Screen state rather than a stored preference: snapping is right while you
+   * are playing a note and wrong the moment you are chasing a specific
+   * frequency, and that changes several times inside one sitting.
+   */
+  const [snapCarrier, setSnapCarrier] = useState(false);
 
   const playing = snapshot.state === 'playing';
   const capture = useScopeCapture(20, playing);
@@ -150,6 +159,14 @@ export default function ExploreScreen() {
             integerDigits={4}
             defaultValue={220}
             caption="The audible tone"
+            // The carrier is the only frequency on this screen a note name
+            // describes: it is the pitch you actually hear. The beat below it
+            // is a difference between two of them, and naming a 7.83 Hz
+            // difference "B-1" would be a category error dressed as a fact.
+            showNote
+            referenceHz={preferences.noteReferenceHz}
+            snapToNote={snapCarrier}
+            onToggleSnapToNote={() => setSnapCarrier((on) => !on)}
             onChange={(value) => apply({ carrierHz: value })}
             onRequestNumericEntry={() => setEntry('carrier')}
           />
@@ -384,6 +401,13 @@ export default function ExploreScreen() {
           min={entry === 'beat' ? MIN_BEAT_HZ : MIN_CARRIER_HZ}
           max={entry === 'beat' ? MAX_BEAT_HZ : MAX_CARRIER_HZ}
           precision={3}
+          notes={entry === 'carrier'}
+          referenceHz={preferences.noteReferenceHz}
+          onChangeReferenceHz={
+            entry === 'carrier'
+              ? (hz) => void updatePreferences({ noteReferenceHz: hz })
+              : undefined
+          }
           onCancel={() => setEntry(null)}
           onSubmit={(value) => {
             apply(entry === 'beat' ? { beatHz: value } : { carrierHz: value });

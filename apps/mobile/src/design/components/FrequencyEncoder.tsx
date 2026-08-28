@@ -135,13 +135,15 @@ export function FrequencyEncoder({
     (nextNormalised: number) => {
       const raw = fromNormalised(clamp(nextNormalised, 0, 1), min, max, taper);
       const note = snapToNote ? noteWithin(raw, min, max, referenceHz) : null;
-      // Rounded to the readout's own precision, so the number stored is exactly
-      // the number printed. The residue that costs is under a twentieth of a
-      // cent, which is two orders of magnitude below anything audible.
+      // Rounded to the control's own precision, so a snapped value is no more
+      // exact than the control can express. The residue that costs is under a
+      // twentieth of a cent — two orders of magnitude below anything audible.
       const quantised =
         note === null ? quantise(raw, effectiveStep, min, max) : round(note, precision);
       const detentIndex =
-        note === null ? Math.round(quantised / effectiveStep) : Math.round(semitoneIndex(quantised, referenceHz));
+        note === null
+          ? Math.round(quantised / effectiveStep)
+          : semitoneIndex(quantised, referenceHz);
       if (detentIndex !== lastDetentIndex.current) {
         lastDetentIndex.current = detentIndex;
         haptics.detent();
@@ -272,6 +274,14 @@ export function FrequencyEncoder({
     [referenceHz, showNote, value],
   );
   const noteCents = note ? formatCents(note.centsOff) : null;
+  /**
+   * What the control says when it is read aloud. The note is spelled out
+   * rather than printed, because a screen reader makes nothing of "C#3 +12¢"
+   * and a musician would say it in words anyway (§50).
+   */
+  const spoken = note
+    ? `${value.toFixed(precision)} ${unit}, ${spellNote(note)}`
+    : `${value.toFixed(precision)} ${unit}`;
 
   const scaleLabels = useMemo(
     () => labelStops(min, max, taper).map((stop) => ({
@@ -316,17 +326,18 @@ export function FrequencyEncoder({
           accessible
           accessibilityRole="adjustable"
           accessibilityLabel={label}
-          accessibilityValue={{
-            min,
-            max,
-            now: Number(value.toFixed(precision)),
-            // The note is spelled out rather than printed: a screen reader
-            // makes nothing of "C#3 +12¢", so the spoken form says it the way
-            // a musician would (§50).
-            text: note
-              ? `${value.toFixed(precision)} ${unit}, ${spellNote(note)}`
-              : `${value.toFixed(precision)} ${unit}`,
-          }}
+          accessibilityValue={{ min, max, now: Number(value.toFixed(precision)), text: spoken }}
+          /*
+           * The same value again in ARIA form. `react-native-web` forwards the
+           * flat `aria-*` props but drops the nested `accessibilityValue`
+           * object, so without these four the browser build announces a slider
+           * with no value at all — and the note would be visible but unspoken.
+           * On native the two agree, so nothing changes there.
+           */
+          aria-valuemin={min}
+          aria-valuemax={max}
+          aria-valuenow={Number(value.toFixed(precision))}
+          aria-valuetext={spoken}
           accessibilityHint={
             snapToNote
               ? 'Double tap to type an exact value or a note name. Swipe up or down to move by semitones.'
@@ -432,6 +443,10 @@ export function FrequencyEncoder({
           }}
           accessibilityRole="switch"
           accessibilityState={{ checked: !!snapToNote }}
+          // Same reason as the encoder's aria values: the browser build drops
+          // the nested `accessibilityState`, so without this the switch is
+          // announced with no on/off state at all.
+          aria-checked={!!snapToNote}
           accessibilityLabel={`Snap ${label} to notes`}
           accessibilityHint="Settles the encoder on exact note frequencies."
           style={styles.snap}

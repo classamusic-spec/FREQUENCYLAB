@@ -78,6 +78,7 @@ export function NumericEntrySheet({
   onCancel,
 }: NumericEntrySheetProps) {
   const [mode, setMode] = useState<EntryMode>('number');
+  const [noteFocused, setNoteFocused] = useState(false);
   const [draft, setDraft] = useState(() => trimTrailingZeros(value.toFixed(precision)));
   const [noteDraft, setNoteDraft] = useState(() => {
     const match = frequencyToNote(value, { referenceHz });
@@ -126,6 +127,7 @@ export function NumericEntrySheet({
   };
 
   const noteMode = !!notes && mode === 'note';
+  const message = noteMessage(noteDraft, noteHz, noteInRange, min, max, unit);
 
   return (
     <Modal transparent animationType="fade" onRequestClose={onCancel}>
@@ -161,6 +163,8 @@ export function NumericEntrySheet({
                 <TextInput
                   value={noteDraft}
                   onChangeText={setNoteDraft}
+                  onFocus={() => setNoteFocused(true)}
+                  onBlur={() => setNoteFocused(false)}
                   placeholder="A4"
                   placeholderTextColor={colors.textDisabled}
                   // Never auto-capitalised: a lowercase `b` is the flat sign, so
@@ -170,17 +174,24 @@ export function NumericEntrySheet({
                   spellCheck={false}
                   maxLength={5}
                   accessibilityLabel="Note name"
-                  style={[styles.noteInput, noteHz === null && noteDraft ? styles.noteInvalid : null]}
+                  style={[
+                    styles.noteInput,
+                    noteFocused ? styles.noteInputFocused : null,
+                    noteHz === null && noteDraft.trim() ? styles.noteInvalid : null,
+                  ]}
                 />
-                <Text variant="readout" tone="tertiary">
-                  {resolved && noteInRange ? `= ${noteHz!.toFixed(2)} ${unit}` : ''}
+                <Text variant="readout" tone="tertiary" numberOfLines={1}>
+                  {noteInRange ? `= ${noteHz!.toFixed(2)} ${unit}` : ''}
                 </Text>
               </View>
-              <Text variant="caption" tone={noteMessage(noteDraft, noteHz, noteInRange) ? 'limit' : 'tertiary'}>
-                {noteMessage(noteDraft, noteHz, noteInRange) ??
+              <Text
+                variant="caption"
+                tone={message ? 'limit' : 'tertiary'}
+              >
+                {message ??
                   (resolved
-                    ? `${formatNote(resolved)} at A4 = ${referenceHz} ${unit}. Range ${min} – ${max} ${unit}.`
-                    : `Type a note, or tap one below. Range ${min} – ${max} ${unit}.`)}
+                    ? `${formatNote(resolved)}, with A4 at ${referenceHz} ${unit}.`
+                    : `Type a note, or tap one below. ${min} – ${max} ${unit}.`)}
               </Text>
 
               <View style={styles.keypad}>
@@ -318,10 +329,17 @@ export function NumericEntrySheet({
  * nothing wrong. An empty field is not an error — it is a field nobody has
  * typed in yet — so it falls through to the hint.
  */
-function noteMessage(draft: string, hz: number | null, inRange: boolean): string | null {
+function noteMessage(
+  draft: string,
+  hz: number | null,
+  inRange: boolean,
+  min: number,
+  max: number,
+  unit: string,
+): string | null {
   if (draft.trim() === '') return null;
   if (hz === null) return 'Not a note. Try A4, C#3 or Db5.';
-  if (!inRange) return `That note is ${hz.toFixed(2)} Hz, outside what this control holds.`;
+  if (!inRange) return `That is ${hz.toFixed(2)} ${unit}, outside ${min} – ${max} ${unit}.`;
   return null;
 }
 
@@ -395,14 +413,20 @@ const styles = StyleSheet.create({
   noteInput: {
     ...type.readoutXl,
     color: colors.text,
-    minWidth: 120,
+    width: 148,
+    minHeight: MIN_TOUCH_TARGET,
     // The one editable field in the design system, so it carries the only
-    // underline: a milled slot in the panel that text is written into.
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    // underline: a milled slot in the panel that text is written into. The
+    // browser's own focus ring is suppressed and replaced below, rather than
+    // simply removed — a keyboard user still has to be able to see where they
+    // are (§50).
+    borderBottomWidth: 1,
     borderBottomColor: colors.hairlineStrong,
     paddingBottom: space.xxs,
+    outlineWidth: 0,
   },
-  noteInvalid: { color: colors.limit },
+  noteInputFocused: { borderBottomColor: colors.signal },
+  noteInvalid: { color: colors.limit, borderBottomColor: colors.limit },
   keypad: {
     flexDirection: 'row',
     flexWrap: 'wrap',

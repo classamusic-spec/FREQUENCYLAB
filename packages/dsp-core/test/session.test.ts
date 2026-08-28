@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SLEEP_TIMER_FADE_SEC,
   SessionRenderer,
   buildStage,
   createProtocol,
@@ -424,5 +425,98 @@ describe('automation with an explicit lane', () => {
     expect(at(1)).toBeCloseTo(11.4, 0);
     expect(at(25)).toBeCloseTo(4, 0);
     expect(at(45)).toBeCloseTo(9, 0);
+  });
+});
+
+/*
+ * The sleep timer is the one stop nobody is awake to expect, so what is checked
+ * here is the shape of what a listener hears rather than the flag that starts
+ * it: the level has to come down smoothly, all the way to true silence, over
+ * the whole fade — never a cut, and never quicker than the stop the user hears
+ * when they press the button themselves (§28).
+ */
+describe('the sleep timer fade', () => {
+  const WINDOW_SEC = 0.25;
+
+  /** Peak level per 250 ms window from the moment a stop fade begins. */
+  function fadeProfile(fadeSec: number): {
+    peaks: number[];
+    trace: Float32Array;
+    silentAfterSec: number;
+    complete: boolean;
+  } {
+    const protocol = sweepProtocol(120, 10, 10);
+    const renderer = new SessionRenderer(protocol, { sampleRate: SR });
+    const block = 4096;
+    const left = new Float32Array(block);
+    const right = new Float32Array(block);
+
+    // Ten seconds in: past the session fade-in, nowhere near the fade-out.
+    for (let i = 0; i < Math.ceil((10 * SR) / block); i++) renderer.render(left, right, block);
+
+    renderer.beginStopFade(fadeSec);
+    const total = Math.ceil((fadeSec + 1) * SR);
+    const trace = new Float32Array(total);
+    let written = 0;
+    while (written < total) {
+      renderer.render(left, right, block);
+      trace.set(left.subarray(0, Math.min(block, total - written)), written);
+      written += block;
+    }
+
+    const size = Math.round(WINDOW_SEC * SR);
+    const peaks: number[] = [];
+    for (let i = 0; i + size <= total; i += size) peaks.push(peak(trace, i, i + size));
+    const firstSilent = peaks.findIndex((level) => level < 1e-6);
+    return {
+      peaks,
+      trace,
+      silentAfterSec: firstSilent < 0 ? Infinity : firstSilent * WINDOW_SEC,
+      complete: renderer.stopFadeComplete,
+    };
+  }
+
+  it('takes the level all the way down to silence over the whole fade', () => {
+    const { peaks, trace, silentAfterSec, complete } = fadeProfile(SLEEP_TIMER_FADE_SEC);
+
+    // It starts from a session that was genuinely audible...
+    expect(peaks[0]).toBeGreaterThan(0.2);
+    // ...comes down monotonically, window by window, with no step back up...
+    for (let i = 1; i < peaks.length; i++) {
+      expect(peaks[i], `window ${i} is louder than the one before it`).toBeLessThanOrEqual(peaks[i - 1]);
+    }
+    // ...is still clearly audible a second in, so this is a fade and not a cut...
+    expect(peaks[4]).toBeGreaterThan(peaks[0] * 0.5);
+    // ...and ends in real silence, not merely something quiet.
+    expect(peak(trace, Math.round((SLEEP_TIMER_FADE_SEC + 0.5) * SR))).toBeLessThan(1e-9);
+    expect(complete).toBe(true);
+
+    // Silence arrives when the fade says it does, to within one window.
+    expect(silentAfterSec).toBeGreaterThan(SLEEP_TIMER_FADE_SEC - 2 * WINDOW_SEC);
+    expect(silentAfterSec).toBeLessThan(SLEEP_TIMER_FADE_SEC + 2 * WINDOW_SEC);
+
+    // And nothing in it steps further than one cycle of the tone can carry it.
+    const slope = (2 * Math.PI * 230 * peak(trace)) / SR;
+    expect(maxStep(trace)).toBeLessThan(slope * 1.5);
+  });
+
+  it('never fades faster than a manual stop', () => {
+    // The floor is the fade a user hears when they press stop themselves. A
+    // sleep timer may be gentler than that; it may never be sharper.
+    const manual = fadeProfile(0.45);
+    expect(manual.silentAfterSec).toBeLessThan(SLEEP_TIMER_FADE_SEC);
+    expect(fadeProfile(SLEEP_TIMER_FADE_SEC).silentAfterSec).toBeGreaterThan(manual.silentAfterSec);
+  });
+
+  it('leaves a session that is still playing untouched until it is asked to stop', () => {
+    // Arming is not a level change: nothing may be audible about a timer until
+    // the moment it expires.
+    const protocol = sweepProtocol(120, 10, 10);
+    const renderer = new SessionRenderer(protocol, { sampleRate: SR });
+    const left = new Float32Array(4096);
+    const right = new Float32Array(4096);
+    for (let i = 0; i < 200; i++) renderer.render(left, right, 4096);
+    expect(renderer.stopFadeComplete).toBe(false);
+    expect(peak(left)).toBeGreaterThan(0.2);
   });
 });

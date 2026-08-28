@@ -14,6 +14,7 @@ import {
   StereoVectorScope,
 } from '../src/design/components/Visualizers';
 import { SafetyBanner } from '../src/design/components/SafetyBanner';
+import { SleepTimerPanel } from '../src/design/components/SleepTimer';
 import { Label, Text } from '../src/design/components/Text';
 import { DisplayGlass } from '../src/design/components/Surface';
 import {
@@ -49,6 +50,9 @@ export default function SessionScreen() {
   const stop = usePlayer((state) => state.stop);
   const setMasterGain = usePlayer((state) => state.setMasterGain);
   const lastCompletedSessionId = usePlayer((state) => state.lastCompletedSessionId);
+  const armSleepTimer = usePlayer((state) => state.armSleepTimer);
+  const cancelSleepTimer = usePlayer((state) => state.cancelSleepTimer);
+  const sleepTimerStopped = usePlayer((state) => state.sleepTimerStopped);
   const preferences = usePreferences((state) => state.preferences);
 
   const [showDetails, setShowDetails] = useState(false);
@@ -75,6 +79,19 @@ export default function SessionScreen() {
   useEffect(() => {
     if (snapshot.state === 'completed') haptics.complete();
   }, [snapshot.state]);
+
+  /*
+   * The sleep timer ends the session from outside the component tree, so the
+   * screen leaves on the state rather than on the press that caused it — and
+   * only once the fade has finished, so the last seconds of a session are not
+   * played to a screen that has already gone. No rating prompt: the whole point
+   * of the timer is that nobody is awake to answer one.
+   */
+  useEffect(() => {
+    if (!sleepTimerStopped) return;
+    if (snapshot.state !== 'idle') return;
+    router.back();
+  }, [router, sleepTimerStopped, snapshot.state]);
 
   useEffect(() => {
     if (snapshot.state !== 'completed') return;
@@ -328,6 +345,12 @@ export default function SessionScreen() {
             </Pressable>
           </View>
         </InstrumentPanel>
+
+        <SleepTimerPanel
+          timer={snapshot.sleepTimer}
+          onArm={armSleepTimer}
+          onCancel={cancelSleepTimer}
+        />
 
         {showIntensity ? (
           <InstrumentPanel tone="raised" label="Intensity">

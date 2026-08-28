@@ -400,6 +400,12 @@ export class SessionController implements RenderSource {
    */
   private checkSleepTimer(): boolean {
     if (this.sleepTimerEndsAt === null || this.sleepTimerFiring) return false;
+    // A session that is already ending has nothing left for a timer to do. This
+    // is the narrow case where the protocol reaches its own end in the same
+    // handful of milliseconds the deadline passes: completion is latched in the
+    // render path and torn down a tick later, and without this the timer would
+    // start a second, longer stop underneath it.
+    if (this.pendingStop !== null) return false;
     if (Date.now() < this.sleepTimerEndsAt) return false;
     // Latched before anything asynchronous happens, so a deadline that has
     // passed can only ever start one stop.
@@ -429,7 +435,11 @@ export class SessionController implements RenderSource {
     const ms = Math.max(0, this.sleepTimerEndsAt - Date.now());
     this.sleepTimerBackstop = setTimeout(() => {
       this.sleepTimerBackstop = null;
-      if (!this.checkSleepTimer() && !this.sleepTimerFiring) this.scheduleSleepTimerBackstop();
+      // Another look only if there is still something to look for. Once the
+      // timer has fired, or a stop is already in flight, the deadline is in the
+      // past and rescheduling would spin at zero delay until the teardown.
+      if (this.checkSleepTimer() || this.sleepTimerFiring || this.pendingStop !== null) return;
+      this.scheduleSleepTimerBackstop();
     }, ms);
   }
 
