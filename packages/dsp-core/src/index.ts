@@ -22,6 +22,8 @@ export * from './dsp/noise.js';
 export * from './dsp/limiter.js';
 export * from './dsp/meter.js';
 
+export * from './music/theory.js';
+
 export * from './graph/types.js';
 export * from './graph/descriptors.js';
 export * from './graph/factory.js';
@@ -51,6 +53,7 @@ export * from './domain/models.js';
 export * from './analysis/stats.js';
 export * from './analysis/experiments.js';
 export * from './analysis/insights.js';
+export * from './analysis/history.js';
 export * from './library/types.js';
 export * from './library/entries.js';
 export * from './protocol/presets.js';

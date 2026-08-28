@@ -5,6 +5,7 @@ import { describeShareCode, encodeShareCode, type Protocol } from '@frequencylab
 import { colors, radius, space } from '../tokens';
 import * as haptics from '../haptics';
 import { HardwareButton } from './HardwareButton';
+import { ShareCodeQr } from './ShareCodeQr';
 import { Label, Text } from './Text';
 import { Recessed } from './Surface';
 
@@ -23,12 +24,19 @@ export interface ShareCodeCardProps {
  * into a message, readable enough to check by eye, and a complete rebuild of
  * the protocol rather than a summary.
  *
+ * The QR sits behind a toggle rather than always on. Sharing across a table is
+ * the minority case — most people copy the code into a message — and a symbol
+ * permanently occupying 220pt of a screen that already carries the protocol,
+ * its description and two actions would be paying for that case with everyone
+ * else's scrolling.
+ *
  * A protocol built with custom routing in Lab Mode has no short form. Rather
  * than emit something lossy, the card says so plainly and offers the file —
  * which is the honest version of "this one is too complex to text".
  */
 export function ShareCodeCard({ protocol, onShareFile }: ShareCodeCardProps) {
   const [copied, setCopied] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   // Encoding runs a full parse-and-hash round trip to verify itself, so it is
   // keyed on the protocol rather than repeated on every unrelated re-render of
   // the screen (export progress, stage selection, this card's own state).
@@ -90,6 +98,27 @@ export function ShareCodeCard({ protocol, onShareFile }: ShareCodeCardProps) {
         {describeShareCode(protocol)}
       </Text>
 
+      {/* On its own row: three pills across a phone would break "Send as file"
+          onto a second line, and a share code is not worth a ragged control bar. */}
+      <HardwareButton
+        label={showQr ? 'Hide QR' : 'Show QR'}
+        variant="ghost"
+        selected={showQr}
+        accessibilityHint={
+          showQr ? 'Hides the scannable code' : 'Shows a code another phone can scan'
+        }
+        onPress={() => setShowQr((visible) => !visible)}
+      />
+
+      {showQr ? (
+        <View style={styles.qr}>
+          <ShareCodeQr value={code} />
+          <Text variant="caption" tone="tertiary" style={styles.qrCaption}>
+            Point another phone&apos;s camera at this — it carries the same code, nothing more.
+          </Text>
+        </View>
+      ) : null}
+
       <View style={styles.actions}>
         <HardwareButton
           label={copied ? 'Copied' : 'Copy code'}
@@ -130,6 +159,8 @@ const styles = StyleSheet.create({
   // Monospaced so the code's groups line up and a mistyped character is easy
   // to spot against the original.
   code: { fontFamily: 'IBMPlexMono_400Regular', lineHeight: 20 },
+  qr: { alignItems: 'center', gap: space.sm },
+  qrCaption: { textAlign: 'center' },
   actions: { flexDirection: 'row', gap: space.sm },
   action: { flex: 1 },
 });

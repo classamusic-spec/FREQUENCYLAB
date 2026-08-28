@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
@@ -9,12 +9,15 @@ import {
   NOT_MEDICAL_NOTICE,
   PROTOCOL_SCHEMA_VERSION,
   VOLUME_GUIDANCE,
+  dailyTotals,
   formatClock,
+  listeningSummary,
   type ExperienceLevel,
 } from '@frequencylab/dsp-core';
 import { Screen, ScreenHeader, SectionHeader } from '../../src/design/components/Screen';
 import { InstrumentPanel, PanelDivider, PanelRow } from '../../src/design/components/InstrumentPanel';
 import { HardwareButton } from '../../src/design/components/HardwareButton';
+import { ListeningTrend } from '../../src/design/components/ListeningTrend';
 import { SegmentSelector } from '../../src/design/components/SegmentSelector';
 import { Label, Text } from '../../src/design/components/Text';
 import { colors, layout, radius, space } from '../../src/design/tokens';
@@ -27,6 +30,9 @@ import { buildExport } from '../../src/storage/repositories';
 import { clearAll } from '../../src/storage/store';
 
 const APP_VERSION = (Constants.expoConfig?.version as string) ?? '0.1.0';
+
+/** Days plotted in the trend. A month is long enough to show a habit forming. */
+const TREND_DAYS = 30;
 
 /**
  * Profile (§48, §50, §74).
@@ -42,8 +48,25 @@ export default function ProfileScreen() {
   const protocols = useProtocolLibrary((state) => state.protocols);
   const [exporting, setExporting] = useState(false);
 
-  const totalPlayed = sessions.reduce((sum, session) => sum + session.metrics.playedSec, 0);
-  const rated = sessions.filter((session) => session.ratings.length > 0).length;
+  /**
+   * The one impure step, kept here on purpose.
+   *
+   * `listeningSummary` and `dailyTotals` never read a clock or a zone, so both
+   * have to be told what "now" is and how far east the device sits — otherwise
+   * the same history would summarise differently on two phones. Reading them
+   * once per history change keeps the screen stable while it is open, and keeps
+   * the analysis itself testable.
+   */
+  const trend = useMemo(() => {
+    const now = new Date().toISOString();
+    const timeZoneOffsetMinutes = -new Date().getTimezoneOffset();
+    return {
+      summary: listeningSummary(sessions, { now, timeZoneOffsetMinutes }),
+      days: dailyTotals(sessions, { now, timeZoneOffsetMinutes, days: TREND_DAYS }),
+    };
+  }, [sessions]);
+  const { summary } = trend;
+  const windowSec = trend.days.reduce((sum, day) => sum + day.playedSec, 0);
 
   const exportData = async () => {
     setExporting(true);
@@ -78,17 +101,68 @@ export default function ProfileScreen() {
     <Screen bottomInset={layout.transportHeight}>
       <ScreenHeader eyebrow="Profile" title="You" subtitle="Settings, history and your data." />
 
-      <InstrumentPanel tone="raised" label="History">
-        <View style={styles.statRow}>
-          <Stat label="Sessions" value={String(sessions.length)} />
-          <Stat label="Rated" value={String(rated)} />
-          <Stat label="Listening" value={formatClock(totalPlayed)} />
-          <Stat label="Protocols" value={String(protocols.length)} />
-        </View>
-        <PanelDivider />
-        <Pressable onPress={() => router.push('/history')} accessibilityRole="button">
-          <Label tone="signal">View all sessions</Label>
-        </Pressable>
+      <InstrumentPanel
+        tone="raised"
+        label="History"
+        headerRight={
+          summary.totalSessions > 0 ? (
+            <Label>{`Last ${TREND_DAYS} days`}</Label>
+          ) : null
+        }
+      >
+        {summary.totalSessions === 0 ? (
+          // Zeros in every field would look like a measurement. There has been
+          // no measurement, so the panel says so and says what would fill it.
+          <View style={styles.emptyTrend}>
+            <Text variant="bodySm" tone="secondary">
+              Nothing to show yet. No sessions have been recorded on this device, so there is no
+              trend to draw — not a flat one, and not a zero.
+            </Text>
+            <Text variant="caption" tone="tertiary">
+              After your first session this panel plots daily listening time over the last{' '}
+              {TREND_DAYS} days, alongside your longest run of consecutive days. Sessions under
+              thirty seconds are never recorded, so an accidental start will not appear here.
+            </Text>
+          </View>
+        ) : (
+          <>
+            <ListeningTrend days={trend.days} />
+
+            {windowSec === 0 ? (
+              <Text variant="caption" tone="tertiary" style={styles.trendNote}>
+                The line is flat because nothing falls inside this window — your{' '}
+                {summary.totalSessions === 1 ? 'session is' : 'sessions are'} older than{' '}
+                {TREND_DAYS} days, not missing.
+              </Text>
+            ) : null}
+
+            <PanelDivider />
+
+            <View style={styles.statRow}>
+              <Stat label="Streak" value={String(summary.currentStreakDays)} unit="days" />
+              <Stat label="Longest" value={String(summary.longestStreakDays)} unit="days" />
+              <Stat label="Avg session" value={formatClock(summary.averageSessionSec)} />
+            </View>
+            {/* The rule, in the same words as the JSDoc that implements it. */}
+            <Text variant="caption" tone="tertiary" style={styles.trendNote}>
+              A streak is consecutive days with at least one session, however short. Today not
+              having one yet does not break it — a day only counts as missed once it is over.
+            </Text>
+
+            <PanelDivider />
+
+            <PanelRow label="Total listening" value={formatClock(summary.totalPlayedSec)} />
+            <PanelRow label={`Last ${TREND_DAYS} days`} value={formatClock(windowSec)} />
+            <PanelRow label="Sessions" value={String(summary.totalSessions)} />
+            <PanelRow label="Rated" value={`${summary.ratedCount} of ${summary.totalSessions}`} />
+            <PanelRow label="Protocols" value={String(protocols.length)} />
+
+            <PanelDivider />
+            <Pressable onPress={() => router.push('/history')} accessibilityRole="button">
+              <Label tone="signal">View all sessions</Label>
+            </Pressable>
+          </>
+        )}
       </InstrumentPanel>
 
       <SectionHeader label="Experience level" />
@@ -205,11 +279,19 @@ export default function ProfileScreen() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+/** A readout with its engraved caption above and its unit set small beside it. */
+function Stat({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (
     <View style={styles.stat}>
       <Label>{label}</Label>
-      <Text variant="readoutLg">{value}</Text>
+      <View style={styles.statValue}>
+        <Text variant="readoutLg">{value}</Text>
+        {unit ? (
+          <Text variant="caption" tone="tertiary" style={styles.statUnit}>
+            {unit}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -251,8 +333,12 @@ function ToggleRow({
 }
 
 const styles = StyleSheet.create({
-  statRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  statRow: { flexDirection: 'row', justifyContent: 'space-between', gap: space.sm },
   stat: { gap: 2, flex: 1 },
+  statValue: { flexDirection: 'row', alignItems: 'baseline', gap: space.xxs },
+  statUnit: { flexShrink: 1 },
+  emptyTrend: { gap: space.sm },
+  trendNote: { marginTop: space.sm },
   buttonRow: { flexDirection: 'row', gap: space.sm, marginTop: space.md },
   paragraph: { marginBottom: space.sm },
   toggleRow: {
