@@ -341,3 +341,81 @@ export function bumpVersion(protocol: Protocol): Protocol {
     },
   };
 }
+
+/**
+ * Naming.
+ *
+ * A protocol's name is whatever the person who made it wants to call it, and
+ * `canonicalProtocol` deliberately excludes name, description and id from the
+ * canonical form. Renaming therefore changes what a protocol is *called* and
+ * nothing at all about what it *sounds like*: same fingerprint, same share
+ * code, same audio. `test/rename.test.ts` proves that rather than asserting it.
+ *
+ * The limits below exist so a name stays readable in a list, not to police what
+ * anyone calls their own work. Two protocols are allowed to share a name — what
+ * actually distinguishes them is their fingerprint, and refusing a duplicate
+ * would be the app having an opinion about someone else's filing.
+ */
+
+export const PROTOCOL_NAME_MAX_LENGTH = 60;
+export const PROTOCOL_DESCRIPTION_MAX_LENGTH = 160;
+
+/**
+ * Tidies typed or pasted text into a single clean line.
+ *
+ * Control characters and line breaks become spaces, runs of whitespace
+ * collapse, the ends are trimmed and the result is capped. Collapsing rather
+ * than refusing means a name pasted out of a document arrives usable, instead
+ * of being rejected for a character the user cannot see.
+ */
+function tidyLine(input: string, maxLength: number): string {
+  return input
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength)
+    // A cut can land mid-space, so the trim is repeated after the slice.
+    .trim();
+}
+
+export function normaliseProtocolName(input: string): string {
+  return tidyLine(input, PROTOCOL_NAME_MAX_LENGTH);
+}
+
+export function normaliseProtocolDescription(input: string): string {
+  return tidyLine(input, PROTOCOL_DESCRIPTION_MAX_LENGTH);
+}
+
+/**
+ * Why a name cannot be used, phrased the way the UI will show it, or `null`
+ * when it is fine.
+ *
+ * Only emptiness is refused. An over-long name is shortened by
+ * `normaliseProtocolName` rather than rejected, and a duplicate is not an issue
+ * at all.
+ */
+export function protocolNameIssue(input: string): string | null {
+  return normaliseProtocolName(input).length === 0 ? 'A protocol needs a name.' : null;
+}
+
+/**
+ * Renames a protocol, optionally replacing its description.
+ *
+ * Only `name` and `description` move; stages, master settings, sample rate and
+ * every other audio-determining field are carried through untouched, which is
+ * exactly what keeps the fingerprint stable.
+ *
+ * Pass an empty description to remove one; omit the argument to leave whatever
+ * description the protocol already has.
+ */
+export function renameProtocol(protocol: Protocol, name: string, description?: string): Protocol {
+  const issue = protocolNameIssue(name);
+  if (issue) throw new Error(issue);
+
+  const renamed: Protocol = { ...protocol, name: normaliseProtocolName(name) };
+  if (description !== undefined) {
+    const tidied = normaliseProtocolDescription(description);
+    renamed.description = tidied.length > 0 ? tidied : undefined;
+  }
+  return renamed;
+}

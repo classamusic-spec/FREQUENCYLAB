@@ -16,11 +16,27 @@ export interface ProtocolCardProps {
 }
 
 export function ProtocolCard({ protocol, onPress, onPlay, compact, style }: ProtocolCardProps) {
+  /*
+   * Names are allowed to collide, so a card has to stay readable when one does.
+   * The disambiguator is the description — the user's own words for what a
+   * protocol is for, which is exactly the difference they are looking for. A
+   * compact card normally hides it to save a line; when the name is shared,
+   * that line is the whole point and is shown anyway.
+   *
+   * Nothing is invented for this: with no description, the duration, stage
+   * count and DNA chip already on the card are what tell the rows apart.
+   */
+  const showDescription = Boolean(protocol.description) && (!compact || protocol.nameIsShared);
+
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${protocol.name}, ${Math.round(protocol.durationSec / 60)} minutes, ${protocol.stageCount} stages`}
+      // A screen reader hearing two identical rows has the same problem as
+      // someone seeing them, so the description goes into the label too.
+      accessibilityLabel={`${protocol.name}, ${Math.round(protocol.durationSec / 60)} minutes, ${protocol.stageCount} stages${
+        protocol.nameIsShared && protocol.description ? `. ${protocol.description}` : ''
+      }`}
       style={[styles.card, compact ? styles.cardCompact : null, style]}
     >
       <View style={styles.cardHeader}>
@@ -28,7 +44,7 @@ export function ProtocolCard({ protocol, onPress, onPlay, compact, style }: Prot
           <Text variant="heading" numberOfLines={1}>
             {protocol.name}
           </Text>
-          {!compact && protocol.description ? (
+          {showDescription ? (
             <Text variant="bodySm" tone="secondary" numberOfLines={2} style={styles.cardDescription}>
               {protocol.description}
             </Text>

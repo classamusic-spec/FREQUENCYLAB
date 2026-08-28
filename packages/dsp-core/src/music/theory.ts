@@ -223,6 +223,74 @@ export function frequencyToNote(hz: number, options: TuningOptions = {}): NoteMa
   };
 }
 
+/**
+ * Frequency of the note nearest `hz`, optionally `semitones` away from it.
+ *
+ * This is the arithmetic behind a snap-to-note detent and behind stepping a
+ * control by whole notes: round onto the tempered grid, move a whole number of
+ * places along it, and come back to a frequency. With `semitones` at 0 it is
+ * simply "the exact frequency of the note this is nearest to".
+ *
+ * Returns null for a frequency with no position on the pitch axis, matching
+ * {@link frequencyToNote} rather than inventing a nearest note for 0 Hz.
+ */
+export function nearestNoteFrequency(
+  hz: number,
+  semitones = 0,
+  options: TuningOptions = {},
+): number | null {
+  const referenceHz = options.referenceHz ?? DEFAULT_REFERENCE_HZ;
+  if (!Number.isFinite(hz) || hz <= 0) return null;
+  if (!Number.isFinite(referenceHz) || referenceHz <= 0) return null;
+  if (!Number.isFinite(semitones)) return null;
+  const nearest = Math.round(frequencyToMidi(hz, referenceHz));
+  return midiToFrequency(nearest + Math.round(semitones), referenceHz);
+}
+
+/*
+ * Written form.
+ *
+ * These three are presentation rather than theory, and they live here for the
+ * same reason `formatHz` lives in `math/util`: a note readout appears on the
+ * encoder, in note entry and in any panel that names a pitch, and the moment
+ * two of them disagree about whether to print "0¢" the interface stops looking
+ * like one instrument. One policy, one place, covered by the same tests as the
+ * arithmetic it describes.
+ */
+
+/** Scientific pitch notation: `C#3`. */
+export function formatNote(match: Pick<NoteMatch, 'name' | 'octave'>): string {
+  return `${match.name}${match.octave}`;
+}
+
+/**
+ * Signed cents, or null when the pitch is close enough to be called the note.
+ *
+ * The sign is always printed, because "12¢" without one is unreadable — sharp
+ * and flat of a note are opposite mistakes. Below a cent nothing is printed at
+ * all: a cent is roughly the threshold of pitch discrimination, so a readout
+ * flickering between "+0¢" and "-0¢" would be reporting noise as information.
+ */
+export function formatCents(cents: number): string | null {
+  if (!Number.isFinite(cents) || Math.abs(cents) < 1) return null;
+  const rounded = Math.round(cents);
+  return `${rounded > 0 ? '+' : '-'}${Math.abs(rounded)}¢`;
+}
+
+/**
+ * The same readout as words, for a screen reader.
+ *
+ * "C#3 +12¢" is read aloud as something between meaningless and wrong, so the
+ * accessible path gets the spelling a musician would say out loud (§50).
+ */
+export function spellNote(match: NoteMatch): string {
+  const letter = match.name.length > 1 ? `${match.name[0]} sharp` : match.name;
+  const written = `${letter} ${match.octave}`;
+  if (Math.abs(match.centsOff) < 1) return written;
+  const rounded = Math.abs(Math.round(match.centsOff));
+  return `${written}, ${rounded} cents ${match.centsOff > 0 ? 'sharp' : 'flat'}`;
+}
+
 /** One row of {@link noteTable}. */
 export interface NoteTableEntry {
   name: SharpNoteName;

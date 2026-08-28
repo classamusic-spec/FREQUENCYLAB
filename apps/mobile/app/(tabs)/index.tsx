@@ -14,7 +14,7 @@ import { HardwareButton } from '../../src/design/components/HardwareButton';
 import { ExperimentCard, InsightCard, ProtocolCard } from '../../src/design/components/Cards';
 import { Label, Text } from '../../src/design/components/Text';
 import { colors, layout, space } from '../../src/design/tokens';
-import { useProtocolLibrary, summarise } from '../../src/state/library';
+import { useProtocolLibrary, summariseLibrary } from '../../src/state/library';
 import { useHistory } from '../../src/state/history';
 import { useExperiments } from '../../src/state/experiments';
 import { usePreferences } from '../../src/state/preferences';
@@ -47,10 +47,12 @@ export default function HomeScreen() {
       }
       if (ordered.length >= 3) break;
     }
+    // Summarised against the whole library, not just these three, so a name
+    // shared with a protocol further down the list still gets its date.
+    const summaries = summariseLibrary(protocols);
     return ordered
-      .map((id) => protocols.find((protocol) => protocol.id === id))
-      .filter((protocol): protocol is NonNullable<typeof protocol> => protocol !== undefined)
-      .map(summarise);
+      .map((id) => summaries.find((summary) => summary.id === id))
+      .filter((summary): summary is NonNullable<typeof summary> => summary !== undefined);
   }, [protocols, sessions]);
 
   const runningExperiment = experiments.find((experiment) => experiment.status === 'running');

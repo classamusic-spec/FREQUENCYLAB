@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import {
@@ -8,6 +8,7 @@ import {
   describeShareCode,
   formatClock,
   parseShareCode,
+  renameProtocol,
   totalDurationSec,
   validateProtocol,
   type Protocol,
@@ -15,8 +16,9 @@ import {
 import { Screen, ScreenHeader, SectionHeader } from '../src/design/components/Screen';
 import { InstrumentPanel, PanelRow } from '../src/design/components/InstrumentPanel';
 import { HardwareButton } from '../src/design/components/HardwareButton';
+import { NameEntrySheet, RENAME_FOOTNOTE } from '../src/design/components/NameEntrySheet';
 import { Label, Text } from '../src/design/components/Text';
-import { colors, space } from '../src/design/tokens';
+import { colors, MIN_TOUCH_TARGET, space } from '../src/design/tokens';
 import * as haptics from '../src/design/haptics';
 import { useProtocolLibrary } from '../src/state/library';
 
@@ -93,6 +95,25 @@ export default function ImportScreen() {
   const router = useRouter();
   const [text, setText] = useState('');
   const saveProtocol = useProtocolLibrary((state) => state.save);
+  const existingNames = useProtocolLibrary((state) => state.protocols).map((entry) => entry.name);
+
+  /*
+   * A protocol arriving from a share code is called "Shared protocol", and one
+   * from a DNA string is called whatever its author called it. Neither is a
+   * name the receiver chose, so the screen offers one before the protocol is
+   * added — naming it here is far more likely to happen than naming it later.
+   *
+   * `null` means "keep the name it came with". It is cleared whenever the
+   * pasted text changes, because at that point this is a different protocol
+   * and a name chosen for the previous one would be wrong.
+   */
+  const [chosenName, setChosenName] = useState<string | null>(null);
+  const [naming, setNaming] = useState(false);
+
+  const replaceText = (value: string) => {
+    setText(value);
+    setChosenName(null);
+  };
 
   const parsed = useMemo(() => interpret(text), [text]);
   const protocol = parsed.kind === 'code' || parsed.kind === 'dna' ? parsed.protocol : undefined;
@@ -112,7 +133,7 @@ export default function ImportScreen() {
       <InstrumentPanel tone="recessed" bare>
         <TextInput
           value={text}
-          onChangeText={setText}
+          onChangeText={replaceText}
           placeholder="FL1 C220 NP12 | 20m B10 #P4X3"
           placeholderTextColor={colors.textDisabled}
           multiline
@@ -125,7 +146,7 @@ export default function ImportScreen() {
 
       <HardwareButton
         label="Paste from clipboard"
-        onPress={async () => setText(await Clipboard.getStringAsync())}
+        onPress={async () => replaceText(await Clipboard.getStringAsync())}
       />
 
       {parsed.kind === 'error' ? (
@@ -138,9 +159,29 @@ export default function ImportScreen() {
 
       {protocol ? (
         <>
-          <SectionHeader label="What this is" />
+          <SectionHeader
+            label="What this is"
+            right={
+              <Pressable
+                onPress={() => setNaming(true)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Give this protocol your own name"
+                style={styles.headerAction}
+              >
+                <Label tone="signal">{chosenName ? 'Change name' : 'Name it'}</Label>
+              </Pressable>
+            }
+          />
           <InstrumentPanel tone="flat">
-            <Text variant="heading">{protocol.name}</Text>
+            <Text variant="heading">{chosenName ?? protocol.name}</Text>
+            {chosenName ? (
+              <Text variant="caption" tone="tertiary">
+                Arrived as {'“'}
+                {protocol.name}
+                {'”'}.
+              </Text>
+            ) : null}
             <Text variant="bodySm" tone="secondary" style={styles.note}>
               {describeShareCode(protocol)}
             </Text>
@@ -232,14 +273,34 @@ export default function ImportScreen() {
             </InstrumentPanel>
           ) : null}
 
+          {naming ? (
+            <NameEntrySheet
+              title="Name this protocol"
+              name={chosenName ?? protocol.name}
+              existingNames={existingNames}
+              footnote={RENAME_FOOTNOTE}
+              submitLabel="Set name"
+              onCancel={() => setNaming(false)}
+              onSubmit={(name) => {
+                setChosenName(name);
+                setNaming(false);
+                haptics.confirm();
+              }}
+            />
+          ) : null}
+
           <HardwareButton
             label="Add to my protocols"
             variant="primary"
             size="lg"
             disabled={!validation?.ok}
             onPress={async () => {
+              // The rename is applied to the incoming protocol rather than
+              // saved and then edited, so the library never briefly holds a
+              // protocol under a name nobody chose.
+              const named = chosenName ? renameProtocol(protocol, chosenName) : protocol;
               const saved = await saveProtocol({
-                ...protocol,
+                ...named,
                 id: `protocol-${Date.now().toString(36)}`,
               });
               haptics.confirm();
@@ -273,6 +334,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlignVertical: 'top',
   },
+  headerAction: { minHeight: MIN_TOUCH_TARGET, justifyContent: 'center', paddingLeft: space.md },
   note: { marginTop: space.xs },
   metaRow: { flexDirection: 'row', gap: space.xl, marginTop: space.md },
   metaCell: { gap: space.xxs },

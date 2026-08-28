@@ -17,11 +17,12 @@ import { InstrumentPanel, PanelDivider, PanelRow } from '../../src/design/compon
 import { HardwareButton } from '../../src/design/components/HardwareButton';
 import { SegmentSelector } from '../../src/design/components/SegmentSelector';
 import { SignalFlowView } from '../../src/design/components/SignalFlowView';
+import { NameEntrySheet, RENAME_FOOTNOTE } from '../../src/design/components/NameEntrySheet';
 import { Tag } from '../../src/design/components/Badges';
 import { ShareCodeCard } from '../../src/design/components/ShareCodeCard';
 import { ChevronIcon } from '../../src/design/components/Icons';
 import { Label, Text } from '../../src/design/components/Text';
-import { colors, space } from '../../src/design/tokens';
+import { colors, MIN_TOUCH_TARGET, space } from '../../src/design/tokens';
 import * as haptics from '../../src/design/haptics';
 import { confirm, notify } from '../../src/design/dialogs';
 import { useProtocolLibrary } from '../../src/state/library';
@@ -48,9 +49,11 @@ export default function ProtocolScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const protocol = useProtocolLibrary((state) => state.get(id));
+  const protocols = useProtocolLibrary((state) => state.protocols);
   const lineageOf = useProtocolLibrary((state) => state.lineageOf);
   const fork = useProtocolLibrary((state) => state.fork);
   const remove = useProtocolLibrary((state) => state.remove);
+  const rename = useProtocolLibrary((state) => state.rename);
   const openInLab = useLab((state) => state.open);
   const requestStart = useSessionStart((state) => state.request);
   const preferences = usePreferences((state) => state.preferences);
@@ -59,6 +62,14 @@ export default function ProtocolScreen() {
   const [exportLength, setExportLength] = useState('180');
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [renaming, setRenaming] = useState(false);
+
+  // Every other name in the library, so the sheet can mention a collision
+  // without treating it as a mistake.
+  const otherNames = useMemo(
+    () => protocols.filter((entry) => entry.id !== id).map((entry) => entry.name),
+    [protocols, id],
+  );
 
   const dna = useMemo(() => (protocol ? protocolDna(protocol) : undefined), [protocol]);
   const [showTechnical, setShowTechnical] = useState(false);
@@ -100,11 +111,41 @@ export default function ProtocolScreen() {
 
   return (
     <Screen>
+      {/* The name leads the screen, so the control that changes it sits on the
+          same row rather than in the footer with Fork and Delete — renaming is
+          something you do *to the title*, not a destructive action. */}
       <ScreenHeader
         eyebrow={protocol.meta.generatedBy === 'ai' ? 'AI generated' : 'Protocol'}
         title={protocol.name}
-        subtitle={protocol.description}
+        subtitle={protocol.description ?? 'No description yet.'}
+        right={
+          <Pressable
+            onPress={() => setRenaming(true)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={`Rename ${protocol.name}`}
+            style={styles.headerAction}
+          >
+            <Label tone="signal">Rename</Label>
+          </Pressable>
+        }
       />
+
+      {renaming ? (
+        <NameEntrySheet
+          title="Name this protocol"
+          name={protocol.name}
+          description={protocol.description ?? ''}
+          existingNames={otherNames}
+          footnote={RENAME_FOOTNOTE}
+          onCancel={() => setRenaming(false)}
+          onSubmit={async (name, description) => {
+            setRenaming(false);
+            await rename(protocol.id, name, description);
+            haptics.confirm();
+          }}
+        />
+      ) : null}
 
       <View style={styles.metaRow}>
         <Tag label={`${protocol.stages.length} stages`} />
@@ -402,6 +443,7 @@ function diffLineage(lineage: Protocol[], current: Protocol): string[] {
 }
 
 const styles = StyleSheet.create({
+  headerAction: { minHeight: MIN_TOUCH_TARGET, justifyContent: 'center', paddingLeft: space.md },
   metaRow: { flexDirection: 'row', gap: space.xs, flexWrap: 'wrap' },
   actionRow: { flexDirection: 'row', gap: space.sm },
   actionButton: { flex: 1 },

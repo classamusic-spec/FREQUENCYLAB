@@ -16,13 +16,14 @@ import { SegmentSelector } from '../../src/design/components/SegmentSelector';
 import { ParameterControl } from '../../src/design/components/ParameterControl';
 import { SignalFlowView } from '../../src/design/components/SignalFlowView';
 import { ProtocolCard } from '../../src/design/components/Cards';
+import { NameEntrySheet, RENAME_FOOTNOTE } from '../../src/design/components/NameEntrySheet';
 import { DnaChip, Tag } from '../../src/design/components/Badges';
 import { Oscilloscope, SpectrumAnalyzer } from '../../src/design/components/Visualizers';
 import { Label, Text } from '../../src/design/components/Text';
-import { colors, layout, radius, space } from '../../src/design/tokens';
+import { colors, layout, MIN_TOUCH_TARGET, radius, space } from '../../src/design/tokens';
 import * as haptics from '../../src/design/haptics';
 import { useLab } from '../../src/state/lab';
-import { useProtocolLibrary, summarise } from '../../src/state/library';
+import { useProtocolLibrary, summariseLibrary } from '../../src/state/library';
 import { usePlayer, useScopeCapture } from '../../src/state/player';
 import { useSessionStart } from '../../src/state/sessionStart';
 import { usePreferences } from '../../src/state/preferences';
@@ -74,12 +75,12 @@ export default function LabScreen() {
             message="Presets are installed on first launch. If you cleared your data, create a new protocol to start again."
           />
         ) : (
-          protocols.map((protocol) => (
+          summariseLibrary(protocols).map((summary, index) => (
             <ProtocolCard
-              key={protocol.id}
-              protocol={summarise(protocol)}
+              key={summary.id}
+              protocol={summary}
               onPress={() => {
-                open(protocol);
+                open(protocols[index]);
                 haptics.engage();
               }}
             />
@@ -107,8 +108,10 @@ function LabWorkspace() {
   const connect = useLab((state) => state.connect);
   const disconnect = useLab((state) => state.disconnect);
   const close = useLab((state) => state.close);
+  const renameDraft = useLab((state) => state.rename);
   const issues = useLab((state) => state.issues);
   const dna = useLab((state) => state.dna);
+  const protocols = useProtocolLibrary((state) => state.protocols);
 
   const saveProtocol = useProtocolLibrary((state) => state.save);
   const requestStart = useSessionStart((state) => state.request);
@@ -118,6 +121,7 @@ function LabWorkspace() {
 
   const [showAddModule, setShowAddModule] = useState(false);
   const [showRouting, setShowRouting] = useState(false);
+  const [renaming, setRenaming] = useState(false);
 
   const stage = draft.stages[stageIndex];
   const graph = stage?.graph;
@@ -160,11 +164,49 @@ function LabWorkspace() {
           draft.stages.reduce((sum, entry) => sum + entry.durationSec, 0),
         )}`}
         right={
-          <Pressable onPress={close} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close workspace">
-            <Label>Close</Label>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              onPress={() => setRenaming(true)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={`Rename ${draft.name}`}
+              style={styles.headerAction}
+            >
+              <Label tone="signal">Rename</Label>
+            </Pressable>
+            <Pressable
+              onPress={close}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Close workspace"
+              style={styles.headerAction}
+            >
+              <Label>Close</Label>
+            </Pressable>
+          </View>
         }
       />
+
+      {/* The draft is not in the library yet, so this renames the working copy;
+          Save protocol at the foot of the screen is what commits it. */}
+      {renaming ? (
+        <NameEntrySheet
+          title="Name this protocol"
+          name={draft.name}
+          description={draft.description ?? ''}
+          existingNames={protocols
+            .filter((entry) => entry.id !== draft.id)
+            .map((entry) => entry.name)}
+          footnote={RENAME_FOOTNOTE}
+          submitLabel="Set name"
+          onCancel={() => setRenaming(false)}
+          onSubmit={(name, description) => {
+            renameDraft(name, description);
+            setRenaming(false);
+            haptics.confirm();
+          }}
+        />
+      ) : null}
 
       {errors.length > 0 ? (
         <InstrumentPanel tone="flat" label="Cannot play">
@@ -444,6 +486,8 @@ function LabWorkspace() {
 }
 
 const styles = StyleSheet.create({
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  headerAction: { minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' },
   actionRow: { flexDirection: 'row', gap: space.sm },
   actionButton: { flex: 1 },
   flow: { paddingHorizontal: space.lg, paddingBottom: space.md },

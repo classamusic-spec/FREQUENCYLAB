@@ -4,6 +4,7 @@ import {
   emptyGraph,
   makeNode,
   protocolDna,
+  renameProtocol,
   validateProtocol,
   withConnection,
   withNode,
@@ -54,7 +55,11 @@ interface LabState {
   removeLane: (laneId: string) => void;
 
   setMaster: (patch: Partial<Protocol['master']>) => void;
-  rename: (name: string) => void;
+  /**
+   * Renames the open draft. Pass an empty description to clear one, or omit it
+   * to leave it alone. The change lands in the library when the draft is saved.
+   */
+  rename: (name: string, description?: string) => void;
 
   currentStage: () => ProtocolStage | undefined;
   currentGraph: () => RoutingGraph | undefined;
@@ -236,10 +241,12 @@ export const useLab = create<LabState>((set, get) => ({
     set({ draft: { ...draft, master: { ...draft.master, ...patch } }, dirty: true });
   },
 
-  rename: (name) => {
+  rename: (name, description) => {
     const draft = get().draft;
     if (!draft) return;
-    set({ draft: { ...draft, name }, dirty: true });
+    // `renameProtocol` does the trimming and refuses an empty name, so the
+    // workspace cannot end up holding a draft with a blank title.
+    set({ draft: renameProtocol(draft, name, description), dirty: true });
   },
 
   currentStage: () => get().draft?.stages[get().stageIndex],
