@@ -9,6 +9,7 @@ import {
   type Favorite,
   type Protocol,
   type ProtocolStage,
+  type RepresentationKind,
   type SafetyEvent,
   type Session,
   type UserPreferences,
@@ -179,4 +180,46 @@ export async function loadArchiveAcknowledgedAt(): Promise<string | null> {
 
 export async function saveArchiveAcknowledgedAt(at: string): Promise<void> {
   await writeValue(StorageKeys.archiveAcknowledgedAt, at);
+}
+
+/**
+ * The user's relationship with the factory preset shelves.
+ *
+ * Only the relationship is stored — which rows were starred and which were
+ * played, by id and by the version that actually ran. The presets themselves
+ * are code, exactly like the shipped archive entries, so improving a row's
+ * wording in an update never has to migrate anything the user owns.
+ */
+
+export async function loadPresetFavorites(): Promise<string[]> {
+  return readValue<string[]>(StorageKeys.presetFavorites, []);
+}
+
+export async function savePresetFavorites(ids: string[]): Promise<void> {
+  await writeValue(StorageKeys.presetFavorites, ids);
+}
+
+/**
+ * A play, pinned to the preset version that produced the sound (§43).
+ *
+ * The version is recorded rather than looked up later, because the point of
+ * pinning is that a row can change: a list that resolved the current version at
+ * read time would quietly rewrite what somebody listened to.
+ */
+export interface PresetPlay {
+  presetId: string;
+  version: number;
+  at: string;
+  /** The representation that was actually played, which the user may have changed. */
+  representation: RepresentationKind;
+}
+
+export async function loadPresetPlays(): Promise<PresetPlay[]> {
+  return readValue<PresetPlay[]>(StorageKeys.presetPlays, []);
+}
+
+export async function savePresetPlays(plays: PresetPlay[]): Promise<void> {
+  // Bounded: this is a recent-plays shelf, not a session history. The real
+  // record of what was listened to lives in `sessions`.
+  await writeValue(StorageKeys.presetPlays, plays.slice(0, 100));
 }

@@ -257,6 +257,7 @@ export default function ProfileScreen() {
       </InstrumentPanel>
 
       <SectionHeader label="Library" />
+      <HardwareButton label="Preset collections" onPress={() => router.push('/collections')} />
       <HardwareButton label="Frequency library" onPress={() => router.push('/library')} />
       <HardwareButton label="Historical archive" onPress={() => router.push('/archive')} />
       <HardwareButton label="AI protocol designer" onPress={() => router.push('/ai')} />

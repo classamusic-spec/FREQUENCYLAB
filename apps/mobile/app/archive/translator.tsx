@@ -66,6 +66,24 @@ export default function TranslatorScreen() {
     () => (valid ? transformsFor(hz, { carrierHz }) : []),
     [carrierHz, hz, valid],
   );
+
+  /**
+   * The same fourteen options, viable ones first.
+   *
+   * Nothing is hidden and nothing is reordered within a group — the sort is
+   * stable, so the translator's own order survives inside each half. What it
+   * fixes is a list that had grown from seven options to fourteen: for a value
+   * already in the audible band, the second and third rows are the divide and
+   * multiply options refusing themselves, and reading two refusals before the
+   * first thing you can actually press makes the list look broken rather than
+   * careful. The refusals still have to be there — a missing row reads as an
+   * oversight — so they move below instead of away.
+   */
+  const ordered = useMemo(
+    () => [...transforms].sort((a, b) => Number(b.available) - Number(a.available)),
+    [transforms],
+  );
+  const availableCount = transforms.filter((entry) => entry.available).length;
   const transform =
     chosen && transforms.some((t) => t.kind === chosen.kind && t.available)
       ? transforms.find((t) => t.kind === chosen.kind)!
@@ -177,9 +195,21 @@ export default function TranslatorScreen() {
             </Text>
           </InstrumentPanel>
 
-          <SectionHeader label="Available transforms" />
+          <SectionHeader
+            label="How this value can be heard"
+            right={
+              <Text variant="caption" tone="tertiary">
+                {availableCount} of {transforms.length} available
+              </Text>
+            }
+          />
+          <Text variant="caption" tone="tertiary">
+            Options this value cannot honestly carry stay on the list with the reason attached. A
+            row that had been filtered out would look like an oversight, and a substituted one
+            would be the silent conversion this whole tool exists to prevent.
+          </Text>
           <TransformPicker
-            transforms={transforms}
+            transforms={ordered}
             selected={transform ?? undefined}
             onSelect={setChosen}
           />

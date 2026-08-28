@@ -19,6 +19,7 @@ import { Screen, ScreenHeader, SectionHeader } from '../../src/design/components
 import { InstrumentPanel, PanelRow } from '../../src/design/components/InstrumentPanel';
 import { HardwareButton } from '../../src/design/components/HardwareButton';
 import { ArchiveEvidenceBadge, VerificationBadge } from '../../src/design/components/Badges';
+import { ClaimEvidenceCard } from '../../src/design/components/ClaimEvidenceCard';
 import { DisplayGlass } from '../../src/design/components/Surface';
 import {
   TransformPicker,
@@ -224,32 +225,20 @@ export default function ArchiveEntryScreen() {
         <>
           <SectionHeader label="Claims and current evidence" />
           <Text variant="caption" tone="tertiary">
-            The left column is what a source said, reproduced so it can be seen accurately. The
-            right column is what can be said today. They are kept apart deliberately.
+            The engraved half is what a source said, reproduced so it can be seen accurately. The
+            printed half below it is what can be said today. They are kept apart deliberately.
           </Text>
+          {/* The same component the preset screens use. A claim and the answer
+              to it are one thing wherever they appear, and rendering them two
+              different ways is how one of the two eventually gets rendered
+              badly. */}
           {entry.claims.map((claim, index) => (
-            <View key={index} style={styles.claim}>
-              <View style={styles.claimSide}>
-                <Label>What was claimed</Label>
-                <Text variant="bodySm" tone="secondary" style={styles.claimText}>
-                  {claim.claim}
-                </Text>
-                {claim.medical ? (
-                  <View style={styles.medicalTag}>
-                    <Text variant="label" uppercase tone="limit">
-                      Medical claim
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-              <View style={styles.claimDivider} />
-              <View style={styles.claimSide}>
-                <Label>What the evidence supports</Label>
-                <Text variant="bodySm" style={styles.claimText}>
-                  {claim.currentEvidence}
-                </Text>
-              </View>
-            </View>
+            <ClaimEvidenceCard
+              key={index}
+              association={claim}
+              claimLabel="What was claimed"
+              evidenceLabel="What the evidence supports"
+            />
           ))}
         </>
       ) : null}
@@ -441,18 +430,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: StyleSheet.hairlineWidth,
     borderLeftColor: colors.hairlineStrong,
   },
-  claim: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.card,
-    padding: space.lg,
-    gap: space.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.edgeLight,
-  },
-  claimSide: { gap: space.xxs },
-  claimText: { marginTop: space.xxs },
-  claimDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.hairlineStrong },
-  medicalTag: { marginTop: space.xs },
   relatedRow: {
     flexDirection: 'row',
     alignItems: 'center',

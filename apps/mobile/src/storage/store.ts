@@ -27,6 +27,8 @@ export const StorageKeys = {
   archiveNotes: 'archive-notes',
   archiveFavorites: 'archive-favorites',
   archiveAcknowledgedAt: 'archive-acknowledged-at',
+  presetFavorites: 'preset-favorites',
+  presetPlays: 'preset-plays',
 } as const;
 
 export type StorageKey = (typeof StorageKeys)[keyof typeof StorageKeys];

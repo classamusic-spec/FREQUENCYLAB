@@ -105,6 +105,25 @@ export const archiveEvidenceColors = {
   'unsupported-medical-claim': palette.evidenceUnsupported,
 } as const;
 
+/**
+ * The preset shelves' classifications, on the same ramp.
+ *
+ * These describe where a preset's standing comes from, not how good it is, so
+ * `mathematical` sits off the evidence ramp entirely in neutral ink: exact
+ * arithmetic is neither strong nor weak evidence, it is not evidence about an
+ * effect at all, and giving it a rung on a green-to-red scale would say
+ * something the classification does not.
+ */
+export const classificationColors = {
+  research: palette.evidenceStrong,
+  'emerging-research': palette.evidencePromising,
+  traditional: palette.evidenceTraditional,
+  historical: palette.evidenceTraditional,
+  mathematical: palette.inkTertiary,
+  experimental: palette.evidenceLimited,
+  'unsupported-medical-claim': palette.evidenceUnsupported,
+} as const;
+
 export const verificationColors = {
   'primary-historical': palette.evidenceStrong,
   'secondary-historical': palette.evidencePromising,

@@ -2,14 +2,17 @@ import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import {
   ARCHIVE_EVIDENCE_LABELS,
+  CLASSIFICATION_LABELS,
   EVIDENCE_LABELS,
   VERIFICATION_LABELS,
   type ArchiveEvidenceLevel,
   type EvidenceLevel,
+  type PresetClassification,
   type VerificationStatus,
 } from '@frequencylab/dsp-core';
 import {
   archiveEvidenceColors,
+  classificationColors,
   colors,
   evidenceColors,
   radius,
@@ -128,6 +131,46 @@ const ARCHIVE_EVIDENCE_SHORT: Record<ArchiveEvidenceLevel, string> = {
   experimental: 'Experimental',
   'unsupported-medical-claim': 'Claim unsupported',
 };
+
+/**
+ * A preset's evidence classification (§25).
+ *
+ * Every row that can be found — in a shelf, in a search result, in the user's
+ * own favourites — carries one of these, because being findable is not being
+ * endorsed and the badge is the sentence that says so. It is deliberately never
+ * optional on a result row: a list that could render without it is a list that
+ * eventually will.
+ *
+ * The word is always present beside the dot, and the full note is on the
+ * accessibility label, so the classification is reachable by a screen reader
+ * rather than only visible as a colour (§50).
+ */
+export function ClassificationBadge({
+  classification,
+  note,
+  style,
+}: {
+  classification: PresetClassification;
+  /** The classification's description, read out but not printed on the badge. */
+  note?: string;
+  style?: ViewStyle;
+}) {
+  const color = classificationColors[classification];
+  return (
+    <View
+      style={[styles.badge, { borderColor: withAlpha(color, 0.4) }, style]}
+      accessible
+      accessibilityLabel={`Evidence classification: ${CLASSIFICATION_LABELS[classification]}.${
+        note ? ` ${note}` : ''
+      }`}
+    >
+      <View style={[styles.dot, { backgroundColor: color }]} />
+      <Text variant="label" uppercase tone="secondary">
+        {CLASSIFICATION_LABELS[classification]}
+      </Text>
+    </View>
+  );
+}
 
 export interface DnaChipProps {
   /** Human DNA — the short readable form. */
