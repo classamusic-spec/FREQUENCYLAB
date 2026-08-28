@@ -369,7 +369,6 @@ export default function BuilderScreen() {
       {fingerprint ? (
         <View style={styles.dnaRow}>
           <DnaChip human={fingerprint.human} fingerprint={fingerprint.fingerprint} />
-          <Label>{fingerprint.shortFingerprint}</Label>
         </View>
       ) : null}
 

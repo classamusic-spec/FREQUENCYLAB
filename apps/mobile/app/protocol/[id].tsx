@@ -17,7 +17,9 @@ import { InstrumentPanel, PanelDivider, PanelRow } from '../../src/design/compon
 import { HardwareButton } from '../../src/design/components/HardwareButton';
 import { SegmentSelector } from '../../src/design/components/SegmentSelector';
 import { SignalFlowView } from '../../src/design/components/SignalFlowView';
-import { DnaChip, Tag } from '../../src/design/components/Badges';
+import { Tag } from '../../src/design/components/Badges';
+import { ShareCodeCard } from '../../src/design/components/ShareCodeCard';
+import { ChevronIcon } from '../../src/design/components/Icons';
 import { Label, Text } from '../../src/design/components/Text';
 import { colors, space } from '../../src/design/tokens';
 import * as haptics from '../../src/design/haptics';
@@ -58,6 +60,7 @@ export default function ProtocolScreen() {
   const [progress, setProgress] = useState(0);
 
   const dna = useMemo(() => (protocol ? protocolDna(protocol) : undefined), [protocol]);
+  const [showTechnical, setShowTechnical] = useState(false);
   const validation = useMemo(() => (protocol ? validateProtocol(protocol) : undefined), [protocol]);
   const lineage = useMemo(() => (protocol ? lineageOf(protocol.id) : []), [lineageOf, protocol]);
 
@@ -132,54 +135,76 @@ export default function ProtocolScreen() {
         />
       </View>
 
-      <SectionHeader label="Protocol DNA" />
-      <InstrumentPanel tone="recessed">
-        <PanelRow label="Human" value={dna.human} />
-        <PanelRow label="Short" value={dna.shortFingerprint} />
-        <PanelRow label="DSP" value={dna.dspVersion} />
-        <PanelRow label="Schema" value={`v${dna.schemaVersion}`} />
-        <PanelDivider />
-        <DnaChip human={dna.human} fingerprint={dna.fingerprint} />
-        <Text variant="readoutXs" tone="tertiary" numberOfLines={2} style={styles.fingerprint}>
-          {dna.fingerprint}
-        </Text>
-        <View style={styles.dnaActions}>
+      <SectionHeader label="Share" />
+      <ShareCodeCard
+        protocol={protocol}
+        onShareFile={async () => {
+          const result = await exportDnaFile(protocol);
+          await share(result.uri, 'application/json', result.filename);
+        }}
+      />
+
+      {/* The fingerprint and engine versions are what actually prove two
+          protocols are identical, but almost nobody needs them — they sit
+          behind a disclosure so the share code is what the screen is about. */}
+      <Pressable
+        onPress={() => setShowTechnical((current) => !current)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: showTechnical }}
+        accessibilityLabel="Technical identity"
+        style={styles.disclosure}
+      >
+        <Label tone={showTechnical ? 'signal' : 'tertiary'}>Technical identity</Label>
+        <ChevronIcon
+          direction={showTechnical ? 'up' : 'down'}
+          size={16}
+          color={showTechnical ? colors.signal : colors.textTertiary}
+        />
+      </Pressable>
+
+      {showTechnical ? (
+        <InstrumentPanel tone="recessed">
+          <PanelRow label="Summary" value={dna.human} />
+          <PanelRow label="Short id" value={dna.shortFingerprint} />
+          <PanelRow label="Engine" value={dna.dspVersion} />
+          <PanelRow label="Schema" value={`v${dna.schemaVersion}`} />
+          <PanelDivider />
+          <Label>Fingerprint</Label>
+          <Text variant="readoutXs" tone="tertiary" style={styles.fingerprint}>
+            {dna.fingerprint}
+          </Text>
           <HardwareButton
-            label="Copy DNA"
+            label="Copy full DNA"
             size="sm"
+            variant="ghost"
+            style={styles.fullDnaButton}
             onPress={() => {
               void Clipboard.setStringAsync(encodeDnaString(protocol));
               haptics.confirm();
-              Alert.alert('Copied', 'The full DNA string is on your clipboard. Anyone with this app can import it and get exactly this protocol.');
+              Alert.alert(
+                'Full DNA copied',
+                'This is the complete, lossless form — thousands of characters. For sending to someone, the share code above is the same protocol in one line.',
+              );
             }}
           />
-          <HardwareButton
-            label="Share DNA"
-            size="sm"
-            variant="ghost"
-            onPress={async () => {
-              const result = await exportDnaFile(protocol);
-              await share(result.uri, 'application/json', result.filename);
-            }}
-          />
-        </View>
-        <PanelDivider />
-        <View style={styles.verifyRow}>
-          <Label tone={verification.matches ? 'signal' : 'limit'}>
-            {verification.matches ? 'Verified' : 'Fingerprint mismatch'}
-          </Label>
-          {verification.note ? (
-            <Text variant="caption" tone="warning" style={styles.verifyNote}>
-              {verification.note}
-            </Text>
-          ) : (
-            <Text variant="caption" tone="tertiary" style={styles.verifyNote}>
-              The configuration hashes to its recorded fingerprint, so this will render exactly as
-              it did when it was made.
-            </Text>
-          )}
-        </View>
-      </InstrumentPanel>
+          <PanelDivider />
+          <View style={styles.verifyRow}>
+            <Label tone={verification.matches ? 'signal' : 'limit'}>
+              {verification.matches ? 'Verified' : 'Fingerprint mismatch'}
+            </Label>
+            {verification.note ? (
+              <Text variant="caption" tone="warning" style={styles.verifyNote}>
+                {verification.note}
+              </Text>
+            ) : (
+              <Text variant="caption" tone="tertiary" style={styles.verifyNote}>
+                The configuration hashes to its recorded fingerprint, so this will render exactly as
+                it did when it was made.
+              </Text>
+            )}
+          </View>
+        </InstrumentPanel>
+      ) : null}
 
       <SectionHeader label="Stages" />
       {protocol.stages.length > 1 ? (
@@ -382,6 +407,13 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: space.sm },
   actionButton: { flex: 1 },
   dnaActions: { flexDirection: 'row', gap: space.sm, marginTop: space.md },
+  disclosure: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: space.sm,
+  },
+  fullDnaButton: { marginTop: space.md },
   fingerprint: { marginTop: space.sm },
   verifyRow: { gap: space.xxs },
   verifyNote: { marginTop: space.xxs },

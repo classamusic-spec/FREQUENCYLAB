@@ -39,6 +39,7 @@ export * from './protocol/dna.js';
 export * from './protocol/validate.js';
 export * from './protocol/migrate.js';
 export * from './protocol/builders.js';
+export * from './protocol/shareCode.js';
 export * from './protocol/recipes.js';
 
 export * from './engine/master.js';
