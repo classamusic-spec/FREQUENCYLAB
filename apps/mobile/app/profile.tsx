@@ -14,20 +14,20 @@ import {
   listeningSummary,
   type ExperienceLevel,
 } from '@frequencylab/dsp-core';
-import { Screen, ScreenHeader, SectionHeader } from '../../src/design/components/Screen';
-import { InstrumentPanel, PanelDivider, PanelRow } from '../../src/design/components/InstrumentPanel';
-import { HardwareButton } from '../../src/design/components/HardwareButton';
-import { ListeningTrend } from '../../src/design/components/ListeningTrend';
-import { SegmentSelector } from '../../src/design/components/SegmentSelector';
-import { Label, Text } from '../../src/design/components/Text';
-import { colors, layout, radius, space } from '../../src/design/tokens';
-import * as haptics from '../../src/design/haptics';
-import { confirm, notify } from '../../src/design/dialogs';
-import { usePreferences } from '../../src/state/preferences';
-import { useHistory } from '../../src/state/history';
-import { useProtocolLibrary } from '../../src/state/library';
-import { buildExport } from '../../src/storage/repositories';
-import { clearAll } from '../../src/storage/store';
+import { Screen, ScreenHeader, SectionHeader } from '../src/design/components/Screen';
+import { InstrumentPanel, PanelDivider, PanelRow } from '../src/design/components/InstrumentPanel';
+import { HardwareButton } from '../src/design/components/HardwareButton';
+import { ListeningTrend } from '../src/design/components/ListeningTrend';
+import { SegmentSelector } from '../src/design/components/SegmentSelector';
+import { Label, Text } from '../src/design/components/Text';
+import { colors, layout, radius, space } from '../src/design/tokens';
+import * as haptics from '../src/design/haptics';
+import { confirm, notify } from '../src/design/dialogs';
+import { usePreferences } from '../src/state/preferences';
+import { useHistory } from '../src/state/history';
+import { useProtocolLibrary } from '../src/state/library';
+import { buildExport } from '../src/storage/repositories';
+import { clearAll } from '../src/storage/store';
 
 const APP_VERSION = (Constants.expoConfig?.version as string) ?? '0.1.0';
 
@@ -99,7 +99,14 @@ export default function ProfileScreen() {
 
   return (
     <Screen bottomInset={layout.transportHeight}>
-      <ScreenHeader eyebrow="Profile" title="You" subtitle="Settings, history and your data." />
+      {/* A modal reached from the disc in every screen's top right, and the
+          stack draws no header of its own, so the way back has to be here. */}
+      <ScreenHeader
+        eyebrow="Profile"
+        title="You"
+        subtitle="Settings, history and your data."
+        right={<HardwareButton label="Done" size="sm" onPress={() => router.back()} />}
+      />
 
       <InstrumentPanel
         tone="raised"

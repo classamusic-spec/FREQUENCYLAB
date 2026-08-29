@@ -10,7 +10,6 @@ import {
   DialIcon,
   FlaskIcon,
   LibraryIcon,
-  PersonIcon,
   PulseIcon,
   WaveformIcon,
 } from '../../src/design/components/Icons';
@@ -27,6 +26,12 @@ import { usePreferences } from '../../src/state/preferences';
  * reachable only by opening Profile — the last tab, which reads as Settings —
  * and scrolling past the safety notices to a button. Content nobody can find is
  * content that is not there, and this is most of what the app knows.
+ *
+ * Profile went the other way, to a disc in the top right of every main screen.
+ * A tab slot is expensive: it costs the five surfaces that *are* the product a
+ * sixth of the bottom edge each, permanently, for a screen most people open
+ * about as often as they change their address. A corner is the right size for
+ * it, and the top right is where people already look for their own account.
  */
 const TABS = [
   { name: 'index', label: 'Player', route: '/', Icon: WaveformIcon },
@@ -34,7 +39,6 @@ const TABS = [
   { name: 'library', label: 'Library', route: '/library', Icon: LibraryIcon },
   { name: 'lab', label: 'Lab', route: '/lab', Icon: FlaskIcon },
   { name: 'experiments', label: 'Trials', route: '/experiments', Icon: PulseIcon },
-  { name: 'profile', label: 'Profile', route: '/profile', Icon: PersonIcon },
 ] as const;
 
 export default function TabsLayout() {
@@ -52,7 +56,6 @@ export default function TabsLayout() {
           smaller than it is, and the screen itself explains what it is for. */}
       <Tabs.Screen name="lab" options={{ title: level === 'simple' ? 'Lab' : 'Lab' }} />
       <Tabs.Screen name="experiments" />
-      <Tabs.Screen name="profile" />
     </Tabs>
   );
 }

@@ -10,6 +10,7 @@ import {
   type NodeKind,
 } from '@frequencylab/dsp-core';
 import { EmptyState, Screen, ScreenHeader, SectionHeader } from '../../src/design/components/Screen';
+import { ProfileButton } from '../../src/design/components/ProfileButton';
 import { InstrumentPanel, PanelDivider } from '../../src/design/components/InstrumentPanel';
 import { HardwareButton } from '../../src/design/components/HardwareButton';
 import { SegmentSelector } from '../../src/design/components/SegmentSelector';
@@ -50,6 +51,7 @@ export default function LabScreen() {
           eyebrow="Lab"
           title="Workspace"
           subtitle="Open a protocol to take it apart, or start from a blank rack."
+          right={<ProfileButton />}
         />
         <View style={styles.actionRow}>
           <HardwareButton

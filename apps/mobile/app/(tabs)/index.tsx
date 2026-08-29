@@ -12,6 +12,7 @@ import { EmptyState, Screen, ScreenHeader, SectionHeader } from '../../src/desig
 import { InstrumentPanel } from '../../src/design/components/InstrumentPanel';
 import { HardwareButton } from '../../src/design/components/HardwareButton';
 import { ExperimentCard, InsightCard, ProtocolCard } from '../../src/design/components/Cards';
+import { ProfileButton } from '../../src/design/components/ProfileButton';
 import { Label, Text } from '../../src/design/components/Text';
 import { colors, layout, space } from '../../src/design/tokens';
 import { useProtocolLibrary, summariseLibrary } from '../../src/state/library';
@@ -74,7 +75,12 @@ export default function HomeScreen() {
 
   return (
     <Screen bottomInset={layout.transportHeight}>
-      <ScreenHeader eyebrow={greeting()} title="Frequency Lab" subtitle="Sound. Measured personally." />
+      <ScreenHeader
+        eyebrow={greeting()}
+        title="Frequency Lab"
+        subtitle="Sound. Measured personally."
+        right={<ProfileButton />}
+      />
 
       <InstrumentPanel tone="raised" label="Current recommendation">
         <Text variant="title" style={styles.recommendationTitle}>

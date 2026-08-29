@@ -100,6 +100,10 @@ export default function RootLayout() {
             name="session"
             options={{ animation: 'slide_from_bottom', gestureEnabled: false }}
           />
+          {/* Reached from the disc in every screen's top right, not from the
+              tab bar. A modal, because it is somewhere you go and come back
+              from rather than a place in the app you can be. */}
+          <Stack.Screen name="profile" options={{ presentation: 'modal' }} />
           <Stack.Screen name="calibration" options={{ presentation: 'modal' }} />
           <Stack.Screen name="diagnostics" options={{ presentation: 'modal' }} />
           <Stack.Screen name="ai" options={{ presentation: 'modal' }} />

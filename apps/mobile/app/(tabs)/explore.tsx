@@ -16,6 +16,7 @@ import {
   type StimulationEngine,
 } from '@frequencylab/dsp-core';
 import { Screen, ScreenHeader, SectionHeader } from '../../src/design/components/Screen';
+import { ProfileButton } from '../../src/design/components/ProfileButton';
 import { InstrumentPanel, PanelDivider } from '../../src/design/components/InstrumentPanel';
 import { FrequencyEncoder } from '../../src/design/components/FrequencyEncoder';
 import { SegmentSelector } from '../../src/design/components/SegmentSelector';
@@ -119,6 +120,7 @@ export default function ExploreScreen() {
         eyebrow="Explorer"
         title="Frequency Explorer"
         subtitle="Turn the encoder. The sound follows without a click."
+        right={<ProfileButton />}
       />
 
       <SegmentSelector

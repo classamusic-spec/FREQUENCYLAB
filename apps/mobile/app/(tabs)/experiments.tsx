@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { MIN_SESSIONS_FOR_INSIGHTS } from '@frequencylab/dsp-core';
 import { EmptyState, Screen, ScreenHeader, SectionHeader } from '../../src/design/components/Screen';
+import { ProfileButton } from '../../src/design/components/ProfileButton';
 import { InstrumentPanel } from '../../src/design/components/InstrumentPanel';
 import { HardwareButton } from '../../src/design/components/HardwareButton';
 import { ExperimentCard, InsightCard } from '../../src/design/components/Cards';
@@ -34,6 +35,7 @@ export default function ExperimentsScreen() {
         eyebrow="Trials"
         title="Personal experiments"
         subtitle="Compare two protocols against each other, blinded, in your own life."
+        right={<ProfileButton />}
       />
 
       <HardwareButton

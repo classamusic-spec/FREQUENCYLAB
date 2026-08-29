@@ -11,6 +11,7 @@ import {
   type LibraryCategory,
 } from '@frequencylab/dsp-core';
 import { Screen, ScreenHeader, SectionHeader } from '../../src/design/components/Screen';
+import { ProfileButton } from '../../src/design/components/ProfileButton';
 import { InstrumentPanel } from '../../src/design/components/InstrumentPanel';
 import { HardwareButton } from '../../src/design/components/HardwareButton';
 import { SegmentSelector } from '../../src/design/components/SegmentSelector';
@@ -95,6 +96,7 @@ export default function LibraryScreen() {
         eyebrow="Library"
         title="Frequency library"
         subtitle="What is actually known, what is only claimed, and how to tell them apart."
+        right={<ProfileButton />}
       />
 
       <InstrumentPanel tone="recessed" bare>
