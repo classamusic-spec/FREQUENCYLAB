@@ -214,11 +214,14 @@ export interface AssetMatch {
   readonly matchedPreferredTags: readonly OrganicCharacterTag[];
 }
 
+// Flags that a query filters on, packed into one byte per asset so a scan reads
+// one array rather than four booleans off four nested objects. `streaming` is
+// not among them: the pipeline defines it as the exact complement of `preload`,
+// so a filter for it would be a second name for the same question.
 const APPROVED = 1;
 const LOOPABLE = 2;
 const PRELOAD = 4;
-const STREAMING = 8;
-const MEASURED_PITCH = 16;
+const MEASURED_PITCH = 8;
 
 const NO_TAGS: readonly OrganicCharacterTag[] = [];
 const EMPTY: readonly number[] = [];
@@ -315,7 +318,6 @@ export class OrganicAssetRegistry {
         this.loopableList.push(index);
       }
       if (runtime.preloadRecommended) flags |= PRELOAD;
-      if (runtime.streamingRecommended) flags |= STREAMING;
       if (spectral.noteSource === 'measured') flags |= MEASURED_PITCH;
       this.flags[index] = flags;
     }
