@@ -96,6 +96,14 @@ def check_shape(manifest: dict[str, Any], fail: Failures) -> list[dict[str, Any]
     if not isinstance(assets, list):
         fail.add("manifest has no `assets` array.")
         return []
+    if not assets:
+        # A decode failure is reported but does not fail a run, so a library that
+        # would not open at all writes an empty manifest and exits zero. Nothing
+        # else here would notice: an empty manifest passes every other check.
+        fail.add(
+            "the manifest describes no assets at all. Either the source tree was empty when it "
+            "was built, or every file failed to decode — check `analysisFailures` in the report."
+        )
     if manifest.get("assetCount") != len(assets):
         fail.add(f"manifest says assetCount {manifest.get('assetCount')!r} but carries {len(assets)} assets.")
     ids = [asset.get("assetId") for asset in assets]

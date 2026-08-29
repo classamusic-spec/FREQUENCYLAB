@@ -28,6 +28,7 @@ from pipeline.cache import AnalysisCache  # noqa: E402
 from pipeline.classify import choose_instrument, read_hints, runtime_hints, suggest_roles, suggest_tags  # noqa: E402
 from pipeline.config import AnalysisConfig, PipelineConfig, default_paths  # noqa: E402
 from pipeline.decode import DecodeError, decode, ffmpeg_available  # noqa: E402
+from pipeline.derive import CODECS, transcode  # noqa: E402
 from pipeline.discovery import Discovered, asset_id, discover  # noqa: E402
 from pipeline import emit_ts  # noqa: E402
 from pipeline import manifest as manifest_module  # noqa: E402
@@ -292,18 +293,77 @@ def run(config: PipelineConfig, jobs: int, write_html: bool, strict: bool) -> in
     return 0
 
 
+def stage_derive(config: PipelineConfig, codec: str, approved_only: bool) -> int:
+    """Writes compressed runtime copies of the manifest's assets.
+
+    Reads the committed manifest rather than re-scanning, so a derivative always
+    corresponds to an asset the app actually knows about, and skips anything
+    already written at the right size — re-running is cheap.
+    """
+    manifest_path = config.paths.manifest
+    if not manifest_path.exists():
+        print(f"derive     no manifest at {manifest_path} — run `all` first")
+        return 1
+
+    manifest = json.loads(manifest_path.read_text())
+    assets = manifest.get("assets", [])
+    if approved_only:
+        assets = [asset for asset in assets if asset["review"]["approved"]]
+        print(f"derive     {len(assets)} approved of {len(manifest.get('assets', []))}")
+        if not assets:
+            print("           nothing is approved yet, so there is nothing to ship")
+            return 0
+
+    extension = CODECS[codec][0]
+    out_root = config.paths.root / "generated" / "audio" / "runtime" / codec
+    source_bytes = derived_bytes = 0
+    written = skipped = failed = 0
+
+    for index, asset in enumerate(assets, start=1):
+        source = config.paths.source / asset["source"]["relativePath"]
+        target = out_root / (asset["assetId"] + extension)
+        source_bytes += asset["source"]["bytes"]
+        if target.exists() and target.stat().st_size > 0:
+            derived_bytes += target.stat().st_size
+            skipped += 1
+            continue
+        try:
+            derived_bytes += transcode(source, target, codec)
+            written += 1
+        except Exception as error:  # noqa: BLE001 — reported, never fatal
+            failed += 1
+            print(f"           FAILED {asset['assetId']} ({asset['source']['filename']}): {error}")
+        if index % 50 == 0 or index == len(assets):
+            print(f"           {index}/{len(assets)}")
+
+    print(f"derive     {written} written, {skipped} already present, {failed} failed")
+    if derived_bytes:
+        print(
+            f"           {source_bytes / 1e6:.0f} MB source -> {derived_bytes / 1e6:.0f} MB {codec} "
+            f"({source_bytes / derived_bytes:.0f}x smaller)"
+        )
+    print(f"           {out_root}")
+    return 1 if failed else 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         "command",
         nargs="?",
         default="all",
-        choices=["scan", "analyze", "validate", "build-manifest", "report", "all"],
+        choices=["scan", "analyze", "validate", "build-manifest", "report", "derive", "all"],
     )
     parser.add_argument("--source", type=Path, help="source tree to scan (default: the configured library)")
     parser.add_argument("--jobs", type=int, default=0, help="worker processes (default: one per CPU)")
     parser.add_argument("--no-html", action="store_true", help="skip the HTML curation report")
     parser.add_argument("--strict", action="store_true", help="treat warnings as failures")
+    parser.add_argument("--codec", default="vorbis", choices=sorted(CODECS), help="derivative codec")
+    parser.add_argument(
+        "--all-assets",
+        action="store_true",
+        help="derive every asset rather than only the approved ones",
+    )
     args = parser.parse_args()
 
     root = repo_root()
@@ -313,6 +373,9 @@ def main() -> int:
     config = PipelineConfig(paths=paths)
 
     jobs = args.jobs or None
+    if args.command == "derive":
+        return stage_derive(config, args.codec, approved_only=not args.all_assets)
+
     if args.command == "scan":
         found, skipped = stage_scan(config)
         duplicates = duplicate_groups(found)

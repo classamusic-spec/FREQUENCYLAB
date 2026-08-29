@@ -74,3 +74,6 @@ export * from './presets/validate.js';
 export * from './presets/compile.js';
 export * from './presets/factory.js';
 export * from './presets/search.js';
+
+export * from './organic/manifest.generated.js';
+export * from './organic/registry.js';

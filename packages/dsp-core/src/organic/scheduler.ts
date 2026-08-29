@@ -5,6 +5,7 @@ import {
   type AssetPool,
   type SchedulableAsset,
   type SoundBathEvent,
+  type SoundBathGlobals,
   type SoundBathLayer,
   type SoundBathPreset,
 } from './soundbath.js';
@@ -253,31 +254,7 @@ function chooseAsset(
   const weights = new Array<number>(pool.length);
   for (let i = 0; i < pool.length; i++) {
     const asset = pool[i];
-    let weight = 1;
-
-    for (const tag of asset.tags) {
-      const preferred = layer.pool.preferredTags?.includes(tag) ? 1.6 : 1;
-      const configured = layer.tagWeights?.[tag] ?? 1;
-      weight *= preferred * configured;
-    }
-
-    // Brightness and energy steer selection rather than filtering it: a dark
-    // preset still reaches a bright sample occasionally, which is what keeps a
-    // long session from flattening out.
-    //
-    // A Gaussian rather than the reciprocal this started as. The reciprocal put
-    // only a factor of two between the best and worst match across brightness's
-    // entire range, which the tag and transient weights swamped: sweeping the
-    // control from 0 to 1 moved the mean brightness of what got chosen from
-    // 0.548 to 0.581, on a library whose bowls span 0.224 to 0.811. A control
-    // that does not move anything is exactly what §92 forbids.
-    if (asset.brightness !== null) {
-      weight *= gaussian(asset.brightness - globals.brightness, SELECTION_SIGMA);
-      if (fatigued && asset.brightness > 0.6) weight *= 0.25;
-    }
-    if (asset.transientStrength !== null) {
-      weight *= gaussian(asset.transientStrength - globals.energy, SELECTION_SIGMA);
-    }
+    let weight = selectionWeight(asset, layer, globals, fatigued);
 
     // The no-repeat window. Not a hard ban — a hard ban on a five-asset pool
     // produces a rotation, which is its own kind of obvious. A steep penalty
@@ -296,6 +273,56 @@ function chooseAsset(
     if (ticket <= 0) return pool[i];
   }
   return pool[pool.length - 1];
+}
+
+/**
+ * How likely one asset is to be picked, before its own history is considered.
+ *
+ * Split out of `chooseAsset` rather than copied because a second copy is what
+ * lets a preset pass validation and then sound like something else: the
+ * validator measures how much of a pool the globals actually leave reachable,
+ * and it can only measure that if it is weighing assets the way the scheduler
+ * will. The steps are in the order the scheduler applies them, including the
+ * fatigue penalty landing between brightness and energy, so extracting this
+ * changed no arithmetic.
+ *
+ * The one thing deliberately left outside is the no-repeat penalty, which
+ * depends on what this layer has already played and therefore has no meaning
+ * for a pool at rest.
+ */
+export function selectionWeight(
+  asset: SchedulableAsset,
+  layer: SoundBathLayer,
+  globals: SoundBathGlobals,
+  fatigued = false,
+): number {
+  let weight = 1;
+
+  for (const tag of asset.tags) {
+    const preferred = layer.pool.preferredTags?.includes(tag) ? 1.6 : 1;
+    const configured = layer.tagWeights?.[tag] ?? 1;
+    weight *= preferred * configured;
+  }
+
+  // Brightness and energy steer selection rather than filtering it: a dark
+  // preset still reaches a bright sample occasionally, which is what keeps a
+  // long session from flattening out.
+  //
+  // A Gaussian rather than the reciprocal this started as. The reciprocal put
+  // only a factor of two between the best and worst match across brightness's
+  // entire range, which the tag and transient weights swamped: sweeping the
+  // control from 0 to 1 moved the mean brightness of what got chosen from
+  // 0.548 to 0.581, on a library whose bowls span 0.224 to 0.811. A control
+  // that does not move anything is exactly what §92 forbids.
+  if (asset.brightness !== null) {
+    weight *= gaussian(asset.brightness - globals.brightness, SELECTION_SIGMA);
+    if (fatigued && asset.brightness > 0.6) weight *= 0.25;
+  }
+  if (asset.transientStrength !== null) {
+    weight *= gaussian(asset.transientStrength - globals.energy, SELECTION_SIGMA);
+  }
+
+  return weight;
 }
 
 // ---------------------------------------------------------------------------

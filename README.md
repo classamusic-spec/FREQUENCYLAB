@@ -143,6 +143,7 @@ npm run build --workspace @frequencylab/dsp-core
 | [docs/SAFETY.md](docs/SAFETY.md) | Gain staging, the limiter, route policy, interruption handling and claim boundaries |
 | [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) | Dynamic Type, screen readers, reduced motion, non-colour status, numeric entry |
 | [docs/TESTING.md](docs/TESTING.md) | What the DSP validation suite proves and how to add to it |
+| [docs/audio-asset-pipeline.md](docs/audio-asset-pipeline.md) | The offline audio pipeline: running it, curating the library, overrides, versioning and CI |
 | [docs/BACKEND.md](docs/BACKEND.md) | The cloud architecture the local-first product is designed to grow into |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | What is built, what is stubbed, and what each later phase requires |
 
