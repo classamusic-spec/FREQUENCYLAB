@@ -3,7 +3,9 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   EVIDENCE_DESCRIPTIONS,
+  FACTORY_COLLECTIONS,
   LIBRARY_ENTRIES,
+  presetsInCollection,
   searchLibrary,
   searchPresets,
   type LibraryCategory,
@@ -12,7 +14,7 @@ import { Screen, ScreenHeader, SectionHeader } from '../../src/design/components
 import { InstrumentPanel } from '../../src/design/components/InstrumentPanel';
 import { HardwareButton } from '../../src/design/components/HardwareButton';
 import { SegmentSelector } from '../../src/design/components/SegmentSelector';
-import { EvidenceBadge } from '../../src/design/components/Badges';
+import { ClassificationBadge, EvidenceBadge } from '../../src/design/components/Badges';
 import { PresetCard } from '../../src/design/components/PresetCard';
 import { Label, Text } from '../../src/design/components/Text';
 import { colors, radius, space } from '../../src/design/tokens';
@@ -68,6 +70,24 @@ export default function LibraryScreen() {
   // Unlimited so the count is the real one, then cut for display: "42 matching"
   // followed by twelve rows is honest, "12 matching" would not be.
   const presets = useMemo(() => (searching ? searchPresets(query) : []), [query, searching]);
+
+  /*
+   * The shelves that actually hold factory rows. Historical/Rife and My
+   * Frequencies are assembled elsewhere, so they live on the full collections
+   * screen rather than in a list whose whole point is the preset counts.
+   */
+  const shelves = useMemo(
+    () =>
+      FACTORY_COLLECTIONS.filter((entry) => !entry.sourcedElsewhere).map((entry) => ({
+        collection: entry,
+        count: presetsInCollection(entry.id).length,
+      })),
+    [],
+  );
+  const totalPresets = useMemo(
+    () => shelves.reduce((sum, entry) => sum + entry.count, 0),
+    [shelves],
+  );
 
   return (
     <Screen>
@@ -125,11 +145,38 @@ export default function LibraryScreen() {
           ) : null}
         </>
       ) : (
-        <HardwareButton
-          label="Browse the collections"
-          onPress={() => router.push('/collections')}
-          accessibilityHint="Twelve shelves of presets, each row with its own classification."
-        />
+        <>
+          {/* The shelves themselves, not a button leading to them. Seventy-two
+              presets behind one more tap is seventy-two presets nobody opens. */}
+          <SectionHeader label={`Collections · ${totalPresets} presets`} />
+          {shelves.map(({ collection, count }) => (
+            <Pressable
+              key={collection.id}
+              onPress={() => router.push(`/collections/${collection.id}`)}
+              accessibilityRole="button"
+              accessibilityLabel={`${collection.name}. ${count} presets. ${collection.summary}`}
+              style={styles.shelf}
+            >
+              <Label>{collection.ordinal}</Label>
+              <View style={styles.shelfBody}>
+                <Text variant="heading">{collection.name}</Text>
+                <ClassificationBadge classification={collection.classification} />
+              </View>
+              <View style={styles.shelfCount}>
+                <Text variant="readoutSm" tone="secondary">
+                  {String(count)}
+                </Text>
+                <Label>Presets</Label>
+              </View>
+            </Pressable>
+          ))}
+          <HardwareButton
+            label="All twelve shelves"
+            variant="ghost"
+            onPress={() => router.push('/collections')}
+            accessibilityHint="Includes the historical archive and your own frequencies."
+          />
+        </>
       )}
 
       <SectionHeader label={searching ? `Explained · ${entries.length} matching` : 'Explained'} />
@@ -187,6 +234,20 @@ export default function LibraryScreen() {
 }
 
 const styles = StyleSheet.create({
+  shelf: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.edgeLight,
+    minHeight: 64,
+  },
+  shelfBody: { flex: 1, gap: space.xs, alignItems: 'flex-start' },
+  shelfCount: { alignItems: 'flex-end' },
   search: {
     paddingHorizontal: space.lg,
     paddingVertical: space.md,

@@ -9,6 +9,7 @@ import { Label, Text } from '../../src/design/components/Text';
 import {
   DialIcon,
   FlaskIcon,
+  LibraryIcon,
   PersonIcon,
   PulseIcon,
   WaveformIcon,
@@ -17,9 +18,20 @@ import * as haptics from '../../src/design/haptics';
 import { usePlayer } from '../../src/state/player';
 import { usePreferences } from '../../src/state/preferences';
 
+/*
+ * The bar. Order here must match the `Tabs.Screen` order below, because the
+ * active index comes from the navigator's own state.
+ *
+ * Library earns a tab rather than a row in Settings. Seventy-two factory
+ * presets, seventy-three archive entries and the frequency library were all
+ * reachable only by opening Profile — the last tab, which reads as Settings —
+ * and scrolling past the safety notices to a button. Content nobody can find is
+ * content that is not there, and this is most of what the app knows.
+ */
 const TABS = [
   { name: 'index', label: 'Player', route: '/', Icon: WaveformIcon },
   { name: 'explore', label: 'Explore', route: '/explore', Icon: DialIcon },
+  { name: 'library', label: 'Library', route: '/library', Icon: LibraryIcon },
   { name: 'lab', label: 'Lab', route: '/lab', Icon: FlaskIcon },
   { name: 'experiments', label: 'Trials', route: '/experiments', Icon: PulseIcon },
   { name: 'profile', label: 'Profile', route: '/profile', Icon: PersonIcon },
@@ -35,6 +47,7 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index" />
       <Tabs.Screen name="explore" />
+      <Tabs.Screen name="library" />
       {/* Lab stays in the bar at every level: hiding it would make the app feel
           smaller than it is, and the screen itself explains what it is for. */}
       <Tabs.Screen name="lab" options={{ title: level === 'simple' ? 'Lab' : 'Lab' }} />
