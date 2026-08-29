@@ -42,7 +42,18 @@ export function ProfileButton() {
         pointerEvents="none"
       />
       <View style={styles.rim} pointerEvents="none" />
-      <PersonIcon size={19} color={colors.textSecondary} />
+      {/*
+       * The glyph needs its own stacking context.
+       *
+       * The gradient and the rim are absolutely positioned, and CSS paints
+       * positioned descendants above non-positioned ones regardless of source
+       * order — so on web the opaque gradient covered the icon completely and
+       * the control rendered as a blank disc. It was correct in the DOM the
+       * whole time, which is why only a rendered pixel showed it.
+       */}
+      <View style={styles.glyph}>
+        <PersonIcon size={20} color={colors.textSecondary} strokeWidth={1.7} />
+      </View>
     </Pressable>
   );
 }
@@ -67,5 +78,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.edgeDark,
   },
+  glyph: { zIndex: 1 },
   pressed: { opacity: 0.72 },
 });
