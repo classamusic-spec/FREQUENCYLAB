@@ -21,6 +21,10 @@ import { layout, space } from '../../src/design/tokens';
 import { usePresetShelf } from '../../src/state/presets';
 import { useProtocolLibrary, summariseLibrary } from '../../src/state/library';
 import { NotAtThisLevel } from '../../src/design/components/NotAtThisLevel';
+import {
+  LiveCarrierBeat,
+  LiveStereo,
+} from '../../src/design/components/OnboardingDiagrams';
 import { useTier } from '../../src/features/tier';
 
 /**
@@ -126,6 +130,38 @@ export default function CollectionScreen() {
           <InstrumentPanel tone="recessed" label="Where the edges are">
             <Text variant="bodySm" tone="secondary">
               {BAND_BOUNDARY_NOTE}
+            </Text>
+          </InstrumentPanel>
+        </>
+      ) : null}
+
+      {/*
+       * The two teaching diagrams, on the shelf they teach.
+       *
+       * They were built for onboarding and were left without an importer when
+       * that flow went from five steps to two — which was the right cut, since
+       * a person who has not started yet has no reason to care what a carrier
+       * is. Here they have one: every preset below is an experiment about
+       * exactly these two facts, and both are far easier to see moving than to
+       * read. They run the real expression rather than an illustration of it,
+       * and they hold still under reduced motion.
+       */}
+      {collection.id === 'acoustic-fundamentals' ? (
+        <>
+          <InstrumentPanel tone="recessed" label="Carrier and beat">
+            <LiveCarrierBeat />
+            <Text variant="bodySm" tone="secondary">
+              Two different quantities, and the source of most of the confusion on this shelf. The
+              carrier is the tone that reaches your ear. The beat is the rate that tone changes at,
+              and it is not a sound of its own — nothing is playing at the beat rate.
+            </Text>
+          </InstrumentPanel>
+          <InstrumentPanel tone="recessed" label="Where a binaural beat happens">
+            <LiveStereo />
+            <Text variant="bodySm" tone="secondary">
+              The centre trace is the sum of the two beside it, which is what your hearing does with
+              two slightly different tones. Neither ear receives the beat; it appears only once both
+              are combined, which is why a speaker cannot produce one and headphones can.
             </Text>
           </InstrumentPanel>
         </>
