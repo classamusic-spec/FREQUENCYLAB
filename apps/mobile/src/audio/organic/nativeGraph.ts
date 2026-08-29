@@ -89,6 +89,22 @@ export function createNativeOrganicGraph(context: AudioContext, bus: GainNode): 
       gain.gain.setValueAtTime(0, start);
       gain.gain.linearRampToValueAtTime(request.gain, start + fadeIn);
       gain.gain.setValueAtTime(request.gain, endsAt - fadeOut);
+      /*
+       * Exponential, not linear. A linear ramp in *gain* spends most of its
+       * time in the top few decibels and then falls off a cliff — the ear
+       * hears loudness logarithmically, so a straight line to zero reads as an
+       * abrupt stop no matter how long it is. An exponential ramp is a
+       * straight line in decibels, which is what a decay actually sounds like.
+       *
+       * It cannot reach zero, so it goes to a thousandth — 60 dB down, below
+       * anything audible under a session — and one 10 ms linear step closes
+       * the gap. That last step is short enough to be a de-click and not a
+       * fade, and `AudioParam` requires a non-zero exponential target.
+       */
+      gain.gain.exponentialRampToValueAtTime(
+        Math.max(request.gain * 0.001, 1e-6),
+        endsAt - MIN_FADE_SEC,
+      );
       gain.gain.linearRampToValueAtTime(0, endsAt);
 
       source.connect(panner);
@@ -110,7 +126,15 @@ export function createNativeOrganicGraph(context: AudioContext, bus: GainNode): 
           // automation without this steps the gain back to the last set value,
           // which is a click (§28).
           gain.gain.cancelScheduledValues(t);
-          gain.gain.setValueAtTime(gain.gain.value, t);
+          const from = Math.max(gain.gain.value, 1e-6);
+          gain.gain.setValueAtTime(from, t);
+          // The same shape as the natural release above, for the same reason:
+          // a stolen voice must recede rather than be cut, and linear-in-gain
+          // is a cut with a ramp in front of it.
+          gain.gain.exponentialRampToValueAtTime(
+            Math.max(from * 0.001, 1e-6),
+            t + Math.max(MIN_FADE_SEC, seconds - MIN_FADE_SEC),
+          );
           gain.gain.linearRampToValueAtTime(0, t + seconds);
           try {
             source.stop(t + seconds + 0.02);

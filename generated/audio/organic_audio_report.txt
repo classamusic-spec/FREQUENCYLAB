@@ -1,8 +1,8 @@
 AUDIO ASSET REPORT
 
 Totals
-  Total discovered   369
-  Approved           369
+  Total discovered   371
+  Approved           371
   Needs review       0
   Manual overrides   3
   Loopable           65
@@ -16,35 +16,37 @@ Instruments
   KALIMBA       100
   SINGING_BOWL  68
   TUNING_FORK   10
+  WATER         2
 
 Duration classes
   MICRO     1
   SHORT     144
   MEDIUM    142
-  LONG      71
+  LONG      73
   EXTENDED  11
 
 Tonality
   ATONAL           29
-  INHARMONIC       253
+  INHARMONIC       255
   PARTIALLY_TONAL  44
   TONAL            43
 
 Pitch
   With a note     87
-  Without a note  282
+  Without a note  284
 
 Sample rates
   48000  369
+  96000  2
 
 Channels
-  2  369
+  2  371
 
 Bit depths
-  24  369
+  24  371
 
 Ranges
   Duration (s)     1.333 to 152.0
   Integrated LUFS  -31.44 to -6.25
-  Peak dBFS        -1.0 to -1.0
-  Total material   89.4 minutes
+  Peak dBFS        -1.0 to -0.5
+  Total material   90.8 minutes

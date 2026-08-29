@@ -17,7 +17,7 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
-from .config import PipelineConfig
+from .config import PipelineConfig, library_roots
 from .schema import SUPPORTED_EXTENSIONS
 
 # 48 bits. With a library in the hundreds the chance of two assets colliding is
@@ -81,36 +81,47 @@ def discover(config: PipelineConfig) -> tuple[list[Discovered], list[Path]]:
     was ignored — a library arriving with 40 `.asd` sidecars should read as 40
     ignored files, not as a silently smaller library.
     """
-    root = config.paths.source
-    if not root.exists():
-        return [], []
-
     found: list[Discovered] = []
     skipped: list[Path] = []
-    for path in sorted(root.rglob("*")):
-        if not path.is_file():
+    seen: set[str] = set()
+
+    for pack in library_roots(config.paths.root):
+        if not pack.exists():
             continue
-        relative = path.relative_to(root)
-        if _is_ignored(relative, config):
-            continue
-        extension = path.suffix.lower()
-        if extension not in SUPPORTED_EXTENSIONS:
-            skipped.append(path)
-            continue
-        # A symlink pointing outside the source tree is the one way a scan can
-        # be talked into reading somewhere it should not (§57).
-        resolved = path.resolve()
-        if not str(resolved).startswith(str(root.resolve())):
-            skipped.append(path)
-            continue
-        content_hash, size = sha256_file(path)
-        found.append(
-            Discovered(
-                path=path,
-                relative_path=relative.as_posix(),
-                content_hash=content_hash,
-                bytes_=size,
-                extension=extension,
+        base = config.paths.root
+        for path in sorted(pack.rglob("*")):
+            if not path.is_file():
+                continue
+            # Relative to the *repository*, so the pack name is part of the
+            # recorded path. Two packs may both hold `waves/01.wav`, and
+            # `source / relativePath` has to keep resolving to one of them.
+            relative = path.relative_to(base)
+            if _is_ignored(path.relative_to(pack), config):
+                continue
+            extension = path.suffix.lower()
+            if extension not in SUPPORTED_EXTENSIONS:
+                skipped.append(path)
+                continue
+            # A symlink pointing outside its own pack is the one way a scan can
+            # be talked into reading somewhere it should not (§57).
+            resolved = path.resolve()
+            if not str(resolved).startswith(str(pack.resolve())):
+                skipped.append(path)
+                continue
+            content_hash, size = sha256_file(path)
+            # The same audio in two packs is one asset — the id is its content —
+            # and taking it twice would give the scheduler a duplicate to draw.
+            if content_hash in seen:
+                skipped.append(path)
+                continue
+            seen.add(content_hash)
+            found.append(
+                Discovered(
+                    path=path,
+                    relative_path=relative.as_posix(),
+                    content_hash=content_hash,
+                    bytes_=size,
+                    extension=extension,
+                )
             )
-        )
     return found, skipped

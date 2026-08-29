@@ -52,6 +52,11 @@ export interface OrganicRuntimeAsset {
   readonly streaming: boolean;
   /** How many copies may sound at once before the attacks pile up (§12). */
   readonly maxVoices: number;
+  /**
+   * How loud this asset still is where playback ends, relative to its peak.
+   * `releaseSecondsFor` turns it into this voice's fade-out.
+   */
+  readonly releaseTailDb: number | null;
 }
 
 /**

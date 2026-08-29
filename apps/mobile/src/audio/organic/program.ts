@@ -80,6 +80,7 @@ function toRuntime(asset: OrganicAsset): OrganicRuntimeAsset {
     preload: asset.preload,
     streaming: asset.streaming,
     maxVoices: asset.maxVoices,
+    releaseTailDb: asset.releaseTailDb,
   };
 }
 
@@ -89,6 +90,29 @@ export interface SoundBathProgram {
   readonly preset: SoundBathPreset;
 }
 
+/**
+ * How full the acoustic layer is, as an offset on the preset's own density.
+ *
+ * An offset rather than an absolute value, so each preset keeps its shape:
+ * `Chime Drift` stays the sparsest thing on the shelf at every setting and
+ * `Gamma Light` stays the busiest. `natural` is the preset exactly as written —
+ * which for `Deep Calm` is the 30% its specification names.
+ *
+ * Density is the one control that reaches all three of the scheduler's levers:
+ * it shortens the interval between attempts, raises the chance each attempt
+ * becomes a sound, and raises the ceiling on simultaneous voices. At the
+ * presets' own settings a declared probability of 0.9 is really about 0.55,
+ * which is what makes the shelf feel sparser than its numbers look.
+ */
+export type SoundBathFullness = 'sparse' | 'natural' | 'fuller' | 'full';
+
+const FULLNESS_OFFSET: Record<SoundBathFullness, number> = {
+  sparse: -0.12,
+  natural: 0,
+  fuller: 0.16,
+  full: 0.32,
+};
+
 export interface SoundBathRequest {
   presetId: string;
   /** Seconds. Normally the protocol's own length, so the two end together. */
@@ -97,6 +121,8 @@ export interface SoundBathRequest {
   seed: number | string;
   /** Lowered on weaker hardware; the scheduler honours it (§15, §52). */
   maxVoices?: number;
+  /** Defaults to `natural`, which is the preset as written. */
+  fullness?: SoundBathFullness;
 }
 
 /**
@@ -107,8 +133,20 @@ export interface SoundBathRequest {
  * session rather than throwing on the way into playback.
  */
 export function buildSoundBathProgram(request: SoundBathRequest): SoundBathProgram | null {
-  const preset = soundBathPreset(request.presetId);
-  if (!preset) return null;
+  const shipped = soundBathPreset(request.presetId);
+  if (!shipped) return null;
+
+  const offset = FULLNESS_OFFSET[request.fullness ?? 'natural'];
+  const preset: SoundBathPreset =
+    offset === 0
+      ? shipped
+      : {
+          ...shipped,
+          globals: {
+            ...shipped.globals,
+            density: Math.min(1, Math.max(0, shipped.globals.density + offset)),
+          },
+        };
 
   const plan = planSoundBath({
     preset,

@@ -9,6 +9,7 @@ import {
   type SafetyCheck,
 } from '@frequencylab/dsp-core';
 import { detectOutputRoute } from '../audio/route';
+import type { SoundBathFullness } from '../audio/organic/program';
 import { usePlayer } from './player';
 import { usePreferences } from './preferences';
 import { useHistory } from './history';
@@ -24,7 +25,7 @@ export interface StartOptions {
    * about to play a binaural beat through a speaker — is asked about the core
    * signal, which is present either way (§42).
    */
-  soundBath?: { presetId: string; seed?: number | string };
+  soundBath?: { presetId: string; seed?: number | string; fullness?: SoundBathFullness };
   /** Called once playback has actually begun. */
   onStarted?: () => void;
 }

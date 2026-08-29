@@ -123,6 +123,16 @@ export interface OrganicAsset {
    * not have.
    */
   readonly gainCompensationDb: number | null;
+  /**
+   * How loud this asset still is where playback ends, relative to its own peak.
+   *
+   * Measured over the last half second of the span the player uses. A bowl
+   * reaches about −64 dB by then and a kalimba loop about −18, because a loop
+   * does not decay, it stops. `releaseSecondsFor` turns this into a fade long
+   * enough that neither is cut — see there for why one number cannot serve
+   * both. Null when the asset is shorter than the measuring window.
+   */
+  readonly releaseTailDb: number | null;
   readonly integratedLufs: number | null;
   readonly roles: readonly OrganicRole[];
   readonly characterTags: readonly OrganicCharacterTag[];
@@ -633,6 +643,7 @@ function toAsset(record: OrganicManifestAsset, activeSeconds: number): OrganicAs
     transientStrength: spectral.transientStrength,
     brightness: spectral.brightness,
     gainCompensationDb: levels.recommendedGainDb,
+    releaseTailDb: levels.releaseTailDb,
     integratedLufs: levels.integratedLufs,
     roles: classification.recommendedRoles,
     characterTags: classification.characterTags,

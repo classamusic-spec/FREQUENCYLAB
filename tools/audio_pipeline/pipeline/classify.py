@@ -40,6 +40,20 @@ INSTRUMENT_TOKENS: tuple[tuple[str, str], ...] = (
     ("bowl", "SINGING_BOWL"),
     ("bells", "BELL"),
     ("bell", "BELL"),
+    # Water, before the generic texture tokens. Ordered longest-first within
+    # the group so `ocean waves` cannot be beaten by a shorter accidental match.
+    ("aquatic", "WATER"),
+    ("underwater", "WATER"),
+    ("waterfall", "WATER"),
+    ("ocean", "WATER"),
+    ("river", "WATER"),
+    ("stream", "WATER"),
+    ("brook", "WATER"),
+    ("creek", "WATER"),
+    ("rain", "WATER"),
+    ("surf", "WATER"),
+    ("wave", "WATER"),
+    ("water", "WATER"),
     ("drone", "DRONE"),
     ("texture", "TEXTURE"),
     ("ambient", "AMBIENT"),
@@ -257,6 +271,14 @@ def suggest_roles(instrument: str, seconds: float, config: AnalysisConfig, hints
         roles = [r for r in roles if r != "PRIMARY_BOWL"]
         if "LONG_RESONANCE" not in roles:
             roles.append("LONG_RESONANCE")
+
+    # Water is a bed and nothing else. The duration bands would call a
+    # forty-second recording a `LONG_RESONANCE` or a `MAJOR_EVENT`, which are
+    # both names for something that happens; a wave recording does not happen,
+    # it is simply present. Naming it correctly is what keeps it out of the
+    # layers that schedule events.
+    if instrument == "WATER":
+        roles = ["BED", "EXTENDED_TEXTURE"]
 
     seen: list[str] = []
     for role in roles:

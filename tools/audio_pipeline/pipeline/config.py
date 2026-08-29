@@ -60,16 +60,36 @@ class Paths:
 # it says to inspect the existing architecture first and not to require assets
 # to be perfectly arranged. `--source` overrides it, and a second pack can be
 # added by listing another root here.
-LIBRARY_SOURCE = Path("Healing Sounds - Bells & Chimes")
+LIBRARY_SOURCES: tuple[Path, ...] = (
+    Path("Healing Sounds - Bells & Chimes"),
+    Path("Water and Aquatic Bible"),
+)
+
+#: Fallback when none of the named packs is present.
+FALLBACK_SOURCE = Path("assets/audio/organic/source")
+
+
+def library_roots(root: Path) -> list[Path]:
+    """The packs that are actually on disk, in the order they are listed.
+
+    Order matters only for reading a report: asset ids are content-derived, so
+    a pack arriving or leaving never renumbers anything else.
+    """
+    present = [root / pack for pack in LIBRARY_SOURCES if (root / pack).exists()]
+    if present:
+        return present
+    fallback = root / FALLBACK_SOURCE
+    return [fallback] if fallback.exists() else []
 
 
 def default_paths(root: Path) -> Paths:
-    source = root / LIBRARY_SOURCE
-    if not source.exists():
-        source = root / "assets" / "audio" / "organic" / "source"
+    # `source` is the repository root once there is more than one pack, because
+    # a `relativePath` in the manifest is now pack-qualified — `derive`, `bundle`
+    # and the validator all resolve `source / relativePath`, and that only works
+    # if the two halves agree about where the pack name lives.
     return Paths(
         root=root,
-        source=source,
+        source=root,
         metadata=root / "assets" / "audio" / "organic" / "metadata",
         generated=root / "generated" / "audio",
     )

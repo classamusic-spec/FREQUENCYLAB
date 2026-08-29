@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { planSoundBath, resolvePool } from '../src/organic/scheduler.js';
-import type { SchedulableAsset, SoundBathPreset } from '../src/organic/soundbath.js';
+import { MIN_ENTER_ANYWHERE_SEC, planSoundBath, resolvePool } from '../src/organic/scheduler.js';
+import {
+  RELEASE_CEILING_SEC,
+  RELEASE_FLOOR_SEC,
+  releaseSecondsFor,
+  type SchedulableAsset,
+  type SoundBathPreset,
+} from '../src/organic/soundbath.js';
 
 /**
  * The scheduler, tested against the real library rather than a fixture.
  *
- * Every number these tests assert comes from the 369 assets actually in the
+ * Every number these tests assert comes from the 371 assets actually in the
  * repository, measured by the offline pipeline. A synthetic fixture would let
  * the scheduler pass while being wrong about the material it will really be
  * given — which is the failure mode §59 of the pipeline brief exists to
@@ -85,7 +91,7 @@ const plan = (options: Partial<Parameters<typeof planSoundBath>[0]> = {}) =>
 
 describe('the library the scheduler actually gets', () => {
   it('is the real one', () => {
-    expect(LIBRARY.length).toBe(369);
+    expect(LIBRARY.length).toBe(371);
     expect(LIBRARY.every((asset) => asset.durationSeconds > 0)).toBe(true);
   });
 });
@@ -430,6 +436,127 @@ describe('two rules that were silently not holding', () => {
       expect(gap, `only ${gap.toFixed(1)}s of rest after ${previous.assetId}`).toBeGreaterThanOrEqual(
         REST - 0.5,
       );
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Releasing a voice, and entering a recording part-way
+// ---------------------------------------------------------------------------
+
+describe('the release a voice gets is the one its material needs', () => {
+  /*
+   * One release time cannot serve this library, and the numbers are why. The
+   * pipeline measures how loud each asset still is over the last half second
+   * before playback ends, relative to its own peak. A singing bowl has decayed
+   * about 64 dB by then; a kalimba loop has decayed about 18, because a loop
+   * does not decay, it stops. Fifty-five assets are still above −20 dB at their
+   * end, and the half-second linear ramp they used to get is the abrupt cut a
+   * listener actually hears.
+   */
+  it('gives a decayed sound the floor and an abrupt one much longer', () => {
+    expect(releaseSecondsFor(-64)).toBe(RELEASE_FLOOR_SEC);
+    expect(releaseSecondsFor(-60)).toBe(RELEASE_FLOOR_SEC);
+    // Monotonic: louder at the end always means longer to get out of the way.
+    const steps = [-60, -50, -40, -30, -20, -10].map(releaseSecondsFor);
+    for (let i = 1; i < steps.length; i++) {
+      expect(steps[i], `step ${i}`).toBeGreaterThanOrEqual(steps[i - 1]);
+    }
+    expect(releaseSecondsFor(-10)).toBeGreaterThan(releaseSecondsFor(-44) * 2);
+    expect(Math.max(...steps)).toBeLessThanOrEqual(RELEASE_CEILING_SEC);
+  });
+
+  it('answers for an asset it cannot measure, rather than returning nothing', () => {
+    // Too short for the measuring window. The floor is also what a sound that
+    // brief needs, so this is an answer and not a fallback.
+    expect(releaseSecondsFor(null)).toBe(RELEASE_FLOOR_SEC);
+    expect(releaseSecondsFor(undefined)).toBe(RELEASE_FLOOR_SEC);
+    expect(releaseSecondsFor(Number.NaN)).toBe(RELEASE_FLOOR_SEC);
+  });
+
+  it('separates the library the way the measurement does', () => {
+    // Against the real assets, not against invented numbers: bowls must come
+    // out short and kalimba long, or the measurement is not reaching the voice.
+    const median = (instrument: string) => {
+      const values = manifest.assets
+        .filter((asset) => asset.classification.instrument === instrument)
+        .map((asset) => releaseSecondsFor(asset.levels.releaseTailDb))
+        .sort((a, b) => a - b);
+      return values[Math.floor(values.length / 2)];
+    };
+    expect(median('SINGING_BOWL')).toBe(RELEASE_FLOOR_SEC);
+    expect(median('TUNING_FORK')).toBe(RELEASE_FLOOR_SEC);
+    expect(median('KALIMBA')).toBeGreaterThan(1.5);
+    expect(median('WATER')).toBeGreaterThan(1.5);
+    expect(median('KALIMBA')).toBeGreaterThan(median('SINGING_BOWL') * 4);
+  });
+});
+
+describe('entering a recording part-way', () => {
+  const withLayer = (overrides: Partial<SoundBathPreset['layers'][number]>): SoundBathPreset => {
+    const base = preset();
+    return { ...base, layers: [{ ...base.layers[0], ...overrides }] };
+  };
+
+  it('never offsets struck material', () => {
+    // A bell entered after its attack is not a bell. Every layer that has not
+    // asked for it starts at the top, on every seed.
+    for (const seed of [1, 42, 999, 8675309]) {
+      const events = plan({ seed }).events;
+      expect(events.length).toBeGreaterThan(0);
+      expect(events.every((event) => event.offsetSec === 0), `seed ${seed}`).toBe(true);
+    }
+  });
+
+  it('offsets a layer that asked, and lands somewhere different each time', () => {
+    const bed = withLayer({
+      pool: { instruments: ['WATER'] },
+      enterAnywhere: true,
+      intervalSec: { min: 26, max: 38 },
+      probability: 1,
+      maxVoices: 2,
+    });
+    const events = plan({ preset: bed, requireApproved: false }).events;
+    expect(events.length).toBeGreaterThan(10);
+
+    const offsets = events.map((event) => event.offsetSec);
+    expect(offsets.some((value) => value > 0)).toBe(true);
+    // The point of the feature: two recordings, but the entries are not two.
+    expect(new Set(offsets.map((value) => value.toFixed(1))).size).toBeGreaterThan(events.length * 0.8);
+    // Never past halfway, so most of the recording is still ahead.
+    for (const event of events) {
+      const asset = byId.get(event.assetId)!;
+      expect(event.offsetSec).toBeLessThanOrEqual(asset.durationSeconds * 0.5 + 0.01);
+      expect(event.offsetSec).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('reserves the voice for what is left, not for the whole file', () => {
+    const bed = withLayer({
+      pool: { instruments: ['WATER'] },
+      enterAnywhere: true,
+      probability: 1,
+    });
+    for (const event of plan({ preset: bed }).events) {
+      const asset = byId.get(event.assetId)!;
+      // Booking the full length would hold a voice for audio already skipped.
+      expect(event.durationSec).toBeCloseTo(asset.durationSeconds - event.offsetSec, 1);
+    }
+  });
+
+  it('leaves a short recording alone even when the layer asked', () => {
+    // There is not enough sound to enter into: skipping into a four-second
+    // chime leaves a fragment, which is not what entering anywhere is for.
+    const short = withLayer({
+      pool: { instruments: ['CHIME'], durationClasses: ['SHORT'] },
+      enterAnywhere: true,
+      probability: 1,
+    });
+    const events = plan({ preset: short }).events;
+    expect(events.length).toBeGreaterThan(0);
+    for (const event of events) {
+      const asset = byId.get(event.assetId)!;
+      if (asset.durationSeconds < MIN_ENTER_ANYWHERE_SEC) expect(event.offsetSec).toBe(0);
     }
   });
 });

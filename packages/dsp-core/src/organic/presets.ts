@@ -261,6 +261,18 @@ const ALL_BOWLS: AssetPool = {
 };
 
 /**
+ * Both ocean recordings, and there are only two.
+ *
+ * Well below `MINIMUM_POOL_SIZE`, and the layer using it says so in
+ * `acknowledgedThinPool` rather than the floor being lowered for everything.
+ * The reason it works anyway is `enterAnywhere`: these are forty-three and
+ * forty-four seconds of surf with no attack to miss, so each entry begins
+ * somewhere else in the recording and two files produce entries that do not
+ * repeat. More water would still be better, and the acknowledgement says so.
+ */
+const OCEAN: AssetPool = { instruments: ['WATER'] };
+
+/**
  * All 10 tuning forks, and there will not be more.
  *
  * No duration class filter, because splitting them gives 7 and 3 and neither
@@ -1509,6 +1521,93 @@ function chimeDrift(): SoundBathPreset {
   });
 }
 
+/**
+ * Tide.
+ *
+ * The one preset built on continuous material. Everything else in this file
+ * places struck sounds into silence; this places them over water that does not
+ * stop, which is a different thing to listen to and a different thing to
+ * schedule.
+ *
+ * The bed is two ocean recordings with two voices, so a new entry begins while
+ * the previous one is still sounding and the surf crosses over itself rather
+ * than starting and stopping. Each entry begins somewhere else in the file —
+ * see `OCEAN` — which is what keeps two recordings from sounding like two
+ * recordings.
+ *
+ * Above it: a warm bowl at long intervals, chimes kept sparse and wide, and a
+ * soft bell now and then. The bowl is the slowest thing here on purpose. Water
+ * is already busy, and a bowl layer at its usual spacing turns a bed into a
+ * competition.
+ */
+function tide(): SoundBathPreset {
+  return soundBath({
+    id: 'soundbath.tide',
+    name: 'Tide',
+    copy:
+      'Ocean recordings running underneath, entered at a different point each time so the surf never repeats itself, with a warm bowl well above it, chimes spread wide and a soft bell now and then. The only preset here built on a sound that does not stop.',
+    globals: {
+      density: 0.4,
+      energy: 0.32,
+      brightness: 0.42,
+      reverbPreset: 'hall',
+      width: 0.9,
+    },
+    layers: (every) => [
+      {
+        id: 'ocean',
+        role: 'BED',
+        pool: OCEAN,
+        // Shorter than the recordings are, so the next entry opens while the
+        // last is still sounding and the two overlap rather than butt together.
+        intervalSec: every(26, 38),
+        probability: 1,
+        gainDb: { min: -15, max: -11 },
+        // Wide but never hard: surf panned hard left reads as a fault, not a sea.
+        panRange: { min: -0.35, max: 0.35 },
+        maxVoices: 2,
+        reverbSend: 0.2,
+        enterAnywhere: true,
+        acknowledgedThinPool:
+          'the library holds two ocean recordings, and this layer enters each of them at a different point every time, so the pool is two files but the entries are all different. More water would still be better.',
+      },
+      {
+        id: 'bowls',
+        role: 'PRIMARY_BOWL',
+        pool: { ...DARK_BOWLS, preferredTags: ['warm'] },
+        intervalSec: every(58, 104),
+        probability: 0.7,
+        gainDb: { min: -12, max: -7 },
+        panRange: { min: -0.25, max: 0.25 },
+        maxVoices: 1,
+        reverbSend: 0.5,
+      },
+      {
+        id: 'chimes',
+        role: 'CHIME',
+        pool: { ...CHIMES, preferredTags: ['airy'] },
+        intervalSec: every(40, 78),
+        probability: 0.55,
+        gainDb: { min: -19, max: -14 },
+        panRange: { min: -0.85, max: 0.85 },
+        maxVoices: 2,
+        reverbSend: 0.45,
+      },
+      {
+        id: 'bells',
+        role: 'BELL',
+        pool: { ...SOFT_BELLS, preferredTags: ['gentle'] },
+        intervalSec: every(54, 98),
+        probability: 0.4,
+        gainDb: { min: -20, max: -15 },
+        panRange: { min: -0.7, max: 0.7 },
+        maxVoices: 1,
+        reverbSend: 0.45,
+      },
+    ],
+  });
+}
+
 // ---------------------------------------------------------------------------
 // The set
 // ---------------------------------------------------------------------------
@@ -1541,6 +1640,7 @@ export function buildSoundBathPresets(): SoundBathPreset[] {
     gammaLight(),
     kalimbaPassages(),
     chimeDrift(),
+    tide(),
   ];
 }
 
@@ -1565,6 +1665,7 @@ export const SOUND_BATH_PRESET_IDS = [
   'soundbath.gamma_light',
   'soundbath.kalimba_passages',
   'soundbath.chime_drift',
+  'soundbath.tide',
 ] as const;
 
 export function soundBathPreset(id: string): SoundBathPreset | undefined {

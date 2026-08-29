@@ -215,6 +215,41 @@ def measure_timing(decoded: Decoded, config: AnalysisConfig) -> tuple[dict[str, 
     )
 
 
+#: The window the release level is measured over, and the release the player
+#: applies at minimum. They are the same number on purpose: this measures
+#: exactly the stretch of audio a short fade would be laid over.
+RELEASE_WINDOW_SECONDS = 0.5
+
+
+def measure_release_tail(decoded: Decoded, start_offset: float | None, end_offset: float | None) -> float | None:
+    """How loud the asset still is where playback ends, relative to its peak.
+
+    Measured over the final `RELEASE_WINDOW_SECONDS` of the span the player
+    will actually use — from `recommendedStartOffset` to `recommendedEndOffset`
+    — because that is the audio a release ramp is laid over. Returns dB below
+    the asset's own peak, so it is a property of the recording and not of how
+    loud anyone chose to play it. `None` when the span is shorter than the
+    window, where the question does not arise.
+    """
+    samples = decoded.mono
+    rate = decoded.sample_rate
+    start = 0 if start_offset is None else int(start_offset * rate)
+    end = len(samples) if end_offset is None else int(end_offset * rate)
+    span = samples[start:end]
+    window = int(RELEASE_WINDOW_SECONDS * rate)
+    if len(span) < window or window <= 0:
+        return None
+
+    peak = float(np.abs(span).max())
+    if peak <= 0:
+        return None
+    tail = span[-window:]
+    rms = float(np.sqrt(np.mean(np.square(tail))))
+    if rms <= 0:
+        return -120.0
+    return float(20.0 * np.log10(rms / peak))
+
+
 def measure_decay(decoded: Decoded, config: AnalysisConfig) -> float | None:
     """Time from the loudest moment until the envelope has fallen `decay_drop_db`.
 
@@ -549,6 +584,10 @@ def analyse(decoded: Decoded, config: AnalysisConfig) -> Analysis:
     spectral, spectral_warnings = measure_spectral(decoded, config)
     spectral["decaySeconds"] = measure_decay(decoded, config)
     spectral["transientStrength"] = measure_transient(decoded)
+    # Measured after timing, because it depends on the offsets timing chose.
+    levels["releaseTailDb"] = measure_release_tail(
+        decoded, timing["recommendedStartOffset"], timing["recommendedEndOffset"]
+    )
     return Analysis(
         levels=levels,
         timing=timing,

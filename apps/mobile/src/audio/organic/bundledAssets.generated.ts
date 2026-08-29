@@ -102,6 +102,7 @@ export const BUNDLED_ASSETS: Record<string, BundledAssetModule> = {
   'organic.341d24dc876e': require('../../../assets/organic/organic.341d24dc876e.ogg'),
   'organic.34e313c309a8': require('../../../assets/organic/organic.34e313c309a8.ogg'),
   'organic.35084e9ac15a': require('../../../assets/organic/organic.35084e9ac15a.ogg'),
+  'organic.35859aaa400e': require('../../../assets/organic/organic.35859aaa400e.ogg'),
   'organic.3595159939bd': require('../../../assets/organic/organic.3595159939bd.ogg'),
   'organic.35fd0c094fc1': require('../../../assets/organic/organic.35fd0c094fc1.ogg'),
   'organic.36243f1d4c9c': require('../../../assets/organic/organic.36243f1d4c9c.ogg'),
@@ -250,6 +251,7 @@ export const BUNDLED_ASSETS: Record<string, BundledAssetModule> = {
   'organic.96663cb24dad': require('../../../assets/organic/organic.96663cb24dad.ogg'),
   'organic.968adbe27ded': require('../../../assets/organic/organic.968adbe27ded.ogg'),
   'organic.971a79e88a24': require('../../../assets/organic/organic.971a79e88a24.ogg'),
+  'organic.9728be051ab8': require('../../../assets/organic/organic.9728be051ab8.ogg'),
   'organic.9a0e62e1feca': require('../../../assets/organic/organic.9a0e62e1feca.ogg'),
   'organic.9a987af6fe70': require('../../../assets/organic/organic.9a987af6fe70.ogg'),
   'organic.9a9b950d8d7b': require('../../../assets/organic/organic.9a9b950d8d7b.ogg'),
@@ -397,7 +399,7 @@ export const BUNDLED_ASSETS: Record<string, BundledAssetModule> = {
 };
 
 /** How many assets this build carries. Asserted in tests against the manifest. */
-export const BUNDLED_ASSET_COUNT = 369;
+export const BUNDLED_ASSET_COUNT = 371;
 
 /** The container every bundled asset is in. */
 export const BUNDLED_ASSET_EXTENSION = '.ogg';

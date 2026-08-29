@@ -17,7 +17,8 @@ import {
 /**
  * The registry, tested against the real library rather than against fixtures.
  *
- * 369 assets, 1.5 GB of licensed WAV, already measured and committed as
+ * 371 assets — 369 bells and chimes plus 2 ocean recordings — already measured
+ * and committed as
  * `generated/audio/organic_audio_manifest.json`. Everything below reads that
  * file and nothing else — no decoder, no audio, no `Healing Sounds` directory —
  * which is the property §38–§41 are actually about: the app can answer *what is
@@ -83,8 +84,9 @@ describe('organic asset registry: loading', () => {
     expect(registry.size).toBe(manifest.assetCount);
     expect(registry.size).toBe(manifest.assets.length);
     // The library as it stands. A number here rather than a tautology, so
-    // adding or losing a pack is something a person has to acknowledge.
-    expect(registry.size).toBe(369);
+    // adding or losing a pack is something a person has to acknowledge —
+    // 369 bells and chimes, plus 2 ocean recordings.
+    expect(registry.size).toBe(371);
     expect(registry.schemaVersion).toBe(ORGANIC_SCHEMA_VERSION);
     expect(registry.analysisVersion).toBe(manifest.analysisVersion);
     expect(registry.libraryVersion).toBe(manifest.organicLibraryVersion);
@@ -559,7 +561,7 @@ describe('organic asset registry: the runtime holds no filename logic (§44)', (
 
 describe('organic asset registry: cost', () => {
   it('indexes once and answers from the index', () => {
-    // Not a benchmark — a floor. 2000 filtered queries over 369 records is work
+    // Not a benchmark — a floor. 2000 filtered queries over 371 records is work
     // the app does at startup and during a session, and a scan-per-query
     // implementation would not come near this. It also proves the posting lists
     // are shared rather than rebuilt: the second thousand costs the same as the

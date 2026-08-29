@@ -13,7 +13,7 @@ import {
   type OrganicProgram,
   type ScopeCapture,
 } from '../audio/sessionController';
-import { buildSoundBathProgram } from '../audio/organic/program';
+import { buildSoundBathProgram, type SoundBathFullness } from '../audio/organic/program';
 import { useHistory } from './history';
 import { useExperiments } from './experiments';
 
@@ -84,7 +84,7 @@ interface PlayerState {
        * An unknown id degrades to a frequency session rather than refusing to
        * play (§56 — nothing about the acoustic layer may take the core down).
        */
-      soundBath?: { presetId: string; seed?: number | string };
+      soundBath?: { presetId: string; seed?: number | string; fullness?: SoundBathFullness };
     },
   ) => Promise<void>;
   load: (protocol: Protocol, masterGain?: number) => Promise<void>;
@@ -182,6 +182,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
         durationSec: totalDurationSec(protocol),
         seed,
         maxVoices: DEFAULT_ORGANIC_VOICES,
+        fullness: options.soundBath.fullness,
       });
       if (program) {
         organic = { plan: program.plan, assets: program.assets };

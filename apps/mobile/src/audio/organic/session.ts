@@ -1,4 +1,4 @@
-import type { Plan, SoundBathEvent } from '@frequencylab/dsp-core';
+import { releaseSecondsFor, type Plan, type SoundBathEvent } from '@frequencylab/dsp-core';
 import { OrganicAssetCache, type OrganicCacheStats, type OrganicRuntimeAsset } from './assets';
 import { organicAssetDelivery } from './delivery';
 import { gainFromDb, type OrganicAudioGraph } from './graph';
@@ -78,9 +78,15 @@ const DEFERRED_RETRY_SEC = 0.25;
  */
 const MAX_FINISHING_SEC = 20;
 
-/** Onset and release ramps for a voice when the layer does not specify them. */
+/**
+ * Onset ramp for a voice. Short: a strike should begin like a strike.
+ *
+ * There is no matching release constant. A single one cannot serve a library
+ * where a bowl has decayed 64 dB by its end and a kalimba loop has decayed 18 —
+ * the release comes from `releaseSecondsFor` and the asset's own measurement.
+ * A layer may still override it.
+ */
 const DEFAULT_VOICE_FADE_IN_SEC = 0.02;
-const DEFAULT_VOICE_FADE_OUT_SEC = 0.5;
 
 /**
  * The layer facts an event does not carry.
@@ -378,7 +384,13 @@ export class OrganicSession {
     // below any fixed threshold on the way down — the first dip is not the end
     // of the sound (§13). Starting at frame zero would open on the lead-in
     // silence and cut the same length off the tail.
-    const offsetSec = Math.max(0, asset.startSeconds);
+    // The plan's own entry offset is added on top, and is zero for everything
+    // struck. A bed layer entering a wave recording at a different point each
+    // time is what lets two recordings carry twenty-five minutes; clamped so a
+    // plan can never ask to begin past the end of the sound.
+    const soundingSec = Math.max(0, asset.endSeconds - Math.max(0, asset.startSeconds));
+    const entrySec = Math.min(Math.max(0, event.offsetSec), Math.max(0, soundingSec - 0.5));
+    const offsetSec = Math.max(0, asset.startSeconds) + entrySec;
     const playSec = Math.max(0.05, Math.min(event.durationSec, asset.endSeconds - offsetSec));
 
     const voice = this.graph.start(buffer, {
@@ -389,7 +401,7 @@ export class OrganicSession {
       offsetSec,
       playSec,
       fadeInSec: layer?.fadeInSec ?? DEFAULT_VOICE_FADE_IN_SEC,
-      fadeOutSec: layer?.fadeOutSec ?? DEFAULT_VOICE_FADE_OUT_SEC,
+      fadeOutSec: layer?.fadeOutSec ?? releaseSecondsFor(asset.releaseTailDb),
     });
 
     this.cache.pin(event.assetId);

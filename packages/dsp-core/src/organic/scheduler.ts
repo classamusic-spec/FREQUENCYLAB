@@ -170,6 +170,7 @@ export function planSoundBath(options: PlanOptions): Plan {
       const gainDb = sampleRange(state.layer.gainDb, rng) + (asset.recommendedGainDb ?? 0);
       const pan = sampleRange(state.layer.panRange, rng);
       const detuneCents = retuneFor(asset, preset);
+      const offsetSec = entryOffset(state.layer, asset, rng);
 
       events.push({
         atSec: round(now),
@@ -179,8 +180,11 @@ export function planSoundBath(options: PlanOptions): Plan {
         gainDb: round(gainDb),
         pan: round(pan),
         reverbSend: state.layer.reverbSend ?? 0,
-        durationSec: round(tail),
+        // The sound is shorter by whatever was skipped, or the voice would be
+        // reserved for time the asset no longer has left to play.
+        durationSec: round(tail - offsetSec),
         detuneCents: round(detuneCents),
+        offsetSec: round(offsetSec),
       });
 
       // The layer's own voice is held for the sound plus any rest it asks for;
@@ -205,6 +209,30 @@ export function planSoundBath(options: PlanOptions): Plan {
 // ---------------------------------------------------------------------------
 // Pool resolution
 // ---------------------------------------------------------------------------
+
+/**
+ * The shortest recording worth entering part-way into.
+ *
+ * Below this there is not enough sound to enter *into*: skipping into a
+ * four-second recording leaves a fragment, and the point of entering anywhere
+ * is to get a different-sounding whole.
+ */
+export const MIN_ENTER_ANYWHERE_SEC = 15;
+
+/**
+ * How far into a recording this event begins.
+ *
+ * Zero for everything struck, always — a bell entered after its attack is not
+ * a bell. For a layer that has opted into `enterAnywhere`, a point in the
+ * first half, so there is still most of the recording left to play. That is
+ * what lets two ocean recordings carry a twenty-five minute bed: the pool is
+ * two files and the *entries* are all different.
+ */
+function entryOffset(layer: SoundBathLayer, asset: SchedulableAsset, rng: Rng): number {
+  if (!layer.enterAnywhere) return 0;
+  if (asset.durationSeconds < MIN_ENTER_ANYWHERE_SEC) return 0;
+  return rng.nextFloat() * asset.durationSeconds * 0.5;
+}
 
 export function resolvePool(
   pool: AssetPool,

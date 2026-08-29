@@ -19,7 +19,7 @@ import {
 import type { SchedulableAsset, SoundBathPreset } from '../src/organic/soundbath.js';
 
 /**
- * The nineteen factory sound baths, against the library they will actually be
+ * The twenty factory sound baths, against the library they will actually be
  * given.
  *
  * The same choice `soundbath.test.ts` made, for the same reason and with more
@@ -107,7 +107,7 @@ function peakConcurrency(events: Array<{ atSec: number; durationSec: number }>):
 // ---------------------------------------------------------------------------
 
 describe('the factory set', () => {
-  it('ships exactly the nineteen declared, in the declared order', () => {
+  it('ships exactly the twenty declared, in the declared order', () => {
     const presets = buildSoundBathPresets();
     expect(presets.map((preset) => preset.id)).toEqual([...SOUND_BATH_PRESET_IDS]);
     expect(new Set(presets.map((preset) => preset.id)).size).toBe(presets.length);
@@ -143,10 +143,25 @@ describe('validation against the real library', () => {
      * preset that will alternate audibly, so here a warning is a failure.
      */
     const result = validateSoundBathSet(buildSoundBathPresets(), LIBRARY);
+    const defects = result.issues.filter((issue) => issue.severity !== 'info');
     expect(
-      result.issues.map((issue) => `${issue.severity} ${issue.code} ${issue.field ?? ''}: ${issue.message}`),
+      defects.map((issue) => `${issue.severity} ${issue.code} ${issue.field ?? ''}: ${issue.message}`),
     ).toEqual([]);
     expect(result.ok).toBe(true);
+
+    /*
+     * `info` is not a defect and not a free pass either. Exactly one layer
+     * carries one — `Tide`'s ocean bed, which is two recordings against a floor
+     * of eight — and it is here because somebody wrote down why. Asserted by
+     * layer and by code so that a *second* acknowledged thin pool has to be
+     * added deliberately rather than arriving unnoticed, and so that removing
+     * this one fails rather than silently loosening the set.
+     */
+    const acknowledged = result.issues.filter((issue) => issue.severity === 'info');
+    expect(acknowledged.map((issue) => `${issue.code} ${issue.field}`)).toEqual([
+      'pool-thin-acknowledged layers.ocean.pool',
+    ]);
+    expect(acknowledged[0].message).toContain('two ocean recordings');
   });
 
   it('gives every layer a pool with room for the no-repeat window', () => {
@@ -159,7 +174,19 @@ describe('validation against the real library', () => {
      */
     for (const preset of buildSoundBathPresets()) {
       const report = validateSoundBath({ preset, library: LIBRARY });
+      const acknowledged = new Set(
+        preset.layers.filter((layer) => layer.acknowledgedThinPool).map((layer) => layer.id),
+      );
       for (const layer of report.layers) {
+        if (acknowledged.has(layer.layerId)) {
+          // A layer that admitted its pool is thin still has to hold something
+          // to draw on, and still has to be reachable once the globals weight
+          // it — the acknowledgement is about the *floor*, not about the layer
+          // being exempt from making sound.
+          expect(layer.size, `${preset.id}/${layer.layerId}`).toBeGreaterThan(1);
+          expect(layer.effectiveSize, `${preset.id}/${layer.layerId}`).toBeGreaterThan(1);
+          continue;
+        }
         expect(layer.size, `${preset.id}/${layer.layerId} resolved ${layer.size} assets`).toBeGreaterThanOrEqual(
           MINIMUM_POOL_SIZE,
         );
@@ -280,15 +307,15 @@ describe('the pool floor catches a library that has been cut from under a preset
  *   Chime Garden       105   14 s      Sleep Descent       29   52 s
  *   Alpha Air           78   19 s      Focus Minimal       27   55 s
  *   Float               60   25 s      Pure Bowls          26   57 s
- *   432 Meditation      44   35 s      Chime Drift         24   63 s
- *   528 Organic         36   42 s      Inner Space         23   64 s
- *   Deep Bowls          32   48 s      Theta Bath          22   68 s
- *                                      Deep Calm           21   71 s
+ *   Tide                54   28 s      Chime Drift         24   63 s
+ *   432 Meditation      44   35 s      Inner Space         23   64 s
+ *   528 Organic         36   42 s      Theta Bath          22   68 s
+ *   Deep Bowls          32   48 s      Deep Calm           21   71 s
  * ```
  *
  * Each figure is the mean over two hundred seeds, which is what a preset is: a
  * distribution, not a value. Everything asserted below is derived from these
- * nineteen numbers, so there is one place to change when a preset changes.
+ * twenty numbers, so there is one place to change when a preset changes.
  *
  * The spread that band has to allow is real. `Sleep Descent` runs from 13 to 43
  * events across two hundred seeds — more than three to one — because a layer
@@ -327,6 +354,7 @@ const DESIGN_EVENTS: Record<string, number> = {
   'soundbath.gamma_light': 187,
   'soundbath.kalimba_passages': 30,
   'soundbath.chime_drift': 24,
+  'soundbath.tide': 54,
 };
 
 /** Sparsest and busiest a twenty-five minute session may be, as event counts. */
@@ -491,7 +519,7 @@ describe('what a preset says about itself', () => {
 
   it('keeps the acoustic layer and the core signal separate, in every description', () => {
     // §25. The bowl is not producing the modulation, and every preset has to
-    // say so — appended by the builder rather than typed nineteen times, so
+    // say so — appended by the builder rather than typed twenty times, so
     // the one that gets forgotten cannot exist.
     for (const preset of buildSoundBathPresets()) {
       expect(preset.description.endsWith(ACOUSTIC_LAYER_NOTICE), preset.id).toBe(true);
@@ -683,7 +711,7 @@ describe('the shelf reaches the library it ships with', () => {
 // ---------------------------------------------------------------------------
 
 /**
- * Fifteen of the nineteen presets were designed against the library. Four
+ * Sixteen of the twenty presets were designed against the library. Four
  * were specified: §27 Deep Calm, §28 Earth Resonance, §29 528 Organic and §30
  * Theta Bath each arrived with a layer roster, and Deep Calm with intervals,
  * weights and globals as numbers.
@@ -892,11 +920,18 @@ describe('approval', () => {
     for (const preset of buildSoundBathPresets()) {
       const report = validateSoundBathApproval(preset, LIBRARY);
       expect(report.ready, preset.id).toBe(true);
+      const acknowledged = new Set(
+        preset.layers.filter((layer) => layer.acknowledgedThinPool).map((layer) => layer.id),
+      );
       for (const layer of report.layers) {
+        // Approval is a different question from size: everything the library
+        // holds is approved, so an acknowledged thin pool is approved *in
+        // full* even though it is small.
+        expect(layer.approvedSize, `${preset.id}/${layer.layerId}`).toBe(layer.size);
+        if (acknowledged.has(layer.layerId)) continue;
         expect(layer.approvedSize, `${preset.id}/${layer.layerId}`).toBeGreaterThanOrEqual(
           MINIMUM_POOL_SIZE,
         );
-        expect(layer.approvedSize, `${preset.id}/${layer.layerId}`).toBe(layer.size);
       }
       // `requireApproved` left at its shipping default rather than opted out of,
       // which is the whole point: this is what the app itself will call.

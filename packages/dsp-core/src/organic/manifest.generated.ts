@@ -29,13 +29,13 @@ export const ORGANIC_SCHEMA_VERSION = 1;
  * What the measuring code did. Changes whenever a number the pipeline computes would
  * come out differently, which is what invalidates the analysis cache.
  */
-export const ORGANIC_ANALYSIS_VERSION = '1.7.0';
+export const ORGANIC_ANALYSIS_VERSION = '1.8.0';
 
 /**
  * The content of the sample library itself, which is a curatorial fact rather than a
  * technical one (§34).
  */
-export const ORGANIC_LIBRARY_VERSION = '0.1.0';
+export const ORGANIC_LIBRARY_VERSION = '0.2.0';
 
 // --------------------------------------------------------------------------
 // Closed sets
@@ -51,6 +51,7 @@ export const ORGANIC_INSTRUMENTS = [
   'CHIME',
   'TUNING_FORK',
   'KALIMBA',
+  'WATER',
   'TEXTURE',
   'DRONE',
   'AMBIENT',
@@ -243,6 +244,7 @@ export interface OrganicAssetLevels {
    * rather than treating it as unity.
    */
   readonly recommendedGainDb: number | null;
+  readonly releaseTailDb: number | null;
 }
 
 /**

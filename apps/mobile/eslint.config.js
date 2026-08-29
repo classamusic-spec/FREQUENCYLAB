@@ -3,7 +3,10 @@ const expoConfig = require('eslint-config-expo/flat');
 module.exports = [
   ...expoConfig,
   {
-    ignores: ['dist/*', '.expo/*', 'ios/*', 'android/*'],
+    // Build output, never source. `.vercel` holds a deploy's prebuilt copy
+    // of `dist`, which is a bundled Metro artefact and lints as thousands of
+    // `var` and `__d` errors that mean nothing.
+    ignores: ['dist/*', '.expo/*', 'ios/*', 'android/*', '.vercel/*'],
   },
   {
     rules: {

@@ -38,8 +38,19 @@ import type { SchedulableAsset, SoundBathLayer, SoundBathPreset } from './soundb
  * because a warning is a defect that happens to be audible rather than fatal.
  */
 
+/**
+ * Severities this validator reports.
+ *
+ * `IssueSeverity` from the graph validator is error-or-warning, because a
+ * graph is either buildable or it is not. A preset has a third case: something
+ * a curation screen should show and a build should not fail on — a pool that
+ * is thin *and* has a written reason. Widened here rather than in the shared
+ * type, which nothing else needs.
+ */
+export type SoundBathIssueSeverity = IssueSeverity | 'info';
+
 export interface SoundBathIssue {
-  severity: IssueSeverity;
+  severity: SoundBathIssueSeverity;
   code: string;
   message: string;
   /** Dotted path of the field at fault, e.g. `layers.deep-bowls.pool`. */
@@ -162,7 +173,7 @@ export function validateSoundBath(options: ValidateSoundBathOptions): SoundBathV
   const { preset, library, requireApproved = false } = options;
   const issues: SoundBathIssue[] = [];
   const layers: LayerPoolReport[] = [];
-  const push = (severity: IssueSeverity, code: string, message: string, field?: string) => {
+  const push = (severity: SoundBathIssueSeverity, code: string, message: string, field?: string) => {
     issues.push({ severity, code, message, field });
   };
 
@@ -205,7 +216,25 @@ export function validateSoundBath(options: ValidateSoundBathOptions): SoundBathV
       continue;
     }
 
-    if (pool.length < MINIMUM_POOL_SIZE) {
+    if (pool.length < MINIMUM_POOL_SIZE && layer.acknowledgedThinPool) {
+      /*
+       * A thin pool somebody wrote down a reason for.
+       *
+       * Reported at `info` rather than suppressed: the pool *is* thin, and a
+       * curation screen should still say so. What the acknowledgement changes
+       * is whether it is a defect — the factory set refuses warnings, and this
+       * is how a deliberate case is admitted without lowering the floor for
+       * everything else. The reason is carried into the message so it is read
+       * wherever the issue is read, rather than living only in a source
+       * comment nobody opens.
+       */
+      push(
+        'info',
+        'pool-thin-acknowledged',
+        `Layer "${layer.id}" resolves to ${pool.length} assets, below the ${MINIMUM_POOL_SIZE} the no-repeat window needs. Acknowledged: ${layer.acknowledgedThinPool}`,
+        `layers.${layer.id}.pool`,
+      );
+    } else if (pool.length < MINIMUM_POOL_SIZE) {
       push(
         'warning',
         'pool-thin',
@@ -258,7 +287,7 @@ export function effectivePoolSize(
 // The individual checks
 // ---------------------------------------------------------------------------
 
-type Push = (severity: IssueSeverity, code: string, message: string, field?: string) => void;
+type Push = (severity: SoundBathIssueSeverity, code: string, message: string, field?: string) => void;
 
 function checkGlobals(preset: SoundBathPreset, push: Push): void {
   const globals = preset.globals;
@@ -416,6 +445,8 @@ export interface ApprovalReport {
     size: number;
     /** Assets the query finds that a curator has approved. */
     approvedSize: number;
+    /** True when this layer declared its pool thin on purpose, with a reason. */
+    acknowledged: boolean;
   }>;
 }
 
@@ -442,11 +473,21 @@ export function validateSoundBathApproval(
     layerId: layer.id,
     size: resolvePool(layer.pool, library, false).length,
     approvedSize: resolvePool(layer.pool, library, true).length,
+    acknowledged: layer.acknowledgedThinPool !== undefined,
   }));
-  return {
-    ready: layers.length > 0 && layers.every((layer) => layer.approvedSize >= MINIMUM_POOL_SIZE),
-    layers,
-  };
+  /*
+   * Readiness asks whether enough of this preset's material has been cleared to
+   * ship, and it uses the pool floor as its bar. A layer that acknowledged a
+   * thin pool has to clear a different bar — it can never reach eight — so it
+   * is asked the question that actually applies: is everything it draws on
+   * approved, and is there more than one of them. A layer down to a single
+   * approved asset is not ready however it was declared.
+   */
+  const ready = (layer: (typeof layers)[number]): boolean =>
+    layer.acknowledged
+      ? layer.approvedSize > 1 && layer.approvedSize === layer.size
+      : layer.approvedSize >= MINIMUM_POOL_SIZE;
+  return { ready: layers.length > 0 && layers.every(ready), layers };
 }
 
 // ---------------------------------------------------------------------------

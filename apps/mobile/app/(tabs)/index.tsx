@@ -22,6 +22,7 @@ import { useExperiments } from '../../src/state/experiments';
 import { usePreferences } from '../../src/state/preferences';
 import { useSessionStart } from '../../src/state/sessionStart';
 import { SegmentSelector } from '../../src/design/components/SegmentSelector';
+import type { SoundBathFullness } from '../../src/audio/organic/program';
 
 /**
  * Home (§40).
@@ -72,6 +73,13 @@ export default function HomeScreen() {
    */
   const soundBaths = useMemo(() => buildSoundBathPresets(), []);
   const [soundBathId, setSoundBathId] = useState<string>('none');
+  /*
+   * How much the acoustic layer plays. `natural` is the preset exactly as
+   * written; the other settings shift its density, which is the one control
+   * that reaches all three of the scheduler's levers at once — how often it
+   * tries, how often a try becomes a sound, and how many may ring together.
+   */
+  const [fullness, setFullness] = useState<SoundBathFullness>('fuller');
   const chosenBath = soundBaths.find((preset) => preset.id === soundBathId);
 
   const startRecommendation = async () => {
@@ -82,7 +90,7 @@ export default function HomeScreen() {
     });
     await requestStart(protocol, {
       masterGain: preferences.comfortableOutputLevel,
-      soundBath: soundBathId === 'none' ? undefined : { presetId: soundBathId },
+      soundBath: soundBathId === 'none' ? undefined : { presetId: soundBathId, fullness },
       onStarted: () => router.push('/session'),
     });
   };
@@ -133,6 +141,23 @@ export default function HomeScreen() {
             value={soundBathId}
             onChange={setSoundBathId}
           />
+          {soundBathId === 'none' ? null : (
+            <>
+              <Label>How much it plays</Label>
+              <SegmentSelector
+                accessibilityLabel="How much the acoustic layer plays"
+                options={[
+                  { value: 'sparse', label: 'Sparse' },
+                  { value: 'natural', label: 'As written' },
+                  { value: 'fuller', label: 'Fuller' },
+                  { value: 'full', label: 'Full' },
+                ]}
+                value={fullness}
+                onChange={(value) => setFullness(value as SoundBathFullness)}
+              />
+            </>
+          )}
+
           <Text variant="caption" tone="tertiary">
             {chosenBath
               ? chosenBath.description

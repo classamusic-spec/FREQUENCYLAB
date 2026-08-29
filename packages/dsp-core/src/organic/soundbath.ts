@@ -76,6 +76,27 @@ export interface SoundBathLayer {
   probability: number;
   gainDb: Range;
   panRange: Range;
+  /**
+   * Start this layer's sounds anywhere in the recording rather than at the top.
+   *
+   * For continuous material only — waves, wind, anything with no attack to
+   * miss. Setting it on struck material would cut the onset off every strike,
+   * so `planSoundBath` also refuses to offset anything shorter than
+   * `MIN_ENTER_ANYWHERE_SEC`, where there is not enough sound to enter into.
+   */
+  enterAnywhere?: boolean;
+  /**
+   * Why this layer is allowed a pool below the usual floor.
+   *
+   * The floor exists because the scheduler penalises the six most recently
+   * played ids, so a small pool rotates rather than chooses. That reasoning is
+   * about *events*: six struck bells alternating is audible. It is weaker for
+   * a continuous bed entered at a different point each time, and this field is
+   * how that case is admitted — with a stated reason, in the data, rather than
+   * by lowering the floor for everything. The validator still reports the pool
+   * as thin; what this changes is whether that is a defect.
+   */
+  acknowledgedThinPool?: string;
   maxVoices: number;
   /** Seconds of enforced quiet on this layer after a sound ends. */
   minimumRestSec?: number;
@@ -161,6 +182,17 @@ export interface SoundBathEvent {
   durationSec: number;
   /** Cents of retuning, 0 when none. Only ever applied to pitched material. */
   detuneCents: number;
+  /**
+   * Seconds into the asset's own sounding span to begin, normally 0.
+   *
+   * A struck sound must start at its attack — entering a bell three seconds in
+   * is not a bell. Continuous material is the opposite: a forty-three second
+   * wave recording entered at the same place every time is audibly the same
+   * recording every time, and entering it anywhere is what lets two files
+   * carry a bed. Only layers that set `enterAnywhere` ever get a non-zero
+   * value here.
+   */
+  offsetSec: number;
 }
 
 export function lerpRange(range: Range, t: number): number {
@@ -169,4 +201,49 @@ export function lerpRange(range: Range, t: number): number {
 
 export function sampleRange(range: Range, rng: Rng): number {
   return lerpRange(range, rng.nextFloat());
+}
+
+/**
+ * How long a voice should take to fade out, from how loud it still is.
+ *
+ * A single release time cannot serve this library. Measured over the last half
+ * second before playback ends, a singing bowl sits about 64 dB below its own
+ * peak — it has already decayed, and any fade at all is inaudible. A kalimba
+ * loop sits about 18 dB below peak, because a loop does not decay, it stops.
+ * Ocean waves sit at about 20. Fifty-five of the library's assets are still
+ * above −20 dB at their end, and a half-second ramp on those is the abrupt cut
+ * a listener actually hears rather than a release.
+ *
+ * So the fade covers the distance left to travel, at a fixed and gentle rate.
+ * Everything quieter than `INAUDIBLE_DB` has no distance to travel and takes
+ * the floor; everything louder takes proportionally longer, up to a ceiling
+ * that stops a very loud ending from fading for so long it reads as a separate
+ * musical gesture.
+ *
+ *   −64 dB (a bowl)        -> 0.4 s, the floor
+ *   −44 dB (a soft bell)   -> 0.8 s
+ *   −20 dB (ocean waves)   -> 2.0 s
+ *   −10 dB (a kalimba loop)-> 2.5 s
+ *
+ * `null` — an asset too short to measure — takes the floor, which is what a
+ * sound that brief needs anyway.
+ */
+export const RELEASE_FLOOR_SEC = 0.4;
+export const RELEASE_CEILING_SEC = 3.5;
+/** Below this an asset has effectively already ended. */
+export const RELEASE_INAUDIBLE_DB = -60;
+/** Decibels of release per second. Gentle enough to read as a decay. */
+export const RELEASE_DB_PER_SEC = 20;
+
+export function releaseSecondsFor(releaseTailDb: number | null | undefined): number {
+  if (releaseTailDb === null || releaseTailDb === undefined || !Number.isFinite(releaseTailDb)) {
+    return RELEASE_FLOOR_SEC;
+  }
+  // Distance from where the sound still is *down* to inaudible, so a loud
+  // ending has further to go and takes longer. The other way round is negative
+  // for every asset in the library and clamps them all to the floor.
+  const toTravel = releaseTailDb - RELEASE_INAUDIBLE_DB;
+  if (toTravel <= 0) return RELEASE_FLOOR_SEC;
+  const seconds = toTravel / RELEASE_DB_PER_SEC;
+  return Math.min(RELEASE_CEILING_SEC, Math.max(RELEASE_FLOOR_SEC, seconds));
 }
