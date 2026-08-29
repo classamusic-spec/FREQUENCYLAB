@@ -99,8 +99,18 @@ import type {
 export const ACOUSTIC_LAYER_NOTICE =
   'This is the acoustic layer. It places recorded strikes in time and produces no modulation of its own — no beat, no rate, nothing periodic. Any beat in a session comes from the core signal underneath, which runs whether this layer is playing or silent.';
 
-/** Bumped when a preset's parameters change, so a session record stays readable. */
-const FACTORY_VERSION = 1;
+/**
+ * Bumped when a preset's parameters change, so a session record stays readable.
+ *
+ * One number for all seventeen, so a change to any of them moves all of them.
+ * That is coarser than it could be and is the right trade: the version exists
+ * so a stored session can say which parameters produced it, and seventeen
+ * separately drifting counters would be seventeen things to forget.
+ *
+ * 2 — `Deep Calm`, `Earth Resonance`, `528 Organic` and `Theta Bath` were
+ * brought onto §27–§30's stated parameters.
+ */
+const FACTORY_VERSION = 2;
 
 // ---------------------------------------------------------------------------
 // Pools
@@ -268,56 +278,91 @@ function soundBath(spec: SoundBathSpec): SoundBathPreset {
 /**
  * Deep Calm.
  *
+ * §27, and the only preset in this file whose parameters were given rather than
+ * derived from the library: four layers, their intervals, their relative
+ * weights and four globals. Everything below either is one of those numbers or
+ * says here why it is not.
+ *
+ * **Weight became `probability`.** The spec weights the layers 1.5 / 1.0 / 0.7
+ * / 0.2 and `SoundBathLayer` has no `weight` field, because `probability`
+ * already decides how many of a layer's attempts become sounds and a second
+ * control doing the same job is a control that can contradict the first. The
+ * ratios survive exactly: each weight over the largest, scaled so the heaviest
+ * layer sits at 0.9, giving 0.90 / 0.60 / 0.42 / 0.12.
+ *
+ * **Reverb 40% became four sends of 0.40.** `SoundBathGlobals` has no reverb
+ * scalar — only a named space and a per-layer send — so the number is set on
+ * every layer rather than gestured at with a preset name.
+ *
+ * **The air chime prefers `airy` rather than requiring it.** 27 of the 85
+ * chimes carry the tag, and preferring it across all 85 leaves 63.5 effectively
+ * in play where requiring it leaves 19.6. That is the difference between a
+ * layer that sounds airy and a layer that plays the same twenty-seven files.
+ *
  * Shares a name with the multi-stage protocol in `protocol/factoryProtocols.ts`
  * and that is deliberate: this is the acoustic layer written to sit under that
- * descent, and the two are meant to be selected together. They are separate
- * objects in separate namespaces and neither depends on the other.
+ * descent, and the two are meant to be selected together. §27's core half — a
+ * 6 Hz binaural beat on a 200 Hz carrier under a pink bed at 8% — is the point
+ * that protocol's `Descend` stage arrives at. They are separate objects in
+ * separate namespaces and neither depends on the other.
  */
 function deepCalm(): SoundBathPreset {
   return soundBath({
     id: 'soundbath.deep_calm',
     name: 'Deep Calm',
     copy:
-      'Dark bowls from the bottom of the library — the twenty-five long bowls tagged bright are excluded outright rather than turned down — with a second, slower bowl answering from further back and soft bells placed wide and quiet.',
+      'Dark bowls from the bottom of the library — the twenty-five long bowls tagged bright are excluded outright rather than turned down — with a softer bowl answering from further back, airy chimes a long way above them, and a kalimba that arrives only a handful of times in a session.',
     globals: {
-      density: 0.32,
+      density: 0.3,
       energy: 0.3,
-      brightness: 0.3,
+      brightness: 0.25,
       reverbPreset: 'hall',
-      width: 0.7,
+      width: 0.6,
     },
     layers: (every) => [
       {
         id: 'deep-bowls',
         role: 'PRIMARY_BOWL',
         pool: { ...DARK_BOWLS, preferredTags: ['warm'] },
-        intervalSec: every(36, 58),
+        intervalSec: every(50, 110),
         probability: 0.9,
         gainDb: { min: -8, max: -4 },
         panRange: { min: -0.25, max: 0.25 },
         maxVoices: 2,
-        reverbSend: 0.45,
+        reverbSend: 0.4,
       },
       {
-        id: 'answering-bowls',
+        id: 'soft-bowls',
         role: 'SECONDARY_BOWL',
         pool: LONG_BOWLS,
-        intervalSec: every(54, 86),
+        intervalSec: every(40, 100),
         probability: 0.6,
+        // Stops at −9 because `LONG_BOWLS` holds the +8.44 dB bowl.
         gainDb: { min: -13, max: -9 },
         panRange: { min: -0.6, max: 0.6 },
         maxVoices: 1,
-        reverbSend: 0.5,
+        reverbSend: 0.4,
       },
       {
-        id: 'distant-bells',
-        role: 'BELL',
-        pool: { ...SOFT_BELLS, preferredTags: ['gentle'] },
-        intervalSec: every(26, 42),
-        probability: 0.5,
-        gainDb: { min: -16, max: -11 },
+        id: 'air-chimes',
+        role: 'AIR',
+        pool: { ...CHIMES, preferredTags: ['airy'] },
+        intervalSec: every(70, 160),
+        probability: 0.42,
+        gainDb: { min: -18, max: -13 },
         panRange: { min: -0.75, max: 0.75 },
         maxVoices: 2,
+        reverbSend: 0.4,
+      },
+      {
+        id: 'kalimba',
+        role: 'KALIMBA',
+        pool: SOFT_KALIMBA,
+        intervalSec: every(90, 220),
+        probability: 0.12,
+        gainDb: { min: -19, max: -14 },
+        panRange: { min: -0.5, max: 0.5 },
+        maxVoices: 1,
         reverbSend: 0.4,
       },
     ],
@@ -330,16 +375,41 @@ function deepCalm(): SoundBathPreset {
  * §28. The Schumann resonance is a real electromagnetic phenomenon in the
  * Earth–ionosphere cavity, and this preset does not reproduce it, approximate
  * it or stand in for it. It is named after the core signal it was written to
- * accompany — a 7.83 Hz beat, which is itself an acoustic analogy and is
- * documented as one in `library/entries.ts`. What is actually here is the low,
- * warm end of the bowl library with tuning forks under it.
+ * accompany — a 7.83 Hz binaural difference on a 220 Hz carrier, which is
+ * `7.83 Hz — First mode` in `presets/factoryLab.ts` and is itself an acoustic
+ * analogy documented as one in `library/entries.ts`.
+ *
+ * Three of the spec's five organic elements are here as asked: the deep bowl,
+ * the low tuning fork and the very sparse upper chime. The other two are not,
+ * and the reasons are in the library rather than in this file.
+ *
+ *  - **There is no earth-style chime in this library.** All 89 chimes measure a
+ *    brightness of 0.56 or above and not one carries `warm`, `low`, `dark` or
+ *    `deep` — the low chime the spec is reaching for does not exist here. The
+ *    layer takes the 26 chimes of MEDIUM duration, which are the longest, and
+ *    prefers the `gentle` tag inside them. That is the darkest, slowest chime
+ *    material available, and it is still a bright instrument.
+ *  - **Brown noise is not an organic layer.** Noise comes from the core signal
+ *    — `noise: { color: 'brown' }` on a protocol stage — and `LayerRole` has no
+ *    noise role, because a library of struck recordings contains no noise bed.
+ *    A layer asking for one would resolve to nothing.
+ *
+ * The low fork prefers rather than filters, for the reason the air chime does
+ * in `Deep Calm` and more sharply: 3 of the 10 forks carry `low`, and three is
+ * not a pool. Preferring keeps all ten reachable and 9.0 of them effectively in
+ * play, with the low three coming up most often.
+ *
+ * The spec also asks for slow stereo motion. A `SoundBathEvent` carries a
+ * single `pan` fixed when it is scheduled and nothing that moves it, so this
+ * preset spreads its layers across the field and none of them travels. The
+ * moving spatialisation of §38 is not built, here or anywhere.
  */
 function earthResonance(): SoundBathPreset {
   return soundBath({
     id: 'soundbath.earth_resonance',
     name: 'Earth Resonance',
     copy:
-      'The low, warm end of the bowl library, with tuning forks underneath and bells kept far back. It is named after the core signal it was written to accompany. The Schumann resonance is an electromagnetic phenomenon in the atmosphere; headphones make sound, so nothing acoustic reproduces it and nothing here is trying to.',
+      'The low, warm end of the bowl library, with tuning forks underneath, the darkest and longest chimes this library has kept well back, and a rare bright chime above. It is named after the core signal it was written to accompany. The Schumann resonance is an electromagnetic phenomenon in the atmosphere; headphones make sound, so nothing acoustic reproduces it and nothing here is trying to.',
     globals: {
       density: 0.3,
       energy: 0.25,
@@ -368,7 +438,7 @@ function earthResonance(): SoundBathPreset {
       {
         id: 'forks',
         role: 'TUNING_FORK',
-        pool: TUNING_FORKS,
+        pool: { ...TUNING_FORKS, preferredTags: ['low'] },
         intervalSec: every(56, 88),
         probability: 0.55,
         gainDb: { min: -10, max: -6 },
@@ -377,14 +447,27 @@ function earthResonance(): SoundBathPreset {
         reverbSend: 0.45,
       },
       {
-        id: 'far-bells',
-        role: 'BELL',
-        pool: { ...SOFT_BELLS, preferredTags: ['gentle'] },
-        intervalSec: every(26, 40),
+        id: 'low-chimes',
+        role: 'CHIME',
+        pool: { ...LONG_CHIMES, preferredTags: ['gentle'] },
+        intervalSec: every(54, 92),
         probability: 0.5,
         gainDb: { min: -17, max: -12 },
-        panRange: { min: -0.8, max: 0.8 },
+        panRange: { min: -0.6, max: 0.6 },
         maxVoices: 2,
+        reverbSend: 0.45,
+      },
+      {
+        id: 'upper-chimes',
+        role: 'SPARKLE',
+        // "Very sparse" is a long interval and a low probability together: one
+        // without the other gives either a metronome or a clump.
+        pool: { ...CHIMES, preferredTags: ['airy', 'high'] },
+        intervalSec: every(120, 240),
+        probability: 0.3,
+        gainDb: { min: -22, max: -17 },
+        panRange: { min: -0.85, max: 0.85 },
+        maxVoices: 1,
         reverbSend: 0.4,
       },
     ],
@@ -654,6 +737,19 @@ function morningClarity(): SoundBathPreset {
 /**
  * Theta Bath.
  *
+ * §30: soft bowls, rare chimes, a pink bed from the core, a density of 25%, no
+ * kalimba, and minimal rhythmic distraction as the stated goal.
+ *
+ * The tuning fork and soft bell layers this preset used to carry are gone.
+ * Neither is in the spec, and four layers is not the shape of the sentence
+ * "minimal rhythmic distraction" — two bowl layers and a chime that seldom
+ * fires is. The pink bed is the core signal's, as in `Earth Resonance`: there
+ * is no noise in a library of struck recordings.
+ *
+ * At a density of 0.25 the interval multiplier is 2.375, so the declared
+ * spacings below are what is actually heard and the control still has room to
+ * move in both directions.
+ *
  * Named after the band of the core signal it was written to accompany, in the
  * same way `Alpha Focus` is in `protocol/factoryProtocols.ts`. Nothing in the
  * acoustic layer is at a theta rate, and `ACOUSTIC_LAYER_NOTICE` says so.
@@ -663,9 +759,9 @@ function thetaBath(): SoundBathPreset {
     id: 'soundbath.theta_bath',
     name: 'Theta Bath',
     copy:
-      'Bowls chosen for length rather than for colour, a second bowl answering them, soft bells between, and tuning forks that arrive only a handful of times. Named after the band of the core signal it was written to accompany.',
+      'Bowls chosen for length rather than for colour, a second bowl answering them from further back, and a chime that arrives rarely enough not to become something to listen for. Named after the band of the core signal it was written to accompany.',
     globals: {
-      density: 0.34,
+      density: 0.25,
       energy: 0.32,
       brightness: 0.34,
       reverbPreset: 'hall',
@@ -695,25 +791,14 @@ function thetaBath(): SoundBathPreset {
         reverbSend: 0.5,
       },
       {
-        id: 'forks',
-        role: 'TUNING_FORK',
-        pool: TUNING_FORKS,
-        intervalSec: every(60, 92),
-        probability: 0.55,
-        gainDb: { min: -12, max: -8 },
-        panRange: { min: -0.35, max: 0.35 },
+        id: 'rare-chimes',
+        role: 'CHIME',
+        pool: { ...CHIMES, preferredTags: ['gentle'] },
+        intervalSec: every(100, 200),
+        probability: 0.3,
+        gainDb: { min: -20, max: -15 },
+        panRange: { min: -0.7, max: 0.7 },
         maxVoices: 1,
-        reverbSend: 0.45,
-      },
-      {
-        id: 'bells',
-        role: 'BELL',
-        pool: { ...SOFT_BELLS, preferredTags: ['gentle'] },
-        intervalSec: every(26, 40),
-        probability: 0.55,
-        gainDb: { min: -16, max: -11 },
-        panRange: { min: -0.75, max: 0.75 },
-        maxVoices: 2,
         reverbSend: 0.4,
       },
     ],
@@ -787,13 +872,21 @@ function alphaAir(): SoundBathPreset {
  * the pipeline deliberately refused to claim.
  *
  * No claim is attached to the number, here or anywhere the user can read.
+ *
+ * §29's organic half is a compatible bowl, a soft bell, an occasional chime and
+ * reverb, with noisy and atonal accents kept minimal. The kalimba that used to
+ * hold the third layer is gone: it is not in the spec, and 83 of the 100
+ * kalimba phrases are tagged `inharmonic`, which is precisely the accent §29
+ * asks to keep to a minimum. A soft bell layer takes its place, and the chime
+ * layer is slowed from every 20–32 seconds to every 45–90 at a probability of
+ * 0.35, which is what "occasional" means beside a bowl layer firing at 0.85.
  */
 function organic528(): SoundBathPreset {
   return soundBath({
     id: 'soundbath.528_organic',
     name: '528 Organic',
     copy:
-      'Bowls, chimes and kalimba with the tuning reference moved to A4 = 444 Hz, which puts an equal-tempered C5 within a hundredth of a hertz of 528 — about sixteen cents above concert pitch. The shift reaches only the assets whose pitch was actually measured; a note read off a filename is a label, not an observation, and nothing is moved on the strength of one. This is a tuning choice and nothing more. The popular claims attached to this number are unsupported, and none of them is made here.',
+      'Bowls, soft bells and an occasional chime with the tuning reference moved to A4 = 444 Hz, which puts an equal-tempered C5 within a hundredth of a hertz of 528 — about sixteen cents above concert pitch. The shift reaches only the assets whose pitch was actually measured; a note read off a filename is a label, not an observation, and nothing is moved on the strength of one. This is a tuning choice and nothing more. The popular claims attached to this number are unsupported, and none of them is made here.',
     globals: {
       density: 0.38,
       energy: 0.45,
@@ -816,26 +909,26 @@ function organic528(): SoundBathPreset {
         reverbSend: 0.45,
       },
       {
-        id: 'chimes',
-        role: 'CHIME',
-        pool: CHIMES,
-        intervalSec: every(20, 32),
-        probability: 0.75,
-        gainDb: { min: -17, max: -12 },
-        panRange: { min: -0.7, max: 0.7 },
+        id: 'soft-bells',
+        role: 'BELL',
+        pool: { ...SOFT_BELLS, preferredTags: ['gentle'] },
+        intervalSec: every(30, 55),
+        probability: 0.6,
+        gainDb: { min: -16, max: -11 },
+        panRange: { min: -0.6, max: 0.6 },
         maxVoices: 2,
         reverbSend: 0.35,
       },
       {
-        id: 'kalimba',
-        role: 'MELODIC_ACCENT',
-        pool: KALIMBA,
-        intervalSec: every(20, 32),
-        probability: 0.7,
-        gainDb: { min: -16, max: -12 },
-        panRange: { min: -0.5, max: 0.5 },
+        id: 'chimes',
+        role: 'CHIME',
+        pool: CHIMES,
+        intervalSec: every(45, 90),
+        probability: 0.35,
+        gainDb: { min: -18, max: -13 },
+        panRange: { min: -0.7, max: 0.7 },
         maxVoices: 2,
-        reverbSend: 0.25,
+        reverbSend: 0.35,
       },
     ],
   });

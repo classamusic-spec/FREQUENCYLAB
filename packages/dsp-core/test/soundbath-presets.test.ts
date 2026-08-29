@@ -274,23 +274,23 @@ describe('the pool floor catches a library that has been cut from under a preset
  * minutes, and what that works out to as seconds between events:
  *
  * ```
- *   Gamma Light        187    8 s      432 Meditation      44   35 s
- *   Morning Clarity    134   11 s      Deep Calm           38   40 s
- *   Silver Chimes      107   14 s      Earth Resonance     36   42 s
- *   Chime Garden       105   14 s      Deep Bowls          32   48 s
- *   Alpha Air           78   19 s      Tuning Fork Space   31   48 s
- *   528 Organic         72   21 s      Sleep Descent       29   52 s
- *   Float               60   25 s      Focus Minimal       27   55 s
- *   Theta Bath          47   32 s      Pure Bowls          26   57 s
- *                                      Inner Space         23   64 s
+ *   Gamma Light        187    8 s      Tuning Fork Space   31   48 s
+ *   Morning Clarity    134   11 s      Earth Resonance     30   50 s
+ *   Silver Chimes      107   14 s      Sleep Descent       29   52 s
+ *   Chime Garden       105   14 s      Focus Minimal       27   55 s
+ *   Alpha Air           78   19 s      Pure Bowls          26   57 s
+ *   Float               60   25 s      Inner Space         23   64 s
+ *   432 Meditation      44   35 s      Theta Bath          22   68 s
+ *   528 Organic         36   42 s      Deep Calm           21   71 s
+ *   Deep Bowls          32   48 s
  * ```
  *
  * Each figure is the mean over two hundred seeds, which is what a preset is: a
  * distribution, not a value. Everything asserted below is derived from these
  * seventeen numbers, so there is one place to change when a preset changes.
  *
- * The spread that band has to allow is real. `Earth Resonance` runs from 21 to
- * 50 events across two hundred seeds — better than two to one — because a layer
+ * The spread that band has to allow is real. `Sleep Descent` runs from 13 to 43
+ * events across two hundred seeds — more than three to one — because a layer
  * re-samples its interval on every attempt and a run of long draws thins a
  * whole session. So the per-session band is wide on purpose, and its edges are
  * set by two limits that belong to the material rather than to taste:
@@ -307,16 +307,16 @@ describe('the pool floor catches a library that has been cut from under a preset
  * per-session bound would sleep through.
  */
 const DESIGN_EVENTS: Record<string, number> = {
-  'soundbath.deep_calm': 38,
-  'soundbath.earth_resonance': 36,
+  'soundbath.deep_calm': 21,
+  'soundbath.earth_resonance': 30,
   'soundbath.deep_bowls': 32,
   'soundbath.pure_bowls': 26,
   'soundbath.float': 60,
   'soundbath.inner_space': 23,
   'soundbath.sleep_descent': 29,
-  'soundbath.theta_bath': 47,
+  'soundbath.theta_bath': 22,
   'soundbath.432_meditation': 44,
-  'soundbath.528_organic': 72,
+  'soundbath.528_organic': 36,
   'soundbath.alpha_air': 78,
   'soundbath.silver_chimes': 107,
   'soundbath.chime_garden': 105,
@@ -566,6 +566,194 @@ describe('the two retuned presets', () => {
     for (const preset of buildSoundBathPresets()) {
       if (preset.globals.tuningReferenceHz !== undefined) continue;
       expect(plan(preset, 123456).events.every((event) => event.detuneCents === 0), preset.id).toBe(true);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §27–§30 — the four presets whose parameters were given
+// ---------------------------------------------------------------------------
+
+/**
+ * Thirteen of the seventeen presets were designed against the library. Four
+ * were specified: §27 Deep Calm, §28 Earth Resonance, §29 528 Organic and §30
+ * Theta Bath each arrived with a layer roster, and Deep Calm with intervals,
+ * weights and globals as numbers.
+ *
+ * Those numbers are asserted here rather than described in `presets.ts`, for
+ * the reason every comment in that file eventually needs: a comment saying a
+ * layer fires every fifty to a hundred and ten seconds goes on saying it after
+ * somebody changes the interval. Nothing else in this file would notice — the
+ * event-count band would absorb a 20% drift and the validator does not know
+ * what the spec asked for.
+ *
+ * A declared interval is not the stored one. `soundBath()` divides by the
+ * density multiplier `3 − 2.5·density` so a preset can state the spacing it
+ * means, so these tests multiply it back out and assert the real seconds.
+ */
+describe('the four presets the spec gave parameters for', () => {
+  /** Real seconds between attempts, undoing the density division. */
+  const spacing = (preset: SoundBathPreset, layerId: string) => {
+    const factor = 3 - 2.5 * preset.globals.density;
+    const layer = preset.layers.find((candidate) => candidate.id === layerId)!;
+    expect(layer, `${preset.id} has no layer "${layerId}"`).toBeDefined();
+    return { min: layer.intervalSec.min * factor, max: layer.intervalSec.max * factor };
+  };
+  const layer = (preset: SoundBathPreset, layerId: string) =>
+    preset.layers.find((candidate) => candidate.id === layerId)!;
+  const roles = (preset: SoundBathPreset) => preset.layers.map((entry) => entry.role);
+
+  it('§27 gives Deep Calm four layers at the intervals and weights it names', () => {
+    const preset = soundBathPreset('soundbath.deep_calm')!;
+
+    expect(preset.globals.density).toBe(0.3);
+    expect(preset.globals.brightness).toBe(0.25);
+    expect(preset.globals.width).toBe(0.6);
+
+    expect(preset.layers.map((entry) => entry.id)).toEqual([
+      'deep-bowls',
+      'soft-bowls',
+      'air-chimes',
+      'kalimba',
+    ]);
+
+    // Deep bowl 50–110, soft bowl 40–100, air chime 70–160, kalimba 90–220.
+    for (const [id, min, max] of [
+      ['deep-bowls', 50, 110],
+      ['soft-bowls', 40, 100],
+      ['air-chimes', 70, 160],
+      ['kalimba', 90, 220],
+    ] as const) {
+      const real = spacing(preset, id);
+      expect(real.min, `${id} min`).toBeCloseTo(min, 0);
+      expect(real.max, `${id} max`).toBeCloseTo(max, 0);
+    }
+
+    /*
+     * Weights 1.5 / 1.0 / 0.7 / 0.2 became probabilities, because there is no
+     * `weight` field and `probability` already does the job. The mapping is
+     * weight over the largest weight, scaled so the heaviest layer sits at 0.9,
+     * and the ratios are what the assertion is really about — a future edit
+     * that lifts one layer without the others breaks the proportion even if
+     * every individual number still looks reasonable.
+     */
+    const weights = { 'deep-bowls': 1.5, 'soft-bowls': 1.0, 'air-chimes': 0.7, kalimba: 0.2 };
+    for (const [id, weight] of Object.entries(weights)) {
+      expect(layer(preset, id).probability, id).toBeCloseTo((weight / 1.5) * 0.9, 2);
+    }
+
+    // Reverb 40%. `SoundBathGlobals` has no reverb scalar, so it is every send.
+    for (const entry of preset.layers) {
+      expect(entry.reverbSend, `${entry.id} send`).toBe(0.4);
+    }
+  });
+
+  it('§28 gives Earth Resonance no bell, and no low chime exists to give it', () => {
+    const preset = soundBathPreset('soundbath.earth_resonance')!;
+
+    // Deep bowl, low tuning fork, an earth-style chime and a sparse upper one.
+    expect(preset.layers.map((entry) => entry.id)).toEqual([
+      'ground',
+      'forks',
+      'low-chimes',
+      'upper-chimes',
+    ]);
+    expect(roles(preset)).not.toContain('BELL');
+    expect(roles(preset)).not.toContain('KALIMBA');
+
+    // The fork prefers `low` rather than filtering to it, because filtering
+    // gives three forks and three is not a pool.
+    expect(layer(preset, 'forks').pool.preferredTags).toContain('low');
+    expect(
+      resolvePool({ instruments: ['TUNING_FORK'], requiredTags: ['low'] }, LIBRARY, false).length,
+    ).toBeLessThan(MINIMUM_POOL_SIZE);
+
+    /*
+     * And the claim `presets.ts` makes about why there is no low chime, checked
+     * against the library rather than left as prose. A sound pack that adds
+     * warm chimes should make this fail, so the paragraph explaining their
+     * absence gets revisited instead of quietly becoming false.
+     */
+    const chimes = LIBRARY.filter((asset) => asset.instrument === 'CHIME');
+    expect(chimes.length).toBeGreaterThan(0);
+    for (const tag of ['warm', 'low', 'dark', 'deep']) {
+      expect(
+        chimes.filter((asset) => asset.tags.includes(tag)).length,
+        `a chime is tagged ${tag}, so "no low chime exists" is no longer true`,
+      ).toBe(0);
+    }
+    expect(Math.min(...chimes.map((asset) => asset.brightness))).toBeGreaterThan(0.5);
+
+    // The sparse upper chime is sparse by interval *and* probability.
+    expect(spacing(preset, 'upper-chimes').min).toBeGreaterThanOrEqual(100);
+    expect(layer(preset, 'upper-chimes').probability).toBeLessThanOrEqual(0.35);
+  });
+
+  it('§29 gives 528 Organic a soft bell and no kalimba', () => {
+    const preset = soundBathPreset('soundbath.528_organic')!;
+
+    expect(preset.layers.map((entry) => entry.id)).toEqual(['bowls', 'soft-bells', 'chimes']);
+    expect(roles(preset)).toContain('BELL');
+    expect(roles(preset)).not.toContain('KALIMBA');
+    expect(roles(preset)).not.toContain('MELODIC_ACCENT');
+
+    /*
+     * "Noisy/atonal accents: minimal" is why the kalimba went: 83 of the 100
+     * kalimba phrases are tagged `inharmonic`, which is the accent §29 asks to
+     * keep down. Asserted so the justification in `presets.ts` is checkable.
+     */
+    const kalimba = LIBRARY.filter((asset) => asset.instrument === 'KALIMBA');
+    const inharmonic = kalimba.filter((asset) => asset.tags.includes('inharmonic')).length;
+    expect(inharmonic / kalimba.length).toBeGreaterThan(0.75);
+
+    // "Occasional chime", against a bowl layer that fires most of the time.
+    expect(layer(preset, 'chimes').probability).toBeLessThan(layer(preset, 'bowls').probability);
+    expect(spacing(preset, 'chimes').min).toBeGreaterThan(spacing(preset, 'bowls').min * 0.9);
+  });
+
+  it('§30 gives Theta Bath a density of 25%, no kalimba, and little to listen for', () => {
+    const preset = soundBathPreset('soundbath.theta_bath')!;
+
+    expect(preset.globals.density).toBe(0.25);
+    expect(roles(preset)).not.toContain('KALIMBA');
+    expect(roles(preset)).not.toContain('MELODIC_ACCENT');
+
+    // Soft bowls and a rare chime. "Minimal rhythmic distraction" is a shape,
+    // not a mood: three layers, one of which seldom fires.
+    expect(preset.layers.map((entry) => entry.id)).toEqual(['bowls', 'paired-bowls', 'rare-chimes']);
+    expect(layer(preset, 'rare-chimes').probability).toBeLessThanOrEqual(0.3);
+    expect(spacing(preset, 'rare-chimes').min).toBeGreaterThanOrEqual(90);
+
+    // And it really is the sparsest of the bowl presets in practice.
+    const mean = (id: string) => {
+      const counts = SEEDS.map((seed) => plan(soundBathPreset(id)!, seed).events.length);
+      return counts.reduce((sum, count) => sum + count, 0) / counts.length;
+    };
+    expect(mean('soundbath.theta_bath')).toBeLessThan(mean('soundbath.deep_bowls'));
+  });
+
+  it('leaves the noise beds to the core signal, in all four', () => {
+    /*
+     * §27 asks for pink noise at 8%, §28 for brown and §30 for pink. None of
+     * them is a layer here and none can be: noise comes from a protocol stage,
+     * and `LayerRole` has no noise role because a library of struck recordings
+     * has no noise in it. A layer asking for one would resolve to nothing,
+     * which `emptyLayers` already refuses — this states the reason.
+     */
+    for (const id of [
+      'soundbath.deep_calm',
+      'soundbath.earth_resonance',
+      'soundbath.528_organic',
+      'soundbath.theta_bath',
+    ]) {
+      const preset = soundBathPreset(id)!;
+      for (const entry of preset.layers) {
+        const instruments = entry.pool.instruments ?? [];
+        expect(instruments.some((name) => /NOISE|TEXTURE|AMBIENT/.test(name)), `${id}/${entry.id}`).toBe(
+          false,
+        );
+      }
+      expect(plan(preset, 555).emptyLayers, id).toEqual([]);
     }
   });
 });
