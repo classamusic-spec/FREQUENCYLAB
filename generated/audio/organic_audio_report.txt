@@ -1,0 +1,50 @@
+AUDIO ASSET REPORT
+
+Totals
+  Total discovered   369
+  Approved           0
+  Needs review       369
+  Manual overrides   0
+  Loopable           65
+  Analysis failures  0
+  Duplicate content  0
+  Ignored files      0
+
+Instruments
+  BELL          103
+  CHIME         88
+  KALIMBA       100
+  SINGING_BOWL  68
+  TUNING_FORK   10
+
+Duration classes
+  MICRO     1
+  SHORT     144
+  MEDIUM    142
+  LONG      71
+  EXTENDED  11
+
+Tonality
+  ATONAL           29
+  INHARMONIC       253
+  PARTIALLY_TONAL  44
+  TONAL            43
+
+Pitch
+  With a note     87
+  Without a note  282
+
+Sample rates
+  48000  369
+
+Channels
+  2  369
+
+Bit depths
+  24  369
+
+Ranges
+  Duration (s)     1.333 to 152.0
+  Integrated LUFS  -31.44 to -6.25
+  Peak dBFS        -1.0 to -1.0
+  Total material   89.4 minutes

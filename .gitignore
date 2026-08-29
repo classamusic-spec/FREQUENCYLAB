@@ -16,3 +16,16 @@ out/
 # Vercel
 .vercel
 apps/mobile/dist
+
+# Audio pipeline: derived artefacts that are regenerated, not reviewed.
+# The manifest and the JSON/text reports are committed — the app consumes the
+# manifest, and CI compares the reports. These two are not:
+#   the cache is a local speed-up keyed by content hash and analysis version,
+#   and the HTML report embeds file:// links into the licensed source tree,
+#   which must never leave a developer's machine.
+generated/audio/organic_audio_analysis_cache.json
+generated/audio/organic_audio_report.html
+
+# Python bytecode
+__pycache__/
+*.pyc

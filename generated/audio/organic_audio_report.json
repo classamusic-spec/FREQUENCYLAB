@@ -1,0 +1,1603 @@
+{
+  "analysisFailures": [],
+  "duplicates": [],
+  "filenameNoteConflicts": [
+    {
+      "assetId": "organic.822fb3e7d4ed",
+      "detail": "filename says A, measured B",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bells/Koshi_Bells/Earth/GIO_HEAL_bells_koshi_earth_flat_A.wav"
+    },
+    {
+      "assetId": "organic.9f04aa85d137",
+      "detail": "filename says A, measured E",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bells/Koshi_Bells/Earth/GIO_HEAL_bells_koshi_earth_pieces_A.wav"
+    },
+    {
+      "assetId": "organic.7f1f35a61911",
+      "detail": "filename says A, measured E",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bells/Koshi_Bells/Earth/GIO_HEAL_bells_koshi_earth_simple_A.wav"
+    },
+    {
+      "assetId": "organic.76a2a5b6e900",
+      "detail": "filename says G, measured D",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bells/Koshi_Bells/Fire/GIO_HEAL_bells_koshi_fire_dots_G.wav"
+    },
+    {
+      "assetId": "organic.231e42c3cee0",
+      "detail": "filename says G, measured D",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bells/Koshi_Bells/Fire/GIO_HEAL_bells_koshi_fire_flame_G.wav"
+    },
+    {
+      "assetId": "organic.ba5c820e256d",
+      "detail": "filename says D, measured A#",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bells/Koshi_Bells/Water/GIO_HEAL_bells_koshi_water_drops_D.wav"
+    },
+    {
+      "assetId": "organic.34e313c309a8",
+      "detail": "filename says D, measured A#",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bells/Koshi_Bells/Water/GIO_HEAL_bells_koshi_water_point_D.wav"
+    },
+    {
+      "assetId": "organic.13e14271fe2a",
+      "detail": "filename says D, measured A#",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bells/Koshi_Bells/Water/GIO_HEAL_bells_koshi_water_slide_D.wav"
+    },
+    {
+      "assetId": "organic.7e0bfaa37435",
+      "detail": "filename says F, measured D",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bowls/Hits/Big_Bowls/GIO_HEAL_bowls_big_hard_F.wav"
+    },
+    {
+      "assetId": "organic.0866408ea9b0",
+      "detail": "filename says F, measured D",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bowls/Hits/Big_Bowls/GIO_HEAL_bowls_big_soft_F.wav"
+    },
+    {
+      "assetId": "organic.da03efa448ff",
+      "detail": "filename says F, measured D",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bowls/Hits/Big_Bowls/GIO_HEAL_bowls_big_wah_F.wav"
+    },
+    {
+      "assetId": "organic.59ecb81b1c34",
+      "detail": "filename says F#, measured B",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bowls/Hits/Medium_Bowls/GIO_HEAL_bowls_medium_free_F#.wav"
+    },
+    {
+      "assetId": "organic.c1802bab1b89",
+      "detail": "filename says F#, measured C",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bowls/Hits/Medium_Bowls/GIO_HEAL_bowls_medium_freedom_F#.wav"
+    },
+    {
+      "assetId": "organic.c324803bf430",
+      "detail": "filename says F#, measured B",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bowls/Hits/Medium_Bowls/GIO_HEAL_bowls_medium_hard_F#.wav"
+    },
+    {
+      "assetId": "organic.4379d8bdec79",
+      "detail": "filename says F#, measured B",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bowls/Hits/Medium_Bowls/GIO_HEAL_bowls_medium_soft_F#.wav"
+    },
+    {
+      "assetId": "organic.d1a4b15784f4",
+      "detail": "filename says F#, measured B",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bowls/Hits/Medium_Bowls/GIO_HEAL_bowls_medium_wah_F#.wav"
+    },
+    {
+      "assetId": "organic.9a987af6fe70",
+      "detail": "filename says G#, measured A",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bowls/Hits/Small_Bowls/GIO_HEAL_bowls_small_free_Ab.wav"
+    },
+    {
+      "assetId": "organic.21f530a782db",
+      "detail": "filename says B, measured C",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bowls/Hits/Small_Bowls/GIO_HEAL_bowls_small_free_B.wav"
+    },
+    {
+      "assetId": "organic.72b37c154eff",
+      "detail": "filename says F#, measured B",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bowls/Hits/Small_Bowls/GIO_HEAL_bowls_small_free_F#.wav"
+    },
+    {
+      "assetId": "organic.411902a8ecf0",
+      "detail": "filename says G#, measured A",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bowls/Hits/Small_Bowls/GIO_HEAL_bowls_small_soft_Ab.wav"
+    },
+    {
+      "assetId": "organic.3328a1062265",
+      "detail": "filename says B, measured C",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bowls/Hits/Small_Bowls/GIO_HEAL_bowls_small_soft_B.wav"
+    },
+    {
+      "assetId": "organic.db26255bebf5",
+      "detail": "filename says F, measured D",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Bowls/Long_Hits/GIO_HEAL_bowls_big_long_free_F.wav"
+    },
+    {
+      "assetId": "organic.9336e91f5eba",
+      "detail": "filename says G, measured D",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Kailani/Hits/GIO_HEAL_kailani_hit_gently_G.wav"
+    },
+    {
+      "assetId": "organic.fcebee6fd071",
+      "detail": "filename says C, measured G",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Tuning_Forks/GIO_HEAL_forks_tuning_frequency_C.wav"
+    },
+    {
+      "assetId": "organic.c0d392813555",
+      "detail": "filename says C, measured G",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Tuning_Forks/GIO_HEAL_forks_tuning_united_C.wav"
+    },
+    {
+      "assetId": "organic.c966b67f436e",
+      "detail": "filename says C, measured G",
+      "path": "Healing_Sounds_-_Bells_&_Chimes/One_Shots/Tuning_Forks/GIO_HEAL_forks_tuning_up_C.wav"
+    }
+  ],
+  "issues": [
+    {
+      "assetId": "organic.39f2ac0203a3",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.4841d65fdf49",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.84d2d0850d3e",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.36243f1d4c9c",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.53382296ff61",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.c29e3b8dd68e",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.a42d394da680",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.e2f3a934ac23",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.12df94170c67",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.35fd0c094fc1",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.f992dcfa3ed2",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.0b071d7d9fa7",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.fb00ab55dbe0",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.188e25866f4d",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.3fc618c1c7bd",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.ab71eb3165c0",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.07b59041ed6f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.28a0dd41ca12",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.3f30ba741f8c",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.b4bd94124248",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.3ad02b7bba48",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.72293e99b03d",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.15a4a7879f9a",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.9cb72684926d",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.aee3735a1e6f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.a7339e2cf86c",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.c384004f6e2f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.584a6b673e91",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.81e69f0942d9",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.e5c1873336c0",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.bf7cd81ee952",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.6224461ed6b3",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.49d3bad0061f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.3984147b3732",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.c691be1f1a48",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.35084e9ac15a",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.c9a815d0a21a",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.bcb1772022c6",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.8608dbbc6d5b",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.3faed757663d",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.aa229ad86d9a",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.0f66b8900ee4",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.889ea7e23a8f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.15512aedc8e1",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.a1a8ecf7348d",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.419161c31f0c",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.e061ff300f90",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.1f832b00f29e",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.c9a46932a9b5",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.08aa46369198",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.dba49ee2ef9a",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.aca0370d6e09",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.e51c3168745c",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.27ec82fadb95",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.13117cfda1f7",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.3a5508dc1845",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.0a6fad6a4168",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.86a0bad1392b",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.372170c601c8",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.672cc451198a",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.dd5ce0c1e9ba",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.f70da580474b",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.01d87f100e87",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.411dfce77347",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.ec767ec046f8",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.d6a2607ecdf8",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.312a40e0ceb3",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.3f54e07a7a3f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.cc37a3a514ab",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.341d24dc876e",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.37f5cc95c054",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.757ad71ef200",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.839ab15fe50c",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.294f4b4d8d07",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.295aeb59d4b1",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.ee01fb7f7f64",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.ccde0d3e0345",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.3c0bac40699f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.cd81ad1d90f3",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.c880f4d3aa46",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.472dd4a08818",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.3ad72f75fe23",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.8c58e432819a",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.47e5ba200d36",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.9c966ed383e1",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.edd16cc68908",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.ba0b9b4edc07",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.77ef26857868",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.5229a68242e6",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.2fd22a6bc63a",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.5ef7bb29a6bf",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.9c5e4e904fbd",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.5fc1f584de59",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.908b2961054d",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.1cf46a3902d9",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.085ea3790dfc",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.7648d3f5fc2b",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.396635c1dfaa",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.1228f0c8149b",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.32f44fc52f7d",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.f0c5bc240b4a",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.399205b9ea27",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.039b4fcc6d21",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.3595159939bd",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.dd10af2fd6d9",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.ecc982312031",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.e09b7b9cfc7f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.e449ce1916d6",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.fb1e56c2140d",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.64c0285afd85",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.f44be440034f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.5103407d9956",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.1013b7ace627",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.d06e3f8e2db2",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.9bffebecf6b2",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.d2e623a50988",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.81df28468f21",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.7e858291d088",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.066f8e503799",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.5e6478719851",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.cdd9b1efef94",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.ee49e4a5604d",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.7d2cee29d121",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.c12aecfb1f8d",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.0a53e8c52898",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.2d826faac582",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.808332e31aa5",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.6c7ae2435ae0",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.dd127f46b563",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.250ddeef22f6",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.cd3982a3a5d3",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.b672d558b32c",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.fe8c4d3126ad",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.3aa6c59eaa8f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.3b389ede7b03",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.938375617370",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.76c50b4b0e13",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.4c3dab15e503",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.6537db7a2a6d",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.d24949b06508",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.04f12d074e36",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.adbb35eaa254",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.95c3dc5825d1",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.96663cb24dad",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.ad87a296a98c",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.323927cf9e42",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.7b07c84e37ea",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.7668c94e4092",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.4cee2b19e3b4",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.a5ad2c8a1739",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.001d4082cf6c",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.b4228427e099",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.8675878131fe",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.81d098e0e5f8",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.322ab49ad275",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.f0cc8905b373",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.2666f7d00573",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.95d6b36ffd8f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.ec69e7c784ab",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.5e0a7aaf1c77",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.971a79e88a24",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.6d02cb4f31ab",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.87a04e4d76d8",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.46a13e14b9bc",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.e635dda7a00f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.f8d0e9d8f886",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.22cf7e1c6485",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.45fe6d3e3c06",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.e8cd92c7ea83",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.db9f0cbaa736",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.634b2a230643",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.7ba5da2158a4",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.b73dfa0cd50a",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.aa162aeab99f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.90a24bb2a6b3",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.85ea23cdc2bb",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.17cab606e89a",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.3dba00f057f2",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.3b98fb4bf5e0",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.8e40f5f985e8",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.9a0e62e1feca",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.3a0225e0668b",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.911965a02450",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.dae0838ae809",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.219beaa922a7",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.820830caafe8",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.8fbde33f5dee",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.b642c47abc0e",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.cb79ad898fb8",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.b6355ba459d3",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.d7c88ec7ce38",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.18ecebf2005b",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.0893bd363ed2",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.650f0b1d3702",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.cb8a3b4974de",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.674a98774f85",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.2599d3cbd3f6",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.968adbe27ded",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.9fc1f0499c1e",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.e092d97344b6",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.279e711ca381",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.b74f4f860a06",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.a041470c04ab",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.16b2a7b72b00",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.d931107fdebd",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.54e4a1f80ba5",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.172056ec894c",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.c5bbada4ce7b",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.5260b5b5d5df",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.91202abeffc6",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.fbe299f685c6",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.aefbee022974",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.567970120100",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.7ca92be2185f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.61f96b96017f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.112bc712c6b0",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.035a33f1440b",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.f750e8666673",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.924698ca76e8",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.1ec7d87993f9",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.7caa3ac9ce20",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.acfdd2292f07",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.1d149656f0ad",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.64a84487775b",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.e3099aa09f24",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.33df139d227e",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.c0ae1a20115b",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.db0d21a7616c",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.cac4855ce4cc",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.92bd50ab2afb",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.70e47f1a798f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.8696c8e2eb43",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.47b75731da2f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.cbb084a28a62",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.37e474701550",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.cb585dea8d37",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.2a7b9648bebd",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.a2f94dc996a6",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.20e53cacb5a6",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.52d55c6135d5",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.88384fe93de5",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.24199269593b",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.332d8a18a845",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.2f5cfe46552a",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.062f91d080ae",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.79d326b60fb7",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.a474798c0237",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.ddb60a8d4189",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.028dd69a4f18",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.6a1a7d32e1d4",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.c3091ae08b9b",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.4ff0bcac546d",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.bb4c0d1a5bc4",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.b7c68dfa422b",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.125a46cb2fab",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.ac07d5580787",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.aba7606632f7",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.4f7d1507a63d",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.5c140b83ad58",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.823ffda24301",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.d18c6ed47a2d",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.ce3b8c536db9",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.9eb10b3789a1",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.7e86154a229c",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.d9a03b4f03c4",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.cac8dbc0d155",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.29dd8bccd192",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.80c1579049b3",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.d5c7dac74594",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.a8a9ddadaf93",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.0d0b808634c2",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.2d01dbc38125",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.b08a16be4894",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.6bf0fede9e2e",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.5d14757c8e47",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.09fc8317d919",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.bae6e471f13b",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.d755a1fc2c13",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.401be8ed423b",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.782411cb2775",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.7dcab45a1b1f",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    },
+    {
+      "assetId": "organic.59e897aef433",
+      "fatal": false,
+      "message": "has no confident pitch, so no note is recorded."
+    }
+  ],
+  "summary": {
+    "analysisFailures": 0,
+    "approved": 0,
+    "bitDepths": {
+      "24": 369
+    },
+    "channels": {
+      "2": 369
+    },
+    "duplicateGroups": 0,
+    "durationClasses": {
+      "EXTENDED": 11,
+      "LONG": 71,
+      "MEDIUM": 142,
+      "MICRO": 1,
+      "SHORT": 144
+    },
+    "durationSecondsRange": [
+      1.333,
+      152.0
+    ],
+    "filenameNoteConflicts": 26,
+    "ignoredFiles": 0,
+    "instruments": {
+      "BELL": 103,
+      "CHIME": 88,
+      "KALIMBA": 100,
+      "SINGING_BOWL": 68,
+      "TUNING_FORK": 10
+    },
+    "integratedLufsRange": [
+      -31.44,
+      -6.25
+    ],
+    "loopable": 65,
+    "manualOverrides": 0,
+    "needsReview": 369,
+    "peakDbFSRange": [
+      -1.0,
+      -1.0
+    ],
+    "sampleRates": {
+      "48000": 369
+    },
+    "tonality": {
+      "ATONAL": 29,
+      "INHARMONIC": 253,
+      "PARTIALLY_TONAL": 44,
+      "TONAL": 43
+    },
+    "totalDiscovered": 369,
+    "totalSeconds": 5363.75,
+    "withNote": 87,
+    "withoutNote": 282
+  }
+}

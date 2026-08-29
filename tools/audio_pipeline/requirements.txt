@@ -1,0 +1,7 @@
+# Pinned so an analysis run is reproducible: the numbers this pipeline writes
+# into the manifest depend on these implementations, and `analysisVersion` is
+# only meaningful if the code behind it is fixed too.
+numpy==2.4.6
+scipy==1.16.3
+soundfile==0.14.0
+pyloudnorm==0.1.1
