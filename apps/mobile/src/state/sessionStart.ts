@@ -16,6 +16,15 @@ import { useHistory } from './history';
 export interface StartOptions {
   masterGain?: number;
   experiment?: { experimentId: string; assignmentIndex: number };
+  /**
+   * An acoustic layer to play under the protocol, by sound bath preset id.
+   *
+   * Carried through the safety check rather than around it: a sound bath is
+   * still a session, and the output-route question — whether this person is
+   * about to play a binaural beat through a speaker — is asked about the core
+   * signal, which is present either way (§42).
+   */
+  soundBath?: { presetId: string; seed?: number | string };
   /** Called once playback has actually begun. */
   onStarted?: () => void;
 }
@@ -118,6 +127,7 @@ async function startNow(
   await usePlayer.getState().loadAndPlay(protocol, {
     masterGain: options.masterGain ?? fallbackGain,
     experiment: options.experiment,
+    soundBath: options.soundBath,
   });
   options.onStarted?.();
 }

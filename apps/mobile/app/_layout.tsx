@@ -26,6 +26,8 @@ import { useHistory } from '../src/state/history';
 import { useExperiments } from '../src/state/experiments';
 import { useArchive } from '../src/state/archive';
 import { usePlayerAttachment } from '../src/state/player';
+import { setOrganicAssetDelivery } from '../src/audio/organic/delivery';
+import { BUNDLED_DELIVERY } from '../src/audio/organic/bundledDelivery';
 import { PreflightSheet } from '../src/design/components/PreflightSheet';
 import { SplashSequence } from '../src/design/components/SplashSequence';
 
@@ -56,6 +58,19 @@ export default function RootLayout() {
   const router = useRouter();
 
   usePlayerAttachment();
+
+  /*
+   * How this build obtains the sample library, declared once at startup.
+   *
+   * A property of the build rather than of any session, which is why it is
+   * installed here and not where a sound bath is started. Everything below the
+   * seam — cache, voices, look-ahead, mixer — works against whatever is
+   * installed, and the refusing default is still there for a build that
+   * installs nothing.
+   */
+  useEffect(() => {
+    setOrganicAssetDelivery(BUNDLED_DELIVERY);
+  }, []);
 
   useEffect(() => {
     void Promise.all([

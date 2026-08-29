@@ -10,10 +10,22 @@ import {
 import {
   sessionController,
   type ControllerSnapshot,
+  type OrganicProgram,
   type ScopeCapture,
 } from '../audio/sessionController';
+import { buildSoundBathProgram } from '../audio/organic/program';
 import { useHistory } from './history';
 import { useExperiments } from './experiments';
+
+/**
+ * Voices the organic layer may use at once.
+ *
+ * Eight is what the presets were written against and what the scheduler's own
+ * tests use. §15 and §52 want this lowered on weaker hardware; nothing measures
+ * hardware yet, so it is one number in one place rather than a guess dressed up
+ * as a measurement.
+ */
+const DEFAULT_ORGANIC_VOICES = 8;
 
 interface PlayerState {
   snapshot: ControllerSnapshot;
@@ -42,12 +54,37 @@ interface PlayerState {
    * Cleared when the next protocol is loaded.
    */
   externallyStopped: boolean;
+  /**
+   * The sound bath playing under the current session, if any.
+   *
+   * Kept for the screens rather than for playback — the controller already
+   * holds the plan. `events` and `emptyLayers` are here so a session can say
+   * what it actually scheduled, which is the difference between a quiet passage
+   * and a layer that found nothing (§65).
+   */
+  soundBath?: {
+    presetId: string;
+    name: string;
+    seed: string;
+    events: number;
+    emptyLayers: readonly string[];
+  };
   attach: () => () => void;
   loadAndPlay: (
     protocol: Protocol,
     options?: {
       masterGain?: number;
       experiment?: { experimentId: string; assignmentIndex: number };
+      /**
+       * A sound bath to play under the protocol, by preset id.
+       *
+       * Planned here rather than passed in as a plan, so a caller only has to
+       * know which sound bath it wants: the length comes from the protocol and
+       * the seed from the session, which is what makes the pair reproducible.
+       * An unknown id degrades to a frequency session rather than refusing to
+       * play (§56 — nothing about the acoustic layer may take the core down).
+       */
+      soundBath?: { presetId: string; seed?: number | string };
     },
   ) => Promise<void>;
   load: (protocol: Protocol, masterGain?: number) => Promise<void>;
@@ -134,8 +171,33 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       lastCompletedSessionId: undefined,
       recorded: false,
       externallyStopped: false,
+      soundBath: undefined,
     });
-    await sessionController.load(protocol, { masterGain: options.masterGain });
+
+    let organic: OrganicProgram | undefined;
+    if (options.soundBath) {
+      const seed = options.soundBath.seed ?? `${protocol.id}:${Date.now()}`;
+      const program = buildSoundBathProgram({
+        presetId: options.soundBath.presetId,
+        durationSec: totalDurationSec(protocol),
+        seed,
+        maxVoices: DEFAULT_ORGANIC_VOICES,
+      });
+      if (program) {
+        organic = { plan: program.plan, assets: program.assets };
+        set({
+          soundBath: {
+            presetId: program.preset.id,
+            name: program.preset.name,
+            seed: String(seed),
+            events: program.plan.events.length,
+            emptyLayers: program.plan.emptyLayers,
+          },
+        });
+      }
+    }
+
+    await sessionController.load(protocol, { masterGain: options.masterGain, organic });
     await sessionController.play();
   },
 

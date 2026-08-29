@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   GOAL_PROFILES,
+  buildSoundBathPresets,
   formatClock,
   planNextSession,
   protocolFromSimple,
@@ -20,6 +21,7 @@ import { useHistory } from '../../src/state/history';
 import { useExperiments } from '../../src/state/experiments';
 import { usePreferences } from '../../src/state/preferences';
 import { useSessionStart } from '../../src/state/sessionStart';
+import { SegmentSelector } from '../../src/design/components/SegmentSelector';
 
 /**
  * Home (§40).
@@ -61,6 +63,17 @@ export default function HomeScreen() {
   const recommendation = useRecommendation();
   const topInsight = insights()[0];
 
+  /*
+   * The acoustic layer, offered as a choice on the recommendation rather than
+   * hidden behind Lab. `none` is first and is the default: the frequency
+   * session is the product, and the sound bath is something a person adds to
+   * it (§25). Nothing here says the bowls do anything — the picker names them
+   * and the preset's own copy carries the rest.
+   */
+  const soundBaths = useMemo(() => buildSoundBathPresets(), []);
+  const [soundBathId, setSoundBathId] = useState<string>('none');
+  const chosenBath = soundBaths.find((preset) => preset.id === soundBathId);
+
   const startRecommendation = async () => {
     const protocol = protocolFromSimple({
       goal: recommendation.goal,
@@ -69,6 +82,7 @@ export default function HomeScreen() {
     });
     await requestStart(protocol, {
       masterGain: preferences.comfortableOutputLevel,
+      soundBath: soundBathId === 'none' ? undefined : { presetId: soundBathId },
       onStarted: () => router.push('/session'),
     });
   };
@@ -107,6 +121,25 @@ export default function HomeScreen() {
             </Text>
           </View>
         </View>
+        <View style={styles.acoustic}>
+          <Label>Acoustic layer</Label>
+          <SegmentSelector
+            scrollable
+            accessibilityLabel="Acoustic layer"
+            options={[
+              { value: 'none', label: 'None' },
+              ...soundBaths.map((preset) => ({ value: preset.id, label: preset.name })),
+            ]}
+            value={soundBathId}
+            onChange={setSoundBathId}
+          />
+          <Text variant="caption" tone="tertiary">
+            {chosenBath
+              ? chosenBath.description
+              : 'The frequency session on its own. Recorded bowls, bells and chimes can be placed under it, and they produce no beat of their own — any rate you hear comes from the core signal.'}
+          </Text>
+        </View>
+
         <HardwareButton
           label="Start session"
           variant="primary"
@@ -259,6 +292,7 @@ function greeting(): string {
 }
 
 const styles = StyleSheet.create({
+  acoustic: { gap: space.sm, marginTop: space.md },
   recommendationTitle: { marginTop: space.xxs },
   recommendationBody: { marginTop: space.xs },
   recommendationMeta: {

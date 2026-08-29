@@ -32,6 +32,7 @@ from pipeline.derive import CODECS, transcode  # noqa: E402
 from pipeline.discovery import Discovered, asset_id, discover  # noqa: E402
 from pipeline import emit_ts  # noqa: E402
 from pipeline import manifest as manifest_module  # noqa: E402
+from pipeline import bundle as bundle_module  # noqa: E402
 from pipeline import report as report_module  # noqa: E402
 from pipeline.schema import duration_class  # noqa: E402
 
@@ -375,13 +376,60 @@ def stage_derive(config: PipelineConfig, codec: str, approved_only: bool) -> int
     return 1 if failed else 0
 
 
+def stage_bundle(config: PipelineConfig, codec: str, approved_only: bool) -> int:
+    """Copies the derivatives into the app and writes the require map.
+
+    Reads the committed manifest for the same reason `derive` does: the app must
+    only ever be handed audio the library knows about.
+    """
+    manifest_path = config.paths.manifest
+    if not manifest_path.exists():
+        print(f"bundle     no manifest at {manifest_path} — run `all` first")
+        return 1
+
+    manifest = json.loads(manifest_path.read_text())
+    assets = manifest.get("assets", [])
+    extension = CODECS[codec][0]
+    derivative_dir = config.paths.root / "generated" / "audio" / "runtime" / codec
+    if not derivative_dir.exists():
+        print(f"bundle     no derivatives at {derivative_dir} — run `derive` first")
+        return 1
+
+    app = config.paths.root / "apps" / "mobile"
+    result, missing = bundle_module.bundle(
+        assets,
+        derivative_dir=derivative_dir,
+        asset_dir=app / "assets" / "organic",
+        map_path=app / "src" / "audio" / "organic" / "bundledAssets.generated.ts",
+        extension=extension,
+        approved_only=approved_only,
+    )
+
+    approved = sum(1 for a in assets if a["review"].get("approved"))
+    print(
+        f"bundle     {result.copied} copied, {result.skipped} already current, "
+        f"{result.removed} stale removed"
+    )
+    print(f"           {approved} approved of {len(assets)}; {result.total_bytes / 1e6:.0f} MB in the app tree")
+    print(f"           {result.asset_dir}")
+    print(f"           {result.map_path}")
+    if missing:
+        print(f"bundle     {len(missing)} approved assets have no derivative — run `derive` for them:")
+        for asset_id in missing[:10]:
+            print(f"             {asset_id}")
+        if len(missing) > 10:
+            print(f"             ... and {len(missing) - 10} more")
+        return 1
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         "command",
         nargs="?",
         default="all",
-        choices=["scan", "analyze", "validate", "build-manifest", "report", "derive", "all"],
+        choices=["scan", "analyze", "validate", "build-manifest", "report", "derive", "bundle", "all"],
     )
     parser.add_argument("--source", type=Path, help="source tree to scan (default: the configured library)")
     parser.add_argument("--jobs", type=int, default=0, help="worker processes (default: one per CPU)")
@@ -404,6 +452,8 @@ def main() -> int:
     jobs = args.jobs or None
     if args.command == "derive":
         return stage_derive(config, args.codec, approved_only=not args.all_assets)
+    if args.command == "bundle":
+        return stage_bundle(config, args.codec, approved_only=not args.all_assets)
 
     if args.command == "scan":
         found, skipped = stage_scan(config)

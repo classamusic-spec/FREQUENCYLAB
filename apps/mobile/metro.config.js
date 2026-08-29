@@ -20,6 +20,16 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, 'node_modules'),
 ];
 config.resolver.disableHierarchicalLookup = true;
+
+/**
+ * The organic sample library is Ogg Vorbis, which Metro does not treat as an
+ * asset out of the box — it would try to parse 369 audio files as JavaScript.
+ * Adding the extension is what turns `require('....ogg')` in
+ * `src/audio/organic/bundledAssets.generated.ts` into a real bundled file.
+ */
+if (!config.resolver.assetExts.includes('ogg')) {
+  config.resolver.assetExts = [...config.resolver.assetExts, 'ogg'];
+}
 config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
 config.resolver.unstable_enablePackageExports = true;
 
