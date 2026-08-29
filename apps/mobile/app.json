@@ -25,8 +25,6 @@
         "UIBackgroundModes": [
           "audio"
         ],
-        "NSHealthShareUsageDescription": "FREQUENCY LAB can read heart rate and heart-rate variability around a session so you can see how your body responded. This is optional and the app works fully without it.",
-        "NSHealthUpdateUsageDescription": "FREQUENCY LAB can record completed sessions as mindful minutes. This is optional.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
