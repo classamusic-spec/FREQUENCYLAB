@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -13,6 +13,7 @@ import { EmptyState, Screen, ScreenHeader, SectionHeader } from '../../src/desig
 import { InstrumentPanel } from '../../src/design/components/InstrumentPanel';
 import { HardwareButton } from '../../src/design/components/HardwareButton';
 import { ClassificationBadge } from '../../src/design/components/Badges';
+import { ClassificationSheet } from '../../src/design/components/ClassificationSheet';
 import { PresetCard } from '../../src/design/components/PresetCard';
 import { ProtocolCard } from '../../src/design/components/Cards';
 import { Text } from '../../src/design/components/Text';
@@ -31,11 +32,18 @@ import { useProtocolLibrary, summariseLibrary } from '../../src/state/library';
  * The two collections with no factory rows are handled here rather than being
  * left to render as empty lists, because they are not empty: one is the
  * archive and the other is the user's own material.
+ *
+ * The shelf's classification used to be printed twice — once as a badge, once
+ * as the same sentence spelled out underneath with the "rows carry their own"
+ * caveat after it. The badge now opens `ClassificationSheet`, which holds both
+ * of those sentences plus the six classifications this shelf is *not*, which is
+ * what makes the one it is mean anything.
  */
 export default function CollectionScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const collection = findCollection(id as CollectionId);
+  const [explaining, setExplaining] = useState(false);
 
   const hydrate = usePresetShelf((state) => state.hydrate);
   const hydrated = usePresetShelf((state) => state.hydrated);
@@ -79,12 +87,9 @@ export default function CollectionScreen() {
         <ClassificationBadge
           classification={collection.classification}
           note={CLASSIFICATION_DESCRIPTIONS[collection.classification]}
+          onPress={() => setExplaining(true)}
         />
       </View>
-      <Text variant="caption" tone="tertiary">
-        {CLASSIFICATION_DESCRIPTIONS[collection.classification]} Rows on this shelf carry their own
-        classification, which is the one that counts.
-      </Text>
 
       {/* The brainwave shelf prints band ranges, and a range printed without
           these two sentences is the commonest way this subject gets misread.
@@ -199,6 +204,14 @@ export default function CollectionScreen() {
             />
           ))}
         </>
+      ) : null}
+
+      {explaining ? (
+        <ClassificationSheet
+          current={collection.classification}
+          scope="shelf"
+          onClose={() => setExplaining(false)}
+        />
       ) : null}
     </Screen>
   );

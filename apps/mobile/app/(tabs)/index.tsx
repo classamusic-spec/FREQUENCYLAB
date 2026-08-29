@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   GOAL_PROFILES,
@@ -15,13 +15,14 @@ import { HardwareButton } from '../../src/design/components/HardwareButton';
 import { ExperimentCard, InsightCard, ProtocolCard } from '../../src/design/components/Cards';
 import { ProfileButton } from '../../src/design/components/ProfileButton';
 import { Label, Text } from '../../src/design/components/Text';
-import { colors, layout, space } from '../../src/design/tokens';
+import { colors, MIN_TOUCH_TARGET, radius, space, layout } from '../../src/design/tokens';
 import { useProtocolLibrary, summariseLibrary } from '../../src/state/library';
 import { useHistory } from '../../src/state/history';
 import { useExperiments } from '../../src/state/experiments';
 import { usePreferences } from '../../src/state/preferences';
 import { useSessionStart } from '../../src/state/sessionStart';
-import { SegmentSelector } from '../../src/design/components/SegmentSelector';
+import { NO_SOUND_BATH, SoundBathSheet } from '../../src/design/components/SoundBathSheet';
+import { paceInPlainWords, plainWord, useTier } from '../../src/features/tier';
 import type { SoundBathFullness } from '../../src/audio/organic/program';
 
 /**
@@ -30,9 +31,29 @@ import type { SoundBathFullness } from '../../src/audio/organic/program';
  * Five blocks, in a fixed order, and nothing else: context, a recommendation,
  * a running experiment if there is one, recent protocols, and one insight. The
  * hardest constraint on this screen is what it leaves out.
+ *
+ * ## What it stopped showing
+ *
+ * The acoustic layer used to be laid out here in full: twenty sound baths as a
+ * scrolling chip row plus a four-option density control, twenty-five of the
+ * thirty-three tap targets on the first screen of the app. It is now one row
+ * that names the current choice and opens `SoundBathSheet`, which has room to
+ * say what each preset actually is. Nothing about the choice moved — the same
+ * id and the same fullness reach `requestStart` — only where it is made.
+ *
+ * ## What the tier changes
+ *
+ * At `simple` the recommendation reads as a name and a pace: `Gentle pulse`
+ * rather than `8.00 Hz`, and no carrier at all. That is a substitution of
+ * vocabulary, not of substance — the same protocol is built and the same
+ * session plays. Every caveat on this screen (the recommendation's stated
+ * reason, the insight panel's refusal to claim a pattern it has not got) is
+ * present at all three levels, because those are the sentences that stop a
+ * suggestion being read as a prescription.
  */
 export default function HomeScreen() {
   const router = useRouter();
+  const { level, canSee } = useTier();
   const protocols = useProtocolLibrary((state) => state.protocols);
   const sessions = useHistory((state) => state.sessions);
   const insights = useHistory((state) => state.insights);
@@ -61,18 +82,19 @@ export default function HomeScreen() {
 
   const runningExperiment = experiments.find((experiment) => experiment.status === 'running');
   const experimentPlan = runningExperiment ? planNextSession(runningExperiment) : undefined;
-  const recommendation = useRecommendation();
+  const recommendation = useRecommendation(canSee('signalDetail'));
   const topInsight = insights()[0];
+  const profile = GOAL_PROFILES[recommendation.goal];
 
   /*
    * The acoustic layer, offered as a choice on the recommendation rather than
-   * hidden behind Lab. `none` is first and is the default: the frequency
-   * session is the product, and the sound bath is something a person adds to
-   * it (§25). Nothing here says the bowls do anything — the picker names them
-   * and the preset's own copy carries the rest.
+   * hidden behind Lab. `none` is the default: the frequency session is the
+   * product, and the sound bath is something a person adds to it (§25).
+   * Nothing here says the bowls do anything — the sheet names them and each
+   * preset's own copy carries the rest.
    */
   const soundBaths = useMemo(() => buildSoundBathPresets(), []);
-  const [soundBathId, setSoundBathId] = useState<string>('none');
+  const [soundBathId, setSoundBathId] = useState<string>(NO_SOUND_BATH);
   /*
    * How much the acoustic layer plays. `natural` is the preset exactly as
    * written; the other settings shift its density, which is the one control
@@ -80,7 +102,9 @@ export default function HomeScreen() {
    * tries, how often a try becomes a sound, and how many may ring together.
    */
   const [fullness, setFullness] = useState<SoundBathFullness>('fuller');
+  const [pickingBath, setPickingBath] = useState(false);
   const chosenBath = soundBaths.find((preset) => preset.id === soundBathId);
+  const layerLabel = plainWord('Acoustic layer', level);
 
   const startRecommendation = async () => {
     const protocol = protocolFromSimple({
@@ -90,7 +114,8 @@ export default function HomeScreen() {
     });
     await requestStart(protocol, {
       masterGain: preferences.comfortableOutputLevel,
-      soundBath: soundBathId === 'none' ? undefined : { presetId: soundBathId, fullness },
+      soundBath:
+        soundBathId === NO_SOUND_BATH ? undefined : { presetId: soundBathId, fullness },
       onStarted: () => router.push('/session'),
     });
   };
@@ -106,7 +131,7 @@ export default function HomeScreen() {
 
       <InstrumentPanel tone="raised" label="Current recommendation">
         <Text variant="title" style={styles.recommendationTitle}>
-          {GOAL_PROFILES[recommendation.goal].label}
+          {profile.label}
         </Text>
         <Text variant="bodySm" tone="secondary" style={styles.recommendationBody}>
           {recommendation.reason}
@@ -116,54 +141,48 @@ export default function HomeScreen() {
             <Label>Duration</Label>
             <Text variant="readout">{formatClock(recommendation.durationSec)}</Text>
           </View>
-          <View>
-            <Label>Beat</Label>
-            <Text variant="readout">
-              {GOAL_PROFILES[recommendation.goal].beat.plateau.toFixed(2)} Hz
-            </Text>
-          </View>
-          <View>
-            <Label>Carrier</Label>
-            <Text variant="readout">
-              {GOAL_PROFILES[recommendation.goal].carrierHz.toFixed(0)} Hz
-            </Text>
-          </View>
-        </View>
-        <View style={styles.acoustic}>
-          <Label>Acoustic layer</Label>
-          <SegmentSelector
-            scrollable
-            accessibilityLabel="Acoustic layer"
-            options={[
-              { value: 'none', label: 'None' },
-              ...soundBaths.map((preset) => ({ value: preset.id, label: preset.name })),
-            ]}
-            value={soundBathId}
-            onChange={setSoundBathId}
-          />
-          {soundBathId === 'none' ? null : (
+          {canSee('signalDetail') ? (
             <>
-              <Label>How much it plays</Label>
-              <SegmentSelector
-                accessibilityLabel="How much the acoustic layer plays"
-                options={[
-                  { value: 'sparse', label: 'Sparse' },
-                  { value: 'natural', label: 'As written' },
-                  { value: 'fuller', label: 'Fuller' },
-                  { value: 'full', label: 'Full' },
-                ]}
-                value={fullness}
-                onChange={(value) => setFullness(value as SoundBathFullness)}
-              />
+              <View>
+                <Label>Beat</Label>
+                <Text variant="readout">{profile.beat.plateau.toFixed(2)} Hz</Text>
+              </View>
+              <View>
+                <Label>Carrier</Label>
+                <Text variant="readout">{profile.carrierHz.toFixed(0)} Hz</Text>
+              </View>
             </>
+          ) : (
+            /*
+             * The plain-word stand-in for the beat readout, taken from the
+             * plateau rather than the opening stage: the number it replaces is
+             * the plateau, and a session named "Wind Down" that opened at 8 Hz
+             * and settled at 3 would otherwise be described by the wrong end
+             * of its own descent.
+             */
+            <View>
+              <Label>Pace</Label>
+              <Text variant="readout">{paceInPlainWords(profile.beat.plateau)}</Text>
+            </View>
           )}
-
-          <Text variant="caption" tone="tertiary">
-            {chosenBath
-              ? chosenBath.description
-              : 'The frequency session on its own. Recorded bowls, bells and chimes can be placed under it, and they produce no beat of their own — any rate you hear comes from the core signal.'}
-          </Text>
         </View>
+
+        <Pressable
+          onPress={() => setPickingBath(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`${layerLabel}: ${chosenBath ? chosenBath.name : 'None'}`}
+          accessibilityHint="Opens the list of sound baths."
+          style={styles.layerRow}
+        >
+          <View style={styles.layerText}>
+            <Label>{layerLabel}</Label>
+            <Label>·</Label>
+            <Text variant="readoutSm" tone={chosenBath ? 'signal' : 'secondary'}>
+              {chosenBath ? chosenBath.name : 'None'}
+            </Text>
+          </View>
+          <Label>{'›'}</Label>
+        </Pressable>
 
         <HardwareButton
           label="Start session"
@@ -174,7 +193,7 @@ export default function HomeScreen() {
         />
       </InstrumentPanel>
 
-      {runningExperiment && experimentPlan ? (
+      {canSee('trials') && runningExperiment && experimentPlan ? (
         <>
           <SectionHeader label="Continue experiment" />
           <ExperimentCard
@@ -197,17 +216,18 @@ export default function HomeScreen() {
           <QuickStartTile
             key={goal}
             goal={goal}
+            showNumbers={canSee('signalDetail')}
             onPress={() => router.push({ pathname: '/quick-start', params: { goal } })}
           />
         ))}
       </View>
 
       <SectionHeader
-        label="Recent protocols"
+        label={`Recent ${plainWord('protocols', level)}`}
         right={
-          recent.length > 0 ? (
+          recent.length > 0 && canSee('lab') ? (
             <Text variant="caption" tone="tertiary" onPress={() => router.push('/lab')}>
-              All protocols
+              All {plainWord('protocols', level)}
             </Text>
           ) : null
         }
@@ -224,8 +244,12 @@ export default function HomeScreen() {
       ) : (
         <EmptyState
           title="No sessions yet"
-          message="Protocols you run will collect here, with the exact configuration each one used."
-          action={<HardwareButton label="Open Explorer" onPress={() => router.push('/explore')} />}
+          message={`${plainWord('Protocols', level)} you run will collect here, with the exact configuration each one used.`}
+          action={
+            canSee('explore') ? (
+              <HardwareButton label="Open Explorer" onPress={() => router.push('/explore')} />
+            ) : null
+          }
         />
       )}
 
@@ -241,11 +265,31 @@ export default function HomeScreen() {
           </Text>
         </InstrumentPanel>
       )}
+
+      {pickingBath ? (
+        <SoundBathSheet
+          presets={soundBaths}
+          value={soundBathId}
+          onChange={setSoundBathId}
+          fullness={fullness}
+          onFullnessChange={setFullness}
+          title={layerLabel}
+          onClose={() => setPickingBath(false)}
+        />
+      ) : null}
     </Screen>
   );
 }
 
-function QuickStartTile({ goal, onPress }: { goal: SimpleGoal; onPress: () => void }) {
+function QuickStartTile({
+  goal,
+  showNumbers,
+  onPress,
+}: {
+  goal: SimpleGoal;
+  showNumbers: boolean;
+  onPress: () => void;
+}) {
   const profile = GOAL_PROFILES[goal];
   return (
     <View style={styles.quickTile}>
@@ -257,7 +301,9 @@ function QuickStartTile({ goal, onPress }: { goal: SimpleGoal; onPress: () => vo
         accessibilityHint={profile.description}
       />
       <Text variant="caption" tone="tertiary" numberOfLines={2} style={styles.quickCaption}>
-        {profile.beat.plateau.toFixed(1)} Hz · {profile.carrierHz} Hz carrier
+        {showNumbers
+          ? `${profile.beat.plateau.toFixed(1)} Hz · ${profile.carrierHz} Hz carrier`
+          : paceInPlainWords(profile.beat.plateau)}
       </Text>
     </View>
   );
@@ -268,9 +314,15 @@ function QuickStartTile({ goal, onPress }: { goal: SimpleGoal; onPress: () => vo
  *
  * Time of day and what the user has actually rated well, in that order. It is
  * explicitly framed as a suggestion with a stated reason — never as a
- * prescription, and never with an effect claim attached.
+ * prescription, and never with an effect claim attached. The reason is the one
+ * sentence on this panel that must survive every tier, so `withBandNames` only
+ * decides whether the alpha band is named, not whether the caveat is said.
  */
-function useRecommendation(): { goal: SimpleGoal; durationSec: number; reason: string } {
+function useRecommendation(withBandNames: boolean): {
+  goal: SimpleGoal;
+  durationSec: number;
+  reason: string;
+} {
   const sessions = useHistory((state) => state.sessions);
   const hour = new Date().getHours();
 
@@ -295,9 +347,11 @@ function useRecommendation(): { goal: SimpleGoal; durationSec: number; reason: s
     return {
       goal: 'relax',
       durationSec,
-      reason: `A ${Math.round(durationSec / 60)}-minute alpha-range session, sized to match the length you usually run.`,
+      reason: withBandNames
+        ? `A ${Math.round(durationSec / 60)}-minute alpha-range session, sized to match the length you usually run.`
+        : `A ${Math.round(durationSec / 60)}-minute session, sized to match the length you usually run.`,
     };
-  }, [hour, sessions]);
+  }, [hour, sessions, withBandNames]);
 }
 
 function median(values: number[]): number {
@@ -317,7 +371,6 @@ function greeting(): string {
 }
 
 const styles = StyleSheet.create({
-  acoustic: { gap: space.sm, marginTop: space.md },
   recommendationTitle: { marginTop: space.xxs },
   recommendationBody: { marginTop: space.xs },
   recommendationMeta: {
@@ -328,6 +381,25 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.hairline,
   },
+  // A milled channel with one value in it. The 44 pt comes from `minHeight`
+  // and padding, never `hitSlop` — React Native Web ignores that entirely.
+  layerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.sm,
+    marginTop: space.md,
+    minHeight: MIN_TOUCH_TARGET,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+    borderRadius: radius.control,
+    backgroundColor: colors.surfaceRecessed,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(96,110,132,0.20)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.9)',
+  },
+  layerText: { flexDirection: 'row', alignItems: 'center', gap: space.sm, flexShrink: 1 },
   startButton: { marginTop: space.lg },
   quickGrid: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -6,10 +6,11 @@ import {
   FACTORY_COLLECTIONS,
   presetsInCollection,
   type FrequencyCollection,
+  type PresetClassification,
 } from '@frequencylab/dsp-core';
-import { Screen, ScreenHeader, SectionHeader } from '../../src/design/components/Screen';
-import { InstrumentPanel } from '../../src/design/components/InstrumentPanel';
+import { Screen, ScreenHeader } from '../../src/design/components/Screen';
 import { ClassificationBadge } from '../../src/design/components/Badges';
+import { ClassificationSheet } from '../../src/design/components/ClassificationSheet';
 import { Label, Text } from '../../src/design/components/Text';
 import { colors, layout, MIN_TOUCH_TARGET, radius, space } from '../../src/design/tokens';
 import { usePresetShelf } from '../../src/state/presets';
@@ -24,9 +25,12 @@ import { useProtocolLibrary } from '../../src/state/library';
  * classification of the shelf as a whole.
  *
  * That last badge is a heading and never a verdict on a row. A Solfeggio shelf
- * is `traditional` while 528 Hz on it also carries emerging research, so the
- * panel under the list says so in as many words — the badge that decides
- * anything is the one on the preset.
+ * is `traditional` while 528 Hz on it also carries emerging research — which
+ * used to be said in a panel under the list, where it applied to twelve shelves
+ * and sat beside none of them. It is now the second paragraph of the sheet the
+ * badge itself opens, so the caveat arrives attached to the shelf it qualifies
+ * and one tap from it. The badge is a sibling of the card's pressable rather
+ * than nested inside it, so a tap on the badge cannot also change screen.
  *
  * Two shelves have no factory rows and are not stubs. Historical / Rife opens
  * the archive, which already holds those numbers with their provenance, their
@@ -42,6 +46,7 @@ export default function CollectionsScreen() {
   const favorites = usePresetShelf((state) => state.favorites);
   const plays = usePresetShelf((state) => state.plays);
   const protocols = useProtocolLibrary((state) => state.protocols);
+  const [explaining, setExplaining] = useState<PresetClassification | null>(null);
 
   useEffect(() => {
     if (!hydrated) void hydrate();
@@ -63,57 +68,58 @@ export default function CollectionsScreen() {
       <ScreenHeader
         eyebrow="Collections"
         title="Frequency collections"
-        subtitle="Twelve shelves. Every preset on them says what its number is, what the sound actually does, and where its standing comes from."
+        subtitle="Twelve shelves. Tap a badge for what it means."
       />
 
       {shelves.map(({ collection, count }) => (
-        <Pressable
-          key={collection.id}
-          onPress={() => router.push(routeFor(collection))}
-          accessibilityRole="button"
-          accessibilityLabel={`${collection.name}. ${collection.summary} ${
-            count === undefined ? '' : `${count} presets.`
-          }`}
-          style={styles.card}
-        >
-          <View style={styles.head}>
-            <View style={styles.title}>
-              <Label>{collection.ordinal}</Label>
-              <Text variant="heading" style={styles.name}>
-                {collection.name}
-              </Text>
+        <View key={collection.id} style={styles.card}>
+          <Pressable
+            onPress={() => router.push(routeFor(collection))}
+            accessibilityRole="button"
+            accessibilityLabel={`${collection.name}. ${collection.summary} ${
+              count === undefined ? '' : `${count} presets.`
+            }`}
+            style={styles.pressable}
+          >
+            <View style={styles.head}>
+              <View style={styles.title}>
+                <Label>{collection.ordinal}</Label>
+                <Text variant="heading" style={styles.name}>
+                  {collection.name}
+                </Text>
+              </View>
+              <View style={styles.count}>
+                <Text variant="readoutSm" tone="secondary">
+                  {count === undefined
+                    ? collection.id === 'my-frequencies'
+                      ? String(mine)
+                      : '—'
+                    : String(count)}
+                </Text>
+                <Label>{countCaption(collection, count)}</Label>
+              </View>
             </View>
-            <View style={styles.count}>
-              <Text variant="readoutSm" tone="secondary">
-                {count === undefined
-                  ? collection.id === 'my-frequencies'
-                    ? String(mine)
-                    : '—'
-                  : String(count)}
-              </Text>
-              <Label>{countCaption(collection, count)}</Label>
-            </View>
-          </View>
 
-          <Text variant="bodySm" tone="secondary">
-            {collection.summary}
-          </Text>
+            <Text variant="bodySm" tone="secondary">
+              {collection.summary}
+            </Text>
+          </Pressable>
 
           <ClassificationBadge
             classification={collection.classification}
             note={CLASSIFICATION_DESCRIPTIONS[collection.classification]}
+            onPress={() => setExplaining(collection.classification)}
           />
-        </Pressable>
+        </View>
       ))}
 
-      <SectionHeader label="What the shelf badge means" />
-      <InstrumentPanel tone="recessed">
-        <Text variant="bodySm" tone="secondary">
-          The badge on a shelf describes the collection as a whole, and rows on it can differ. The
-          Solfeggio shelf is traditional, and 528 Hz on that shelf also carries a study — so the
-          classification that decides anything is the one on the preset itself, never this one.
-        </Text>
-      </InstrumentPanel>
+      {explaining ? (
+        <ClassificationSheet
+          current={explaining}
+          scope="shelf"
+          onClose={() => setExplaining(null)}
+        />
+      ) : null}
     </Screen>
   );
 }
@@ -139,12 +145,13 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.card,
-    padding: space.lg,
-    gap: space.md,
-    minHeight: MIN_TOUCH_TARGET,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+    gap: space.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.edgeLight,
   },
+  pressable: { gap: space.md, minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' },
   head: { flexDirection: 'row', gap: space.md, alignItems: 'flex-start' },
   title: { flex: 1, gap: space.xxs },
   name: { flexShrink: 1 },
