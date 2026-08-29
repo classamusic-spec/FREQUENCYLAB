@@ -15,6 +15,12 @@ import {
 } from '../src/design/components/Visualizers';
 import { SafetyBanner } from '../src/design/components/SafetyBanner';
 import { SleepTimerPanel } from '../src/design/components/SleepTimer';
+import {
+  BreathPacingPanel,
+  breathPatternById,
+  type BreathPattern,
+  type BreathSessionState,
+} from '../src/design/components/BreathRing';
 import { Label, Text } from '../src/design/components/Text';
 import { DisplayGlass } from '../src/design/components/Surface';
 import {
@@ -30,6 +36,7 @@ import { bandForFrequency, colors, radius, space } from '../src/design/tokens';
 import * as haptics from '../src/design/haptics';
 import { usePlayer, useScopeCapture } from '../src/state/player';
 import { usePreferences } from '../src/state/preferences';
+import { useTier } from '../src/features/tier';
 import { sessionController } from '../src/audio/sessionController';
 import { describeRoute } from '../src/audio/route';
 
@@ -54,6 +61,8 @@ export default function SessionScreen() {
   const cancelSleepTimer = usePlayer((state) => state.cancelSleepTimer);
   const externallyStopped = usePlayer((state) => state.externallyStopped);
   const preferences = usePreferences((state) => state.preferences);
+  const updatePreferences = usePreferences((state) => state.update);
+  const { canSee } = useTier();
 
   const [showDetails, setShowDetails] = useState(false);
   const [showIntensity, setShowIntensity] = useState(false);
@@ -122,6 +131,34 @@ export default function SessionScreen() {
     if (router.canGoBack()) router.back();
     else router.replace('/');
   }, [router]);
+
+  /**
+   * The session clock, as a function rather than a value.
+   *
+   * `telemetry.positionSec` arrives on a 250 ms tick, which is a fine rate for
+   * a readout and far too coarse for anything that moves. This hands the breath
+   * guide the renderer's own counter instead — `renderedSamples / sampleRate` —
+   * so it samples the clock on its own frames rather than on the screen's.
+   * Stable across renders, or the guide's frame loop would be torn down and
+   * rebuilt four times a second for the rest of the session.
+   */
+  const readSessionClock = useCallback(() => sessionController.positionSec, []);
+
+  const breathPattern = breathPatternById(preferences.breathPatternId);
+  /*
+   * The guide follows the session, not the screen. `finishing` counts as
+   * running because the clock is still turning through the organic tails and
+   * the listener is still lying there; everything else — loading, stopping,
+   * completed, nothing started at all — is no session to pace against.
+   */
+  const breathSessionState: BreathSessionState =
+    playing || finishing ? 'running' : paused ? 'paused' : 'idle';
+  const chooseBreathPattern = useCallback(
+    (pattern: BreathPattern | undefined) => {
+      void updatePreferences({ breathPatternId: pattern?.id });
+    },
+    [updatePreferences],
+  );
 
   /*
    * The sleep timer and the lock-screen stop button both end the session from
@@ -428,6 +465,36 @@ export default function SessionScreen() {
           onArm={armSleepTimer}
           onCancel={cancelSleepTimer}
         />
+
+        {/*
+            Breath pacing, and the reason it is a panel down here rather than
+            something drawn around the dial: a guide concentric with the beat
+            ring would assert a relationship between the count and the beat
+            that does not exist, and it would assert it by layout, where no
+            sentence can take it back. The two are unrelated, so they are drawn
+            as two instruments.
+          */}
+        <BreathPacingPanel
+          pattern={breathPattern}
+          onChange={chooseBreathPattern}
+          clockSec={readSessionClock}
+          sessionState={breathSessionState}
+        />
+
+        {/*
+            The acoustic layer's per-instrument levels live on their own screen.
+            Tiered, because it is a control rather than a claim: Simple plays
+            the mix as shipped, and nothing about the honesty of what is on
+            screen changes with the level of a bell (§80).
+          */}
+        {canSee('mixer') ? (
+          <HardwareButton
+            label="Acoustic mixer"
+            variant="ghost"
+            accessibilityHint="Opens the per-instrument levels for the acoustic layer"
+            onPress={() => router.push('/mixer')}
+          />
+        ) : null}
 
         {showIntensity ? (
           <InstrumentPanel tone="raised" label="Intensity">

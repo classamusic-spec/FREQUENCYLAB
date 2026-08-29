@@ -1,10 +1,12 @@
-import type { AudioBuffer, AudioContext, GainNode } from 'react-native-audio-api';
+import { MIXER_GROUPS, type MixerGroup } from '@frequencylab/dsp-core';
+import type { AudioBuffer, AudioContext, AudioParam, GainNode } from 'react-native-audio-api';
 import type { OrganicAssetPayload } from './delivery';
-import type {
-  OrganicAudioGraph,
-  OrganicDecodedBuffer,
-  OrganicPlatformVoice,
-  OrganicVoiceRequest,
+import {
+  renderReverbImpulse,
+  type OrganicAudioGraph,
+  type OrganicDecodedBuffer,
+  type OrganicPlatformVoice,
+  type OrganicVoiceRequest,
 } from './graph';
 
 /**
@@ -31,17 +33,73 @@ interface LiveVoice {
   source: ReturnType<AudioContext['createBufferSource']>;
   gain: GainNode;
   panner: ReturnType<AudioContext['createStereoPanner']>;
+  send: GainNode | null;
   stopped: boolean;
+}
+
+/** The fader, twice: once to the bus and once to the reverb. See the web adapter. */
+interface GroupStrip {
+  dry: GainNode;
+  send: GainNode;
 }
 
 export function createNativeOrganicGraph(context: AudioContext, bus: GainNode): OrganicAudioGraph {
   const live = new Set<LiveVoice>();
+
+  const groups = {} as Record<MixerGroup, GroupStrip>;
+  const reverbInput = context.createGain();
+  reverbInput.gain.value = 1;
+  for (const group of MIXER_GROUPS) {
+    const dry = context.createGain();
+    dry.gain.value = 1;
+    dry.connect(bus);
+    const send = context.createGain();
+    send.gain.value = 1;
+    send.connect(reverbInput);
+    groups[group] = { dry, send };
+  }
+
+  let convolver: ReturnType<AudioContext['createConvolver']> | null = null;
+  let spaceReturn: GainNode | null = null;
+
+  /** Built on the first request for `Space`, and not before. See the web adapter. */
+  function ensureReverb(): GainNode {
+    if (spaceReturn) return spaceReturn;
+    const [leftIr, rightIr] = renderReverbImpulse(context.sampleRate);
+    const impulse = context.createBuffer(2, leftIr.length, context.sampleRate);
+    impulse.copyToChannel(leftIr, 0);
+    impulse.copyToChannel(rightIr, 1);
+    const node = context.createConvolver();
+    node.normalize = true;
+    node.buffer = impulse;
+    const ret = context.createGain();
+    ret.gain.value = 0;
+    reverbInput.connect(node);
+    node.connect(ret);
+    ret.connect(bus);
+    convolver = node;
+    spaceReturn = ret;
+    return ret;
+  }
+
+  function ramp(param: AudioParam, target: number, at: number, seconds: number): void {
+    const t = Math.max(at, context.currentTime);
+    const from = param.value;
+    param.cancelScheduledValues(t);
+    param.setValueAtTime(from, t);
+    if (seconds <= 0) {
+      param.setValueAtTime(target, t);
+      return;
+    }
+    param.linearRampToValueAtTime(target, t + seconds);
+  }
 
   function teardown(voice: LiveVoice): void {
     if (!live.delete(voice)) return;
     try {
       voice.source.disconnect();
       voice.panner.disconnect();
+      voice.send?.disconnect();
       voice.gain.disconnect();
     } catch {
       // A node disconnected twice is not worth surfacing.
@@ -109,11 +167,25 @@ export function createNativeOrganicGraph(context: AudioContext, bus: GainNode): 
 
       source.connect(panner);
       panner.connect(gain);
-      gain.connect(bus);
+
+      // Into this instrument's strip rather than onto the bus, so the fader
+      // multiplies the voice's envelope instead of being bypassed by it (§31).
+      // See the web adapter: an unrecognised group lands on `texture` rather
+      // than throwing away the voice.
+      const strip = groups[request.group] ?? groups.texture;
+      gain.connect(strip.dry);
+
+      let send: GainNode | null = null;
+      if (request.reverbSend > 0) {
+        send = context.createGain();
+        send.gain.value = Math.min(1, request.reverbSend);
+        gain.connect(send);
+        send.connect(strip.send);
+      }
 
       source.start(start, Math.max(0, request.offsetSec), play);
 
-      const voice: LiveVoice = { source, gain, panner, stopped: false };
+      const voice: LiveVoice = { source, gain, panner, send, stopped: false };
       live.add(voice);
 
       return {
@@ -153,14 +225,19 @@ export function createNativeOrganicGraph(context: AudioContext, bus: GainNode): 
     },
 
     rampBus(target: number, at: number, seconds: number): void {
-      const t = Math.max(at, context.currentTime);
-      bus.gain.cancelScheduledValues(t);
-      bus.gain.setValueAtTime(bus.gain.value, t);
-      if (seconds <= 0) {
-        bus.gain.setValueAtTime(target, t);
-        return;
-      }
-      bus.gain.linearRampToValueAtTime(target, t + seconds);
+      ramp(bus.gain, target, at, seconds);
+    },
+
+    rampGroup(group: MixerGroup, target: number, at: number, seconds: number): void {
+      const strip = groups[group];
+      if (!strip) return;
+      ramp(strip.dry.gain, target, at, seconds);
+      ramp(strip.send.gain, target, at, seconds);
+    },
+
+    rampSpace(target: number, at: number, seconds: number): void {
+      if (target <= 0 && !spaceReturn) return;
+      ramp(ensureReverb().gain, target, at, seconds);
     },
 
     /** See the web adapter: disposal is not a fade, it is after one. */
@@ -177,6 +254,17 @@ export function createNativeOrganicGraph(context: AudioContext, bus: GainNode): 
         teardown(voice);
       }
       live.clear();
+      try {
+        for (const group of MIXER_GROUPS) {
+          groups[group].dry.disconnect();
+          groups[group].send.disconnect();
+        }
+        reverbInput.disconnect();
+        convolver?.disconnect();
+        spaceReturn?.disconnect();
+      } catch {
+        // Best effort; the context is closing behind this.
+      }
     },
   };
 }

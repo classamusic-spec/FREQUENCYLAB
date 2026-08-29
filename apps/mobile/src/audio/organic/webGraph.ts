@@ -1,9 +1,11 @@
+import { MIXER_GROUPS, type MixerGroup } from '@frequencylab/dsp-core';
 import type { OrganicAssetPayload } from './delivery';
-import type {
-  OrganicAudioGraph,
-  OrganicDecodedBuffer,
-  OrganicPlatformVoice,
-  OrganicVoiceRequest,
+import {
+  renderReverbImpulse,
+  type OrganicAudioGraph,
+  type OrganicDecodedBuffer,
+  type OrganicPlatformVoice,
+  type OrganicVoiceRequest,
 } from './graph';
 
 /**
@@ -28,11 +30,105 @@ interface LiveVoice {
   source: AudioBufferSourceNode;
   gain: GainNode;
   panner: StereoPannerNode | null;
+  send: GainNode | null;
   stopped: boolean;
+}
+
+/**
+ * One channel strip: the fader, twice.
+ *
+ * `dry` carries the group to the bus and `send` carries it to the reverb, and
+ * both are ramped to the same value by `rampGroup`. Two nodes rather than one
+ * because gain multiplies in any order: a voice's own send amount sits between
+ * its envelope and `send`, so the wet path ends up as
+ * `envelope × sendAmount × fader` and the dry path as `envelope × fader`. That
+ * is a post-fader send — turn an instrument down and its reflections go with
+ * it, which is the only behaviour that reads as *quieter* rather than as *drier
+ * and further away*.
+ */
+interface GroupStrip {
+  dry: GainNode;
+  send: GainNode;
 }
 
 export function createWebOrganicGraph(context: AudioContext, bus: GainNode): OrganicAudioGraph {
   const live = new Set<LiveVoice>();
+
+  /*
+   * The mixer, built once and never rebuilt.
+   *
+   * Every strip exists from the start, at unity, whether or not this session's
+   * plan has anything to put through it: an empty strip is one idle gain node,
+   * and the alternative — creating a strip when its first voice arrives — would
+   * mean a fader moved before that moment had nowhere to write its value.
+   */
+  const groups = {} as Record<MixerGroup, GroupStrip>;
+  /** Where every strip's send arrives, whether or not a reverb exists yet. */
+  const reverbInput = context.createGain();
+  reverbInput.gain.value = 1;
+  for (const group of MIXER_GROUPS) {
+    const dry = context.createGain();
+    dry.gain.value = 1;
+    dry.connect(bus);
+    const send = context.createGain();
+    send.gain.value = 1;
+    send.connect(reverbInput);
+    groups[group] = { dry, send };
+  }
+
+  /*
+   * The reverb, built the first time it is asked for and not before.
+   *
+   * `Space` ships at zero, so on almost every session this convolution never
+   * exists. Building it eagerly would spend a two-and-a-half second impulse
+   * response's worth of work on every block for a wet signal multiplied by
+   * nothing — which is exactly the kind of decorative cost §52 says the core
+   * signal must never pay.
+   */
+  let convolver: ConvolverNode | null = null;
+  let spaceReturn: GainNode | null = null;
+
+  function ensureReverb(): GainNode {
+    if (spaceReturn) return spaceReturn;
+    const [leftIr, rightIr] = renderReverbImpulse(context.sampleRate);
+    const impulse = context.createBuffer(2, leftIr.length, context.sampleRate);
+    impulse.copyToChannel(leftIr, 0);
+    impulse.copyToChannel(rightIr, 1);
+    const node = context.createConvolver();
+    // Equal-power normalisation, so the wet level is a property of the fader
+    // rather than of how long the impulse happens to be.
+    node.normalize = true;
+    node.buffer = impulse;
+    const ret = context.createGain();
+    ret.gain.value = 0;
+    reverbInput.connect(node);
+    node.connect(ret);
+    ret.connect(bus);
+    convolver = node;
+    spaceReturn = ret;
+    return ret;
+  }
+
+  /**
+   * The one ramp shape the mixer uses.
+   *
+   * Holds the parameter where it currently *is* before cancelling its
+   * automation — cancelling first steps the value back to whatever was last
+   * set, which is a click in the middle of a fader move (§28) — and then walks
+   * it to the target. A drag produces a stream of these, each one starting from
+   * where the last one had reached.
+   */
+  function ramp(param: AudioParam, target: number, at: number, seconds: number): void {
+    const t = Math.max(at, context.currentTime);
+    const from = param.value;
+    param.cancelScheduledValues(t);
+    param.setValueAtTime(from, t);
+    if (seconds <= 0) {
+      param.setValueAtTime(target, t);
+      return;
+    }
+    param.linearRampToValueAtTime(target, t + seconds);
+  }
 
   /*
    * Checked once, here, rather than per voice.
@@ -50,6 +146,7 @@ export function createWebOrganicGraph(context: AudioContext, bus: GainNode): Org
     try {
       voice.source.disconnect();
       voice.panner?.disconnect();
+      voice.send?.disconnect();
       voice.gain.disconnect();
     } catch {
       // A node disconnected twice is not worth surfacing; the point is that it
@@ -135,11 +232,38 @@ export function createWebOrganicGraph(context: AudioContext, bus: GainNode): Org
       } else {
         source.connect(gain);
       }
-      gain.connect(bus);
+
+      /*
+       * Into the strip, never straight onto the bus.
+       *
+       * This is the whole of §31 at the audio level: the voice's own envelope
+       * is upstream of a gain node it shares with every other sound of the same
+       * instrument, so the fader multiplies what this voice is doing instead of
+       * replacing it. A voice wired to `bus` here would play at full level for
+       * its whole life no matter where the fader stood.
+       */
+      // Falls back rather than throwing: a plan naming a group this build has
+      // no strip for would otherwise drop the voice on the scheduling path,
+      // and a sound that plays under the wrong fader is a smaller defect than
+      // a sound that does not play. `texture` is where the mapping already
+      // sends anything it does not recognise.
+      const strip = groups[request.group] ?? groups.texture;
+      gain.connect(strip.dry);
+
+      // The wet path exists only where the preset asked for one. A send of zero
+      // is the common case for a layer the designer wanted dry, and a gain node
+      // multiplying by nothing is still a gain node the graph has to run.
+      let send: GainNode | null = null;
+      if (request.reverbSend > 0) {
+        send = context.createGain();
+        send.gain.value = Math.min(1, request.reverbSend);
+        gain.connect(send);
+        send.connect(strip.send);
+      }
 
       source.start(start, Math.max(0, request.offsetSec), play);
 
-      const voice: LiveVoice = { source, gain, panner, stopped: false };
+      const voice: LiveVoice = { source, gain, panner, send, stopped: false };
       live.add(voice);
 
       return {
@@ -180,14 +304,24 @@ export function createWebOrganicGraph(context: AudioContext, bus: GainNode): Org
     },
 
     rampBus(target: number, at: number, seconds: number): void {
-      const t = Math.max(at, context.currentTime);
-      bus.gain.cancelScheduledValues(t);
-      bus.gain.setValueAtTime(bus.gain.value, t);
-      if (seconds <= 0) {
-        bus.gain.setValueAtTime(target, t);
-        return;
-      }
-      bus.gain.linearRampToValueAtTime(target, t + seconds);
+      ramp(bus.gain, target, at, seconds);
+    },
+
+    rampGroup(group: MixerGroup, target: number, at: number, seconds: number): void {
+      const strip = groups[group];
+      if (!strip) return;
+      // Both halves of the strip together, so the send never drifts away from
+      // the fader it is supposed to follow.
+      ramp(strip.dry.gain, target, at, seconds);
+      ramp(strip.send.gain, target, at, seconds);
+    },
+
+    rampSpace(target: number, at: number, seconds: number): void {
+      // Nothing to fade towards silence when the reverb was never built, and
+      // building one in order to leave it at zero is the work `ensureReverb`
+      // exists to avoid.
+      if (target <= 0 && !spaceReturn) return;
+      ramp(ensureReverb().gain, target, at, seconds);
     },
 
     /**
@@ -212,6 +346,17 @@ export function createWebOrganicGraph(context: AudioContext, bus: GainNode): Org
         teardown(voice);
       }
       live.clear();
+      try {
+        for (const group of MIXER_GROUPS) {
+          groups[group].dry.disconnect();
+          groups[group].send.disconnect();
+        }
+        reverbInput.disconnect();
+        convolver?.disconnect();
+        spaceReturn?.disconnect();
+      } catch {
+        // Same as above: the context is closing behind this.
+      }
     },
   };
 }

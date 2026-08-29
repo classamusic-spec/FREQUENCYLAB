@@ -33,6 +33,18 @@ export interface UserPreferences {
    * 415 are alternative reference pitches a user may prefer to read in.
    */
   noteReferenceHz: number;
+  /**
+   * The breath pacing pattern the session screen shows, by id.
+   *
+   * Absent means off, which is the default and the state a fresh install is in:
+   * a visual guide that tells someone when to breathe is not something to
+   * switch on for them. Stored as an opaque id because the patterns themselves
+   * are an interface concern — the core neither generates them nor knows what
+   * they are — and stored at all because the session screen is somewhere you
+   * leave after every session, so a choice that lived there would have to be
+   * made again every time.
+   */
+  breathPatternId?: string;
   dspDebugEnabled: boolean;
 }
 

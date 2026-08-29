@@ -1,4 +1,5 @@
 import {
+  DEFAULT_ACOUSTIC_MIX,
   DEFAULT_BLOCK_SIZE,
   Fft,
   SLEEP_TIMER_FADE_SEC,
@@ -6,6 +7,7 @@ import {
   hannWindow,
   routeChangeAction,
   totalDurationSec,
+  type AcousticMix,
   type OutputRoute,
   type Plan,
   type Protocol,
@@ -229,6 +231,16 @@ export class SessionController implements RenderSource {
   private organicProgram: OrganicProgram | null = null;
   private organic: OrganicSession | null = null;
   private organicUnavailable: string | undefined;
+  /*
+   * The acoustic mixer's current position (§31).
+   *
+   * Held on the controller rather than passed in with each protocol, because it
+   * belongs to the listener and not to the session: it survives a stop, a
+   * backend restart and a route change, and every organic layer built from here
+   * on starts at it. `setAcousticMix` is the only writer, and `attachOrganic`
+   * the only other reader.
+   */
+  private acousticMix: AcousticMix = DEFAULT_ACOUSTIC_MIX;
   /** Underrun count at the last telemetry tick, for the load governor (§52). */
   private lastUnderruns = 0;
 
@@ -467,6 +479,7 @@ export class SessionController implements RenderSource {
         protocolDurationSec: this.durationSec,
         layers: program.layers,
         maxVoices: program.maxVoices,
+        mix: this.acousticMix,
       });
       session.start();
       this.organic = session;
@@ -738,6 +751,29 @@ export class SessionController implements RenderSource {
 
   setMasterGain(value: number): void {
     this.renderer?.setMasterGain(value);
+  }
+
+  get currentAcousticMix(): AcousticMix {
+    return this.acousticMix;
+  }
+
+  /**
+   * Moves the acoustic mixer (§31).
+   *
+   * Remembered first and applied second, so a mix set with nothing playing is
+   * still the mix the next session starts at. The application is wrapped for
+   * the same reason `attachOrganic` is: the acoustic layer is decoration, and
+   * nothing about it may be able to interrupt the frequency session underneath
+   * it (§56). A failure here costs a fader, not a session.
+   */
+  setAcousticMix(mix: AcousticMix): void {
+    this.acousticMix = mix;
+    try {
+      this.organic?.setMix(mix);
+    } catch (error) {
+      this.organicUnavailable =
+        error instanceof Error ? error.message : 'The acoustic mixer could not be applied.';
+    }
   }
 
   /** Live parameter edit against the running stage's graph. */

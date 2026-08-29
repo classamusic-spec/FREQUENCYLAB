@@ -1,6 +1,7 @@
 import { Rng } from '../math/rng.js';
 import { clamp } from '../math/util.js';
 import {
+  mixerGroupForInstrument,
   sampleRange,
   type AssetPool,
   type SchedulableAsset,
@@ -177,6 +178,9 @@ export function planSoundBath(options: PlanOptions): Plan {
         assetId: asset.assetId,
         layerId: state.layer.id,
         role: state.layer.role,
+        // From the asset's own instrument, so the mixer's faders follow what
+        // actually sounds rather than what a pool query happened to ask for.
+        group: mixerGroupForInstrument(asset.instrument),
         gainDb: round(gainDb),
         pan: round(pan),
         reverbSend: state.layer.reverbSend ?? 0,

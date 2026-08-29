@@ -1,4 +1,13 @@
-import { releaseSecondsFor, type Plan, type SoundBathEvent } from '@frequencylab/dsp-core';
+import {
+  DEFAULT_ACOUSTIC_MIX,
+  MIXER_GROUPS,
+  mixerGain,
+  releaseSecondsFor,
+  type AcousticMix,
+  type MixerGroup,
+  type Plan,
+  type SoundBathEvent,
+} from '@frequencylab/dsp-core';
 import { OrganicAssetCache, type OrganicCacheStats, type OrganicRuntimeAsset } from './assets';
 import { organicAssetDelivery } from './delivery';
 import { gainFromDb, type OrganicAudioGraph } from './graph';
@@ -89,6 +98,17 @@ const MAX_FINISHING_SEC = 20;
 const DEFAULT_VOICE_FADE_IN_SEC = 0.02;
 
 /**
+ * How long a fader takes to reach its new value.
+ *
+ * Long enough that a step in a gain node is a ramp rather than a discontinuity,
+ * short enough that dragging a fader feels connected to the sound. Eighty
+ * milliseconds is about the shortest fade this codebase uses anywhere; the
+ * click it prevents is the one thing a mixer is uniquely placed to produce,
+ * since a drag fires dozens of these a second (§28).
+ */
+const MIX_RAMP_SEC = 0.08;
+
+/**
  * The layer facts an event does not carry.
  *
  * A `SoundBathEvent` says which layer produced it but not what that layer's
@@ -110,6 +130,24 @@ export interface OrganicSkip {
   readonly count: number;
 }
 
+/**
+ * What one mixer strip is actually carrying (§31, §92).
+ *
+ * The mixer draws a fader only where `planned` is above zero, which is the
+ * whole reason this is reported rather than assumed: a `Water` fader on a
+ * preset that never touches the ocean recordings would move, ramp a real gain
+ * node, and change nothing anybody can hear.
+ */
+export interface OrganicGroupState {
+  readonly group: MixerGroup;
+  /** Events the plan holds for this group, for the whole session. */
+  readonly planned: number;
+  /** How many of them have been committed to the audio thread so far. */
+  readonly scheduled: number;
+  /** The fader's current position in dB, as the mix last asked for it. */
+  readonly levelDb: number;
+}
+
 export interface OrganicDiagnostics {
   readonly phase: OrganicPhase;
   readonly output: string;
@@ -127,6 +165,10 @@ export interface OrganicDiagnostics {
   readonly activeVoices: readonly OrganicVoice[];
   /** One line per distinct reason a sound did not happen (§56). */
   readonly skips: readonly OrganicSkip[];
+  /** One entry per mixer strip this plan has any material for (§31). */
+  readonly groups: readonly OrganicGroupState[];
+  /** The reverb return's position in dB. `MIXER_MIN_DB` is off. */
+  readonly spaceDb: number;
 }
 
 export interface OrganicSessionOptions {
@@ -141,6 +183,15 @@ export interface OrganicSessionOptions {
   /** Runtime polyphony cap. Lower than the plan's on a weaker device (§15). */
   readonly maxVoices?: number;
   readonly cacheBudgetBytes?: number;
+  /**
+   * The listener's acoustic mix (§31).
+   *
+   * Applied when the layer starts rather than as voices arrive, because the
+   * faders are permanent nodes in the graph: setting them once at the top means
+   * every voice this session ever creates is already downstream of the right
+   * value, including the ones the look-ahead has not decided on yet.
+   */
+  readonly mix?: AcousticMix;
 }
 
 export class OrganicSession {
@@ -190,6 +241,19 @@ export class OrganicSession {
   private skippedEvents = 0;
   private readonly skips = new Map<string, OrganicSkip>();
 
+  /*
+   * The mixer's own bookkeeping.
+   *
+   * `plannedByGroup` is counted once in the constructor from the plan, which is
+   * fixed for the session; `scheduledByGroup` grows as the look-ahead commits
+   * events. Both are plain objects keyed by group rather than maps built per
+   * call, because `diagnostics()` is polled by the interface while audio is
+   * playing and the render path is one dispatch away from it (§55).
+   */
+  private readonly plannedByGroup: Record<MixerGroup, number>;
+  private readonly scheduledByGroup: Record<MixerGroup, number>;
+  private mix: AcousticMix;
+
   /** Protocol second at which finishing gives up on the remaining tails. */
   private finishesAtSec = 0;
 
@@ -204,6 +268,16 @@ export class OrganicSession {
     this.settled = new Uint8Array(options.plan.events.length);
     this.cache = new OrganicAssetCache(options.graph, options.assets, options.cacheBudgetBytes);
     this.voices = new OrganicVoiceManager(this.configuredCap);
+    this.mix = options.mix ?? DEFAULT_ACOUSTIC_MIX;
+    this.plannedByGroup = emptyGroupCounts();
+    this.scheduledByGroup = emptyGroupCounts();
+    // Guarded because a plan is data handed in from outside. An event naming a
+    // group this build has no fader for is counted nowhere, which leaves the
+    // mixer one strip short; incrementing an absent key would make every count
+    // `NaN` and leave it with no strips at all.
+    for (const event of options.plan.events) {
+      if (this.plannedByGroup[event.group] !== undefined) this.plannedByGroup[event.group]++;
+    }
   }
 
   get currentPhase(): OrganicPhase {
@@ -218,6 +292,37 @@ export class OrganicSession {
     if (this.phase !== 'idle') return;
     this.phase = 'running';
     this.graph.rampBus(1, this.graph.now(), 0);
+    // The faders are set before the first sound rather than after it: a mix
+    // applied a beat late is a session that opens at the wrong level and
+    // corrects itself, which is audible where the correction is not.
+    this.applyMix(0);
+  }
+
+  /**
+   * Moves the mixer while the session plays (§31).
+   *
+   * Everything about the sound bath that a listener can change at all changes
+   * here, and it changes on the audio thread: one `AudioParam` ramp per strip,
+   * on nodes that already stand between every voice and the bus. Voices already
+   * ringing are affected because they are wired through those nodes; voices the
+   * look-ahead has not committed yet are affected for the same reason, without
+   * this having to know they exist.
+   *
+   * Idle and finished sessions still record the mix. The graph is either not
+   * ready or on its way out, but the value is what the next `start` will use.
+   */
+  setMix(mix: AcousticMix): void {
+    this.mix = mix;
+    if (this.phase === 'idle' || this.phase === 'finished') return;
+    this.applyMix(MIX_RAMP_SEC);
+  }
+
+  private applyMix(seconds: number): void {
+    const at = this.graph.now();
+    for (const group of MIXER_GROUPS) {
+      this.graph.rampGroup(group, mixerGain(this.mix.levels[group]), at, seconds);
+    }
+    this.graph.rampSpace(mixerGain(this.mix.spaceDb), at, seconds);
   }
 
   /**
@@ -402,12 +507,17 @@ export class OrganicSession {
       playSec,
       fadeInSec: layer?.fadeInSec ?? DEFAULT_VOICE_FADE_IN_SEC,
       fadeOutSec: layer?.fadeOutSec ?? releaseSecondsFor(asset.releaseTailDb),
+      // The plan already decided which fader owns this sound, from the
+      // instrument of the asset it chose. Nothing is re-derived here (§31).
+      group: event.group,
+      reverbSend: event.reverbSend,
     });
 
     this.cache.pin(event.assetId);
     voice.onEnded(() => this.cache.unpin(event.assetId));
     this.voices.add(candidate, voice);
     this.scheduledEvents++;
+    if (this.scheduledByGroup[event.group] !== undefined) this.scheduledByGroup[event.group]++;
     return true;
   }
 
@@ -510,6 +620,16 @@ export class OrganicSession {
       cache: this.cache.stats(),
       activeVoices: this.voices.active(),
       skips: [...this.skips.values()].sort((a, b) => b.count - a.count),
+      // Only the strips this plan has material for. §92: a fader over an empty
+      // group would move a real gain node and change nothing audible, which is
+      // the definition of a control that does not work.
+      groups: MIXER_GROUPS.filter((group) => this.plannedByGroup[group] > 0).map((group) => ({
+        group,
+        planned: this.plannedByGroup[group],
+        scheduled: this.scheduledByGroup[group],
+        levelDb: this.mix.levels[group],
+      })),
+      spaceDb: this.mix.spaceDb,
     };
   }
 
@@ -518,4 +638,11 @@ export class OrganicSession {
     this.cache.dispose();
     this.graph.dispose();
   }
+}
+
+/** A counter per group, allocated once so `diagnostics` never builds one. */
+function emptyGroupCounts(): Record<MixerGroup, number> {
+  const counts = {} as Record<MixerGroup, number>;
+  for (const group of MIXER_GROUPS) counts[group] = 0;
+  return counts;
 }
