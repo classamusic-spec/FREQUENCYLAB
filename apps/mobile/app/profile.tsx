@@ -24,6 +24,7 @@ import { MIN_TOUCH_TARGET, colors, layout, radius, space } from '../src/design/t
 import * as haptics from '../src/design/haptics';
 import { confirm, notify } from '../src/design/dialogs';
 import { usePreferences } from '../src/state/preferences';
+import { useTier } from '../src/features/tier';
 import { SafetyBanner } from '../src/design/components/SafetyBanner';
 import { useHistory } from '../src/state/history';
 import { useProtocolLibrary } from '../src/state/library';
@@ -36,15 +37,49 @@ const APP_VERSION = (Constants.expoConfig?.version as string) ?? '0.1.0';
 const TREND_DAYS = 30;
 
 /**
+ * What each level actually does, now that it does something.
+ *
+ * One line, and only the selected one is drawn — the note belongs to the
+ * control rather than to the screen, so choosing a level reads it back to you
+ * instead of making you find your row in a paragraph of three.
+ *
+ * Each line names what is *added or withheld*, never what is better. Simple is
+ * not a beginner's version of the instrument; it is the instrument without its
+ * vocabulary, and the constant below says the part that never varies.
+ */
+const LEVEL_NOTES: Record<ExperienceLevel, string> = {
+  simple: 'Player and sounds. No frequencies, no builder, no trials.',
+  explorer: 'Adds frequencies, the library, and how each session is played.',
+  lab: 'Everything: the builder, trials, Protocol DNA and diagnostics.',
+};
+
+/** The half of the app no level touches, said where the level is chosen. */
+const LEVEL_CONSTANT = 'Every rating and safety notice is shown at all three.';
+
+/**
  * Profile (§48, §50, §74).
  *
  * Settings, history, and the two things a product handling personal data owes
  * its user without being asked: a complete export, and a real delete.
+ *
+ * The only screen where the experience level is the *subject* rather than the
+ * reason, so it is the only one that reads the level directly. Two things here
+ * are never tiered and should stay that way: the safety notices, which are the
+ * claim-limiting statements the whole product rests on, and Your data, which is
+ * a right rather than a power feature. Everything the tier does remove is
+ * engineering vocabulary — the sample rate, the reference pitch, the engine
+ * versions, Diagnostics — each gated on the capability that names why.
  */
 export default function ProfileScreen() {
   const router = useRouter();
   const preferences = usePreferences((state) => state.preferences);
   const update = usePreferences((state) => state.update);
+  /*
+   * The one screen that reads the level itself as well as its capabilities:
+   * the control that sets it lives here, so the level is the subject rather
+   * than the reason.
+   */
+  const { canSee } = useTier();
   const sessions = useHistory((state) => state.sessions);
   const storageError = useHistory((state) => state.storageError);
   const protocols = useProtocolLibrary((state) => state.protocols);
@@ -140,13 +175,12 @@ export default function ProfileScreen() {
           // no measurement, so the panel says so and says what would fill it.
           <View style={styles.emptyTrend}>
             <Text variant="bodySm" tone="secondary">
-              Nothing to show yet. No sessions have been recorded on this device, so there is no
-              trend to draw — not a flat one, and not a zero.
+              Nothing recorded on this device yet, so there is no trend to draw — not a flat one,
+              and not a zero.
             </Text>
             <Text variant="caption" tone="tertiary">
-              After your first session this panel plots daily listening time over the last{' '}
-              {TREND_DAYS} days, alongside your longest run of consecutive days. Sessions under
-              thirty seconds are never recorded, so an accidental start will not appear here.
+              After your first session this plots your daily listening over {TREND_DAYS} days.
+              Sessions under thirty seconds are never recorded.
             </Text>
           </View>
         ) : (
@@ -208,8 +242,7 @@ export default function ProfileScreen() {
         onChange={(value) => void update({ experienceLevel: value as ExperienceLevel })}
       />
       <Text variant="caption" tone="tertiary">
-        This changes which controls are shown first. Every level drives the same engine, and Lab is
-        always reachable from the tab bar.
+        {LEVEL_NOTES[preferences.experienceLevel]} {LEVEL_CONSTANT}
       </Text>
 
       <SectionHeader label="Accessibility" />
@@ -223,7 +256,9 @@ export default function ProfileScreen() {
         <PanelDivider />
         <ToggleRow
           label="Haptics"
-          description="Encoder detents, button presses and stage changes."
+          // "Encoder detents" named the mechanism rather than the feeling, and
+          // it was the only word here a Simple user could not place.
+          description="Buttons, dials and stage changes."
           value={preferences.hapticsEnabled}
           onChange={(value) => void update({ hapticsEnabled: value })}
         />
@@ -231,37 +266,52 @@ export default function ProfileScreen() {
 
       <SectionHeader label="Audio" />
       <InstrumentPanel tone="flat">
+        {/* Volume is not engineering. It is the number the safety notices below
+            are about, so it is on this panel at every level. */}
         <PanelRow label="Comfortable level" value={`${Math.round(preferences.comfortableOutputLevel * 100)}%`} />
-        <PanelRow label="Sample rate" value={`${preferences.sampleRate} Hz`} />
-        <PanelRow
-          label="Binaural default"
-          value={preferences.defaultBinauralMode === 'centered' ? 'Centred' : 'Offset'}
-        />
+        {canSee('engineering') ? (
+          <PanelRow label="Sample rate" value={`${preferences.sampleRate} Hz`} />
+        ) : null}
+        {canSee('signalDetail') ? (
+          <PanelRow
+            label="Binaural default"
+            value={preferences.defaultBinauralMode === 'centered' ? 'Centred' : 'Offset'}
+          />
+        ) : null}
         {/* Read-only mirror of what the note sheet sets. The control lives next
             to the note you are typing, where a reference pitch means something;
-            here it is only worth being able to see. */}
-        <PanelRow label="Note reference" value={`A4 = ${preferences.noteReferenceHz} Hz`} />
+            here it is only worth being able to see — and only to somebody who
+            is being shown pitches in the first place. */}
+        {canSee('hertz') ? (
+          <PanelRow label="Note reference" value={`A4 = ${preferences.noteReferenceHz} Hz`} />
+        ) : null}
         <PanelDivider />
         <View style={styles.buttonRow}>
+          {/* Calibration sets the comfortable level, which is a safety control
+              and stays. Diagnostics is the engine talking about itself. */}
           <HardwareButton
             label="Recalibrate"
             size="sm"
             onPress={() => router.push('/calibration')}
           />
-          <HardwareButton
-            label="Diagnostics"
-            size="sm"
-            variant="ghost"
-            onPress={() => router.push('/diagnostics')}
-          />
+          {canSee('engineering') ? (
+            <HardwareButton
+              label="Diagnostics"
+              size="sm"
+              variant="ghost"
+              onPress={() => router.push('/diagnostics')}
+            />
+          ) : null}
         </View>
       </InstrumentPanel>
 
+      {/* Never tiered. Export and delete are what a person is owed for their
+          own records, not a power feature, so both are here at every level. */}
       <SectionHeader label="Your data" />
       <InstrumentPanel tone="flat">
         <Text variant="bodySm" tone="secondary">
-          Everything you create lives on this device in plain JSON. There is no account, nothing is
-          uploaded, and the export below is the complete record — not a summary of it.
+          Everything you create stays on this device. There is no account, nothing is uploaded, and
+          the export is the complete record — not a summary of it.
         </Text>
         <View style={styles.buttonRow}>
           <HardwareButton
@@ -287,29 +337,44 @@ export default function ProfileScreen() {
         </Text>
       </InstrumentPanel>
 
-      <SectionHeader label="Library" />
-      <HardwareButton label="Preset collections" onPress={() => router.push('/collections')} />
-      <HardwareButton label="Frequency library" onPress={() => router.push('/library')} />
-      <HardwareButton label="Historical archive" onPress={() => router.push('/archive')} />
-      <HardwareButton label="AI protocol designer" onPress={() => router.push('/ai')} />
-      <HardwareButton label="Import Protocol DNA" variant="ghost" onPress={() => router.push('/dna-import')} />
+      {/* Shortcuts into the archive and the shelves. At Simple the Sounds tab
+          is already the way to the shelves, and the archive is library
+          material, so the whole block goes rather than being reworded. */}
+      {canSee('library') ? (
+        <>
+          <SectionHeader label="Library" />
+          <HardwareButton label="Preset collections" onPress={() => router.push('/collections')} />
+          <HardwareButton label="Frequency library" onPress={() => router.push('/library')} />
+          <HardwareButton label="Historical archive" onPress={() => router.push('/archive')} />
+        </>
+      ) : null}
+      {canSee('lab') ? (
+        <HardwareButton label="AI protocol designer" onPress={() => router.push('/ai')} />
+      ) : null}
+      {canSee('dna') ? (
+        <HardwareButton label="Import Protocol DNA" variant="ghost" onPress={() => router.push('/dna-import')} />
+      ) : null}
 
+      {/* The roadmap this used to print named Explorer, Lab, routing and WAV
+          export to a reader who may have been shown none of them. What was
+          load-bearing in it was the promise, which is what is left. */}
       <SectionHeader label="Plans" />
       <InstrumentPanel tone="flat">
         <Text variant="bodySm" tone="secondary">
-          Every feature in this build is unlocked, and there is no billing integration in it. The
-          intended shape is a free tier covering generation, presets, Explorer and history; a Pro
-          tier for Lab, automation, routing, the builder, experiments and WAV export; and a research
-          tier for AI generation and deeper analysis. Nothing here will ask for money, and nothing is
-          gated behind a countdown.
+          Every feature in this build is unlocked. There is no billing in it, nothing here will ask
+          for money, and nothing is gated behind a countdown.
         </Text>
       </InstrumentPanel>
 
       <SectionHeader label="About" />
       <InstrumentPanel tone="recessed">
         <PanelRow label="App" value={APP_VERSION} />
-        <PanelRow label="DSP engine" value={DSP_VERSION} />
-        <PanelRow label="Protocol schema" value={`v${PROTOCOL_SCHEMA_VERSION}`} />
+        {canSee('engineering') ? (
+          <>
+            <PanelRow label="DSP engine" value={DSP_VERSION} />
+            <PanelRow label="Protocol schema" value={`v${PROTOCOL_SCHEMA_VERSION}`} />
+          </>
+        ) : null}
       </InstrumentPanel>
     </Screen>
   );
