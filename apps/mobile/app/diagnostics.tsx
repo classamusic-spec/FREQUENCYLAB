@@ -17,8 +17,9 @@ import { Oscilloscope, SpectrumAnalyzer, StereoVectorScope } from '../src/design
 import { Text } from '../src/design/components/Text';
 import { space } from '../src/design/tokens';
 import { usePlayer, useScopeCapture } from '../src/state/player';
-import { sessionController } from '../src/audio/sessionController';
+import { sessionController, type ControllerSnapshot } from '../src/audio/sessionController';
 import { detectOutputRoute, describeRoute } from '../src/audio/route';
+import { organicAssetDelivery } from '../src/audio/organic/delivery';
 
 const BUFFER_SIZES = [512, 1024, 2048, 4096];
 const QUEUE_DEPTHS = [3, 4, 6, 8];
@@ -115,6 +116,8 @@ export default function DiagnosticsScreen() {
         </InstrumentPanel>
       ) : null}
 
+      <OrganicPanel snapshot={snapshot} />
+
       <SectionHeader label="Signal views" />
       <View style={styles.scopes}>
         <Oscilloscope samples={capture?.left ?? null} samplesRight={capture?.right ?? null} height={90} />
@@ -164,6 +167,89 @@ export default function DiagnosticsScreen() {
       <HardwareButton label="Close" variant="ghost" onPress={() => router.back()} />
     </Screen>
   );
+}
+
+/**
+ * What the organic acoustic layer is doing, and — today — why it is not.
+ *
+ * This panel exists because "no sound bath is playing" has several very
+ * different causes and a listener deserves to know which one they have: no
+ * plan was loaded, the backend has no organic bus, or the assets cannot be
+ * obtained by any build of this app. §65's rule is that nothing may look like
+ * it is working when it is not, and the corollary is that nothing may be
+ * silently missing either.
+ */
+function OrganicPanel({ snapshot }: { snapshot: ControllerSnapshot }) {
+  const delivery = organicAssetDelivery();
+  const organic = snapshot.organic;
+
+  return (
+    <InstrumentPanel tone="recessed" label="Organic layer">
+      <PanelRow label="Asset delivery" value={delivery.configured ? delivery.id : 'Not configured'} />
+      <PanelRow label="Bus" value={organic?.output ?? (snapshot.backend.audible ? 'Built, idle' : 'None')} />
+      <PanelRow label="Phase" value={organic?.phase ?? 'idle'} />
+
+      {organic ? (
+        <>
+          <PanelDivider />
+          <PanelRow label="Events planned" value={String(organic.plannedEvents)} />
+          <PanelRow label="Events scheduled" value={String(organic.scheduledEvents)} />
+          <PanelRow label="Events skipped" value={String(organic.skippedEvents)} />
+          <PanelDivider />
+          <PanelRow
+            label="Voices"
+            value={`${organic.voices.active} of ${organic.voices.cap}`}
+          />
+          <PanelRow label="Voices started" value={String(organic.voices.started)} />
+          <PanelRow label="Dropped: polyphony" value={String(organic.voices.droppedForPolyphony)} />
+          <PanelRow label="Dropped: load" value={String(organic.voices.droppedForLoad)} />
+          <PanelDivider />
+          <PanelRow
+            label="Cache"
+            value={`${organic.cache.residentCount} assets · ${formatMb(organic.cache.residentBytes)} of ${formatMb(organic.cache.budgetBytes)}`}
+          />
+          <PanelRow label="Decoded" value={String(organic.cache.loaded)} />
+          <PanelRow label="Evicted" value={String(organic.cache.evicted)} />
+          <PanelRow label="Unavailable" value={String(organic.cache.failed)} />
+          {organic.skips.length > 0 ? (
+            <>
+              <PanelDivider />
+              {organic.skips.slice(0, 6).map((skip) => (
+                <Text key={`${skip.assetId}-${skip.reason}`} variant="caption" tone="warning">
+                  {skip.count}× {skip.assetId}: {skip.reason}
+                </Text>
+              ))}
+            </>
+          ) : null}
+        </>
+      ) : (
+        <>
+          <PanelDivider />
+          <Text variant="caption" tone="tertiary">
+            {snapshot.organicUnavailable ?? 'No organic layer is loaded for this session.'}
+          </Text>
+        </>
+      )}
+
+      {delivery.configured ? null : (
+        <>
+          <PanelDivider />
+          <Text variant="caption" tone="warning">
+            {delivery.description}
+          </Text>
+          <Text variant="caption" tone="tertiary">
+            The scheduler, voice manager, look-ahead and mixer are built and the
+            organic bus is wired into the master mixer. Nothing can be played
+            through them until the library has somewhere to come from.
+          </Text>
+        </>
+      )}
+    </InstrumentPanel>
+  );
+}
+
+function formatMb(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 const styles = StyleSheet.create({

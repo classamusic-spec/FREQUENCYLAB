@@ -109,3 +109,29 @@ export interface OrganicAudioGraph {
 export function gainFromDb(db: number): number {
   return Math.pow(10, db / 20);
 }
+
+/**
+ * A soft-clip curve for the organic bus.
+ *
+ * The precision path ends in the DSP master chain's look-ahead limiter; the
+ * organic path has nothing equivalent, because neither platform's audio graph
+ * offers a limiter this app could trust with someone's ears (`react-native-audio-api`
+ * has no compressor node at all). Gain staging and the polyphony cap are what
+ * keep the bus in range — the pipeline trimmed every asset toward -23 LUFS and
+ * the layer gains sit below that — and this is the guarantee underneath them,
+ * for the case where several sharp attacks land on the same sample.
+ *
+ * `tanh` because its slope at zero is exactly one: below about -20 dBFS it is
+ * indistinguishable from a wire, so it colours nothing in ordinary use and only
+ * asserts itself where the alternative is a full-scale sum. It cannot pump,
+ * cannot ring and has no release, which a compressor put here would.
+ */
+export function softClipCurve(points = 1024): Float32Array<ArrayBuffer> {
+  const curve = new Float32Array(points);
+  for (let i = 0; i < points; i++) {
+    // -3..3 covers everything the bus can produce; beyond it tanh is flat.
+    const x = (i / (points - 1)) * 6 - 3;
+    curve[i] = Math.tanh(x);
+  }
+  return curve;
+}

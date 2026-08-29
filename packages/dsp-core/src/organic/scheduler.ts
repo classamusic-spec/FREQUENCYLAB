@@ -183,13 +183,18 @@ export function planSoundBath(options: PlanOptions): Plan {
         detuneCents: round(detuneCents),
       });
 
-      const endsAt = now + tail + (state.layer.minimumRestSec ?? 0);
-      state.active.push(now + tail);
+      // The layer's own voice is held for the sound plus any rest it asks for;
+      // the global count is released as soon as the sound stops. Rest is a
+      // statement about how often *this* layer may speak, not a reservation
+      // against the whole mix.
+      //
+      // `minimumRestSec` was computed here and then discarded, so a layer
+      // asking for rest got none.
+      state.active.push(now + tail + (state.layer.minimumRestSec ?? 0));
       globalActive.push(now + tail);
       state.recent.unshift(asset.assetId);
       if (state.recent.length > 12) state.recent.pop();
       if ((asset.brightness ?? 0) > 0.6) brightHistory.push(now);
-      void endsAt;
     }
   }
 
@@ -258,9 +263,15 @@ function chooseAsset(
 
     // The no-repeat window. Not a hard ban — a hard ban on a five-asset pool
     // produces a rotation, which is its own kind of obvious. A steep penalty
-    // that decays makes recurrence feel incidental (§16).
+    // that decays back to neutral makes recurrence feel incidental (§16).
+    //
+    // Clamped at 1, which it was not. `0.02 + 0.16 * since` passes 1 at the
+    // seventh position and reaches 1.78 at the twelfth, so an asset played
+    // seven to eleven events ago was up to 1.8 times *more* likely than one
+    // that had never played at all — the opposite of what this is for, and of
+    // what the comment above it said. A penalty may fade; it may not invert.
     const since = recent.indexOf(asset.assetId);
-    if (since >= 0) weight *= 0.02 + 0.16 * since;
+    if (since >= 0) weight *= Math.min(1, 0.02 + 0.16 * since);
 
     weights[i] = weight;
     total += weight;

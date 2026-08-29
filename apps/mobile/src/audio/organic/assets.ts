@@ -28,26 +28,30 @@ import type { OrganicAudioGraph, OrganicDecodedBuffer } from './graph';
  *
  * Declared structurally rather than imported, for the same reason
  * `SchedulableAsset` is in `soundbath.ts`: this depends on the *shape* of an
- * asset, not on the manifest's storage format, so a registry that reads the
+ * asset, not on the manifest's storage format, so the thing that reads the
  * manifest can satisfy it without this file ever learning what a manifest is.
  * Nothing here is a file path or a filename (§44).
+ *
+ * The field names are the DSP core's `OrganicAsset` names, deliberately. That
+ * type is the registry's own flattened view of a manifest record and it
+ * satisfies this interface exactly as it stands — no adapter, no renaming pass,
+ * and no second place where `preload` might come to mean something slightly
+ * different from `preloadRecommended`.
  */
 export interface OrganicRuntimeAsset {
-  readonly assetId: string;
+  readonly id: string;
+  /** The whole file, silence at either end included. */
   readonly durationSeconds: number;
+  /** Where playback should begin, so a strike never starts mid-attack. */
+  readonly startSeconds: number;
+  /** Where the sound is finished. The end of the file unless it has dead air. */
+  readonly endSeconds: number;
   /** Short enough to hold decoded in memory (§23, §53). */
-  readonly preloadRecommended: boolean;
+  readonly preload: boolean;
   /** Too long to hold decoded in memory (§23, §53). */
-  readonly streamingRecommended: boolean;
-  /**
-   * Where playback may begin, from the pipeline's measured lead-in. Null means
-   * there is no silence worth skipping — which is not the same as 0 and is why
-   * this is nullable.
-   */
-  readonly startOffsetSec: number | null;
-  /** Where the sound is finished. Null when the file has no long tail of silence. */
-  readonly endOffsetSec: number | null;
-  readonly maxRecommendedVoices: number;
+  readonly streaming: boolean;
+  /** How many copies may sound at once before the attacks pile up (§12). */
+  readonly maxVoices: number;
 }
 
 /**
@@ -149,7 +153,7 @@ export class OrganicAssetCache {
     // Checked before the decode rather than after it: one long asset at a time
     // is the rule, and finding that out only once 58 MB has already been decoded
     // would spend exactly the memory the rule exists to protect.
-    if (this.assets.get(assetId)?.streamingRecommended === true && this.streamingIsBusy()) return;
+    if (this.assets.get(assetId)?.streaming === true && this.streamingIsBusy()) return;
     this.queue.push(assetId);
     this.pump();
   }
@@ -201,7 +205,7 @@ export class OrganicAssetCache {
   }
 
   private admit(asset: OrganicRuntimeAsset, buffer: OrganicDecodedBuffer): void {
-    if (asset.streamingRecommended) this.dropIdleStreaming();
+    if (asset.streaming) this.dropIdleStreaming();
     this.makeRoomFor(buffer.bytes);
     if (this.residentBytes + buffer.bytes > this.budgetBytes) {
       // Everything evictable has been evicted and it still does not fit. The
@@ -209,15 +213,15 @@ export class OrganicAssetCache {
       // not allowed to push a phone into a memory warning while a session is
       // running (§52).
       this.failures.set(
-        asset.assetId,
+        asset.id,
         `Decodes to ${formatMb(buffer.bytes)}, which does not fit the ${formatMb(this.budgetBytes)} cache.`,
       );
       return;
     }
-    this.resident_.set(asset.assetId, {
-      assetId: asset.assetId,
+    this.resident_.set(asset.id, {
+      assetId: asset.id,
       buffer,
-      streaming: asset.streamingRecommended,
+      streaming: asset.streaming,
       pins: 0,
       usedAt: ++this.clock,
     });

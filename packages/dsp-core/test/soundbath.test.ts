@@ -334,3 +334,94 @@ describe('acceptance: the durations the spec names', () => {
     expect(asset.maxRecommendedVoices).toBeLessThanOrEqual(4);
   });
 });
+
+describe('two rules that were silently not holding', () => {
+  /*
+   * Both of these passed every test in this file while being wrong, which is
+   * why they get their own. Neither is visible in an event list at a glance;
+   * both were found by reading the arithmetic.
+   */
+
+  it('never makes a recently played asset more likely than an unplayed one', () => {
+    /*
+     * The penalty is `0.02 + 0.16 * position`, which passes 1 at the seventh
+     * position and reaches 1.78 at the twelfth. Unclamped, an asset played seven
+     * to eleven events ago was up to 1.8x *more* likely than one that had never
+     * played — a penalty that inverts into a preference.
+     *
+     * The tell is not the mean gap between an asset's repeats, which is fixed by
+     * the pool size and comes out at 9.95 either way. It is the *shape*: a
+     * favoured window at 7-11 pulls the distribution into it and leaves a cliff
+     * past the twelve-entry history, so long gaps stop happening. Measured on
+     * the ten tuning forks — the smallest natural pool in the library, and where
+     * a no-repeat rule matters most — gaps beyond the window are 26.2% of the
+     * total when the penalty is clamped and 18.8% when it inverts.
+     */
+    const forks = LIBRARY.filter((asset) => asset.instrument === 'TUNING_FORK');
+    expect(forks.length).toBe(10);
+
+    const events = planSoundBath({
+      preset: {
+        id: 'repeat-probe',
+        version: 1,
+        name: 'Repeat probe',
+        description: '',
+        globals: { density: 1, energy: 0.2, brightness: 0.4 },
+        layers: [
+          {
+            id: 'forks',
+            role: 'TUNING_FORK',
+            pool: { assetIds: forks.map((asset) => asset.assetId) },
+            intervalSec: { min: 8, max: 16 },
+            probability: 1,
+            gainDb: { min: -20, max: -16 },
+            panRange: { min: -0.3, max: 0.3 },
+            maxVoices: 3,
+          },
+        ],
+      },
+      library: LIBRARY,
+      durationSec: 7200,
+      seed: 5,
+      requireApproved: false,
+    }).events;
+
+    const gaps: number[] = [];
+    const lastSeen = new Map<string, number>();
+    events.forEach((event, index) => {
+      const previous = lastSeen.get(event.assetId);
+      if (previous !== undefined) gaps.push(index - previous);
+      lastSeen.set(event.assetId, index);
+    });
+
+    expect(gaps.length).toBeGreaterThan(500);
+    const beyondWindow = gaps.filter((gap) => gap > 12).length / gaps.length;
+    expect(beyondWindow, 'long gaps are being suppressed, so the penalty has inverted').toBeGreaterThan(
+      0.22,
+    );
+  });
+
+  it('honours a layer that asks for rest between sounds', () => {
+    // `minimumRestSec` was computed into a local and then discarded, so a layer
+    // asking for rest got none. Two bowls back to back is exactly what a rest
+    // exists to prevent.
+    const REST = 90;
+    const events = plan({
+      durationSec: 3600,
+      preset: {
+        ...preset(),
+        globals: { ...preset().globals, density: 1 },
+        layers: [{ ...preset().layers[0], maxVoices: 1, minimumRestSec: REST }],
+      },
+    }).events;
+
+    expect(events.length).toBeGreaterThan(3);
+    for (let i = 1; i < events.length; i++) {
+      const previous = events[i - 1];
+      const gap = events[i].atSec - (previous.atSec + previous.durationSec);
+      expect(gap, `only ${gap.toFixed(1)}s of rest after ${previous.assetId}`).toBeGreaterThanOrEqual(
+        REST - 0.5,
+      );
+    }
+  });
+});

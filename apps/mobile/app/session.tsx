@@ -62,6 +62,16 @@ export default function SessionScreen() {
 
   const playing = snapshot.state === 'playing';
   const paused = snapshot.state === 'paused';
+  /*
+   * The protocol has reached zero and the organic tails are decaying (§76).
+   *
+   * The frequency session is already silent by this point — the master chain's
+   * fade-out ends at the protocol's end — so the transport is shown as a
+   * session that is closing rather than one that can be paused or resumed. It
+   * is a state, not a stall, and saying so is the only way a listener can tell
+   * the difference.
+   */
+  const finishing = snapshot.state === 'finishing';
   const capture = useScopeCapture(showDetails || showScopes ? 24 : 8, playing && (showDetails || showScopes));
   const telemetry = snapshot.telemetry;
 
@@ -125,8 +135,12 @@ export default function SessionScreen() {
 
   const carrier = telemetry?.readouts['tone:carrier'] ?? 0;
   const band = bandForFrequency(beat);
+  // Clamped, because the protocol clock keeps running through the finishing
+  // tails: without this the ring and the bar both overshoot their own ends.
   const progress =
-    telemetry && telemetry.durationSec > 0 ? telemetry.positionSec / telemetry.durationSec : 0;
+    telemetry && telemetry.durationSec > 0
+      ? Math.min(1, telemetry.positionSec / telemetry.durationSec)
+      : 0;
   const stageProgress =
     telemetry && telemetry.stageDurationSec > 0
       ? telemetry.stagePositionSec / telemetry.stageDurationSec
@@ -155,7 +169,7 @@ export default function SessionScreen() {
   const peakL = telemetry?.level.peakL ?? 0;
   const peakR = telemetry?.level.peakR ?? 0;
 
-  const remaining = telemetry ? telemetry.durationSec - telemetry.positionSec : 0;
+  const remaining = telemetry ? Math.max(0, telemetry.durationSec - telemetry.positionSec) : 0;
 
   const toggleMute = () => {
     haptics.engage();
@@ -301,7 +315,7 @@ export default function SessionScreen() {
 
         <InstrumentPanel tone="raised">
           <View style={styles.timeHeader}>
-            <Label>Time remaining</Label>
+            <Label>{finishing ? 'Finishing' : 'Time remaining'}</Label>
             <Label tone="tertiary">{telemetry?.stageName ?? ''}</Label>
           </View>
           <View style={styles.timeRow}>
@@ -323,6 +337,13 @@ export default function SessionScreen() {
             <View style={[styles.progressThumb, { left: `${Math.max(1, progress * 100)}%` }]} />
           </View>
 
+          {finishing ? (
+            <Text variant="caption" tone="tertiary" style={styles.finishingNote}>
+              The protocol has ended. Letting the last sounds decay
+              {snapshot.finishingSec > 0 ? ` — ${Math.ceil(snapshot.finishingSec)}s` : ''}.
+            </Text>
+          ) : null}
+
           <View style={styles.transportRow}>
             <Pressable
               onPress={async () => {
@@ -340,7 +361,11 @@ export default function SessionScreen() {
               onPress={() => (paused ? void play() : void pause())}
               accessibilityRole="button"
               accessibilityLabel={paused ? 'Resume' : 'Pause'}
-              style={styles.transportMain}
+              // Nothing left to pause: the protocol is over and what is still
+              // sounding is a tail the session is deliberately not cutting.
+              disabled={finishing}
+              accessibilityState={{ disabled: finishing }}
+              style={[styles.transportMain, finishing ? styles.transportMainIdle : null]}
             >
               <View style={styles.transportMainRing} pointerEvents="none" />
               {paused ? (
@@ -517,6 +542,8 @@ function modulationEnvelope(beatHz: number): Float32Array | null {
 }
 
 const styles = StyleSheet.create({
+  finishingNote: { marginTop: space.sm },
+  transportMainIdle: { opacity: 0.4 },
   root: { flex: 1, backgroundColor: colors.background },
   content: { padding: space.xl, paddingTop: space.vast, paddingBottom: 140, gap: space.lg },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

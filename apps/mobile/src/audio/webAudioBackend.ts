@@ -1,3 +1,5 @@
+import { softClipCurve, type OrganicAudioGraph } from './organic/graph';
+import { createWebOrganicGraph } from './organic/webGraph';
 import {
   AudioBackendUnavailableError,
   DEFAULT_BACKEND_OPTIONS,
@@ -39,6 +41,20 @@ export class WebAudioBackend implements AudioBackend {
 
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  /**
+   * The two buses (§1, §39).
+   *
+   * `precisionBus` carries the self-rendered PCM and nothing else. It is
+   * private: no reference to it leaves this class, so nothing in the organic
+   * layer can pan, widen or crossfeed the core. That matters most for binaural
+   * material, where the effect *is* the difference between the channels — a
+   * downmix or a pan law applied here would destroy it while leaving something
+   * that still sounds like a tone, which is the kind of defect nobody notices
+   * until every binaural session in the app is quietly wrong.
+   */
+  private precisionBus: GainNode | null = null;
+  private organicBus: GainNode | null = null;
+  private organic: OrganicAudioGraph | null = null;
   private source: RenderSource | null = null;
   private options: AudioBackendOptions;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -95,9 +111,7 @@ export class WebAudioBackend implements AudioBackend {
       this.ctx = new Ctor();
     }
 
-    this.master = this.ctx.createGain();
-    this.master.gain.value = 1;
-    this.master.connect(this.ctx.destination);
+    this.buildMixer(this.ctx);
 
     // Must run inside the gesture that led here, or the context stays suspended.
     await this.ctx.resume().catch(() => undefined);
@@ -109,12 +123,63 @@ export class WebAudioBackend implements AudioBackend {
     this.currentState = 'running';
   }
 
+  /**
+   * Builds the master mixer and its two inputs.
+   *
+   * The order of the organic chain matters: bus gain, then the soft clipper,
+   * then the master. Putting the clipper after the bus gain is what makes the
+   * stop fade able to take the organic layer to silence — a saturator upstream
+   * of the fade would be fading an already-limited signal, which is the same
+   * mistake `MasterChain` avoids by placing the session fade before its limiter.
+   */
+  private buildMixer(ctx: AudioContext): void {
+    this.master = ctx.createGain();
+    this.master.gain.value = 1;
+    this.master.connect(ctx.destination);
+
+    this.precisionBus = ctx.createGain();
+    this.precisionBus.gain.value = 1;
+    /*
+     * Two channels in, the same two channels out, with no matrixing (§39).
+     *
+     * Web Audio's default is `channelCountMode: 'max'` with a `'speakers'`
+     * interpretation, which is a mixing *policy*: it decides for itself how to
+     * fit an input's channels onto a node's, and its rule for going from two
+     * channels to one is (L + R) / 2. Nothing in this graph should ever hand it
+     * a mono node — but a binaural session is exactly the signal where being
+     * wrong about that is inaudible as a fault and fatal as an effect, so the
+     * policy is switched off rather than relied upon. Explicit and discrete
+     * means channel 0 reaches channel 0 and channel 1 reaches channel 1.
+     */
+    this.precisionBus.channelCount = 2;
+    this.precisionBus.channelCountMode = 'explicit';
+    this.precisionBus.channelInterpretation = 'discrete';
+    this.precisionBus.connect(this.master);
+
+    this.organicBus = ctx.createGain();
+    this.organicBus.gain.value = 1;
+    const safety = ctx.createWaveShaper();
+    safety.curve = softClipCurve();
+    safety.oversample = '2x';
+    this.organicBus.connect(safety);
+    safety.connect(this.master);
+
+    this.organic = createWebOrganicGraph(ctx, this.organicBus);
+  }
+
+  /**
+   * The organic bus. The precision bus is not reachable from here on purpose.
+   */
+  organicGraph(): OrganicAudioGraph | null {
+    return this.organic;
+  }
+
   /** Renders and schedules buffers until the look-ahead window is full. */
   private fill(): void {
     const ctx = this.ctx;
     const source = this.source;
-    const master = this.master;
-    if (!ctx || !source || !master || this.currentState === 'stopped') return;
+    const precision = this.precisionBus;
+    if (!ctx || !source || !precision || this.currentState === 'stopped') return;
 
     if (this.nextTime < ctx.currentTime) {
       // The queue drained — the render loop fell behind real time.
@@ -131,7 +196,7 @@ export class WebAudioBackend implements AudioBackend {
       buffer.copyToChannel(this.scratchR, 1);
       const node = ctx.createBufferSource();
       node.buffer = buffer;
-      node.connect(master);
+      node.connect(precision);
       node.start(this.nextTime);
       this.nextTime += frames / this.options.sampleRate;
       this.buffersRendered++;
@@ -163,6 +228,12 @@ export class WebAudioBackend implements AudioBackend {
   async dispose(): Promise<void> {
     await this.stop();
     try {
+      // The organic graph first: it holds source nodes that are still scheduled
+      // against this context, and closing the context underneath them logs a
+      // stream of errors that say nothing about what went wrong.
+      this.organic?.dispose();
+      this.organicBus?.disconnect();
+      this.precisionBus?.disconnect();
       this.master?.disconnect();
       await this.ctx?.close();
     } catch {
@@ -170,6 +241,9 @@ export class WebAudioBackend implements AudioBackend {
     }
     this.ctx = null;
     this.master = null;
+    this.precisionBus = null;
+    this.organicBus = null;
+    this.organic = null;
     this.source = null;
     this.currentState = 'idle';
   }

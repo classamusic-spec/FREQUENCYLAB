@@ -25,13 +25,35 @@ import {
 } from './types';
 import { detectOutputRoute } from './route';
 import { NowPlayingTransport, type NowPlayingInfo, type TransportCommand } from './nowPlaying';
+import type { OrganicRuntimeAsset } from './organic/assets';
+import {
+  OrganicSession,
+  type OrganicDiagnostics,
+  type OrganicLayerRuntime,
+} from './organic/session';
+// Deep import for the same reason `organic/session.ts` uses one: the DSP core
+// does not export its organic module from the package entry yet, and copying
+// the type would be a second schema (§25).
+import type { Plan } from '../../../../packages/dsp-core/src/organic/scheduler';
 
+/**
+ * `finishing` is the organic layer's (§76).
+ *
+ * The protocol has reached zero and the frequency session is already silent —
+ * the master chain's own fade-out saw to that — but a bowl started before the
+ * end may still have thirty seconds of tail to give. Nothing new is scheduled,
+ * nothing is cut, and the session ends when the last sound has decayed or the
+ * plan's tail allowance runs out, whichever is first. A session with no organic
+ * layer never enters this state: it goes from `playing` straight to `completed`
+ * exactly as it always did.
+ */
 export type PlaybackState =
   | 'idle'
   | 'preparing'
   | 'playing'
   | 'paused'
   | 'stopping'
+  | 'finishing'
   | 'completed'
   | 'error';
 
@@ -78,6 +100,23 @@ export interface SleepTimerState {
   minutes: number;
 }
 
+/**
+ * An organic layer to play alongside a protocol.
+ *
+ * The plan is computed once, up front, by `planSoundBath` — this carries it and
+ * the runtime facts about the assets it names. Nothing in the app constructs one
+ * today, because no build of this app can obtain the audio: see
+ * `audio/organic/delivery.ts`, which says so plainly rather than pretending. A
+ * session loaded without one behaves exactly as it did before this existed.
+ */
+export interface OrganicProgram {
+  readonly plan: Plan;
+  readonly assets: ReadonlyMap<string, OrganicRuntimeAsset>;
+  /** Priorities and fades, keyed by layer id. Optional; see `OrganicSession`. */
+  readonly layers?: ReadonlyMap<string, OrganicLayerRuntime>;
+  readonly maxVoices?: number;
+}
+
 export interface ControllerSnapshot {
   state: PlaybackState;
   protocolId?: string;
@@ -94,6 +133,12 @@ export interface ControllerSnapshot {
   playedSec: number;
   pauseCount: number;
   peakGainReductionDb: number;
+  /** The organic layer's state, when this session has one. */
+  organic?: OrganicDiagnostics;
+  /** Why it has none, when one was asked for and could not be built. */
+  organicUnavailable?: string;
+  /** Seconds of organic tail still owed while the state is `finishing` (§76). */
+  finishingSec: number;
 }
 
 export interface ScopeCapture {
@@ -175,6 +220,28 @@ export class SessionController implements RenderSource {
   private telemetryTimer: ReturnType<typeof setInterval> | null = null;
   private backendOptions: AudioBackendOptions = { ...DEFAULT_BACKEND_OPTIONS };
 
+  /*
+   * The organic layer.
+   *
+   * Held here, beside the renderer, because the two are one session: they start
+   * together, fade together and are torn down together. The program is kept
+   * separately from the running session so a backend restart — the fallback to
+   * `NullAudioBackend`, a route change that forced a new context — rebuilds it
+   * against whatever graph the new backend offers, or reports why it could not.
+   */
+  private organicProgram: OrganicProgram | null = null;
+  private organic: OrganicSession | null = null;
+  private organicUnavailable: string | undefined;
+  /** Underrun count at the last telemetry tick, for the load governor (§52). */
+  private lastUnderruns = 0;
+
+  // Finishing, on the same pattern as the sleep timer: a wall-clock deadline
+  // re-read from whichever clock is running, and latched so it can only fire
+  // once. The render path is the clock that matters — during finishing the
+  // backend is still pulling blocks, so it is the most reliable thing available.
+  private finishingEndsAt = 0;
+  private finishingFiring = false;
+
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
     listener(this.snapshot());
@@ -211,6 +278,9 @@ export class SessionController implements RenderSource {
       playedSec: this.playedFrames / (this.renderer?.sampleRate ?? 48000),
       pauseCount: this.pauseCount,
       peakGainReductionDb: this.peakGainReductionDb,
+      organic: this.organic?.diagnostics(),
+      organicUnavailable: this.organicUnavailable,
+      finishingSec: this.organic?.finishingRemainingSec(this.positionSec) ?? 0,
     };
   }
 
@@ -246,9 +316,14 @@ export class SessionController implements RenderSource {
    * Prepares a protocol without starting playback, so the session screen can
    * show the exact configuration and run preflight before any sound is made.
    */
-  async load(protocol: Protocol, options: { masterGain?: number } = {}): Promise<void> {
+  async load(
+    protocol: Protocol,
+    options: { masterGain?: number; organic?: OrganicProgram } = {},
+  ): Promise<void> {
     await this.teardown('replaced');
     this.protocol = protocol;
+    this.organicProgram = options.organic ?? null;
+    this.organicUnavailable = undefined;
     this.renderer = new SessionRenderer(protocol, {
       sampleRate: protocol.sampleRate,
       blockSize: DEFAULT_BLOCK_SIZE,
@@ -286,6 +361,8 @@ export class SessionController implements RenderSource {
     if (this.state === 'paused' && this.backend) {
       this.renderer.cancelStopFade();
       await this.backend.resume();
+      // After the resume, so the ramp is scheduled against a running clock.
+      this.organic?.duck(1, 0.25);
       this.pauseReason = null;
       this.state = 'playing';
       this.startTelemetry();
@@ -319,6 +396,7 @@ export class SessionController implements RenderSource {
     try {
       await this.backend.start(this);
       this.state = 'playing';
+      this.attachOrganic();
       this.showTransport();
       this.startTelemetry();
     } catch (error) {
@@ -338,6 +416,9 @@ export class SessionController implements RenderSource {
         await this.backend.start(this);
         this.state = 'playing';
         this.error = reason;
+        // Called on this path too, so an organic layer that was asked for gets
+        // a stated reason rather than silently not appearing (§65).
+        this.attachOrganic();
         this.startTelemetry();
       } catch {
         this.state = 'error';
@@ -345,6 +426,58 @@ export class SessionController implements RenderSource {
       }
     }
     this.emit();
+  }
+
+  /**
+   * Builds the organic layer against the backend that just started.
+   *
+   * Every refusal is recorded rather than swallowed, because "the sound bath is
+   * not playing" needs a reason attached wherever it is true (§65). The layer is
+   * refused outright on a backend that makes no sound: a silent fallback backend
+   * scheduling voices nobody can hear would be work spent to produce a lie.
+   *
+   * Nothing here can fail the frequency session. A throw is caught, reported and
+   * left behind (§56).
+   */
+  private attachOrganic(): void {
+    this.organic = null;
+    this.organicUnavailable = undefined;
+    const program = this.organicProgram;
+    if (!program) return;
+
+    const backend = this.backend;
+    if (!backend?.audible) {
+      this.organicUnavailable = 'This backend produces no sound, so nothing was scheduled.';
+      return;
+    }
+    const graph = backend.organicGraph?.() ?? null;
+    if (!graph) {
+      this.organicUnavailable = `${backend.name} has no organic bus.`;
+      return;
+    }
+
+    try {
+      const session = new OrganicSession({
+        plan: program.plan,
+        assets: program.assets,
+        graph,
+        // The steady-state distance between what the renderer has produced and
+        // what the listener is hearing. It is what turns a protocol second into
+        // an audio-context timestamp, so it comes from the backend rather than
+        // from the configuration — the two agree, but only one of them is the
+        // thing actually queueing audio.
+        outputLatencySec: backend.stats().outputLatencySec,
+        protocolDurationSec: this.durationSec,
+        layers: program.layers,
+        maxVoices: program.maxVoices,
+      });
+      session.start();
+      this.organic = session;
+      this.lastUnderruns = backend.stats().underruns;
+    } catch (error) {
+      this.organicUnavailable =
+        error instanceof Error ? error.message : 'The organic layer could not be started.';
+    }
   }
 
   private backendOptionsForProtocol(): AudioBackendOptions {
@@ -364,8 +497,11 @@ export class SessionController implements RenderSource {
     if (this.state !== 'playing' || !this.backend) return;
     this.pauseReason = reason;
     this.pauseCount++;
-    // A short fade before suspending: cutting a tone mid-cycle clicks.
+    // A short fade before suspending: cutting a tone mid-cycle clicks. The
+    // organic bus is ducked over the same quarter second — a bowl frozen
+    // mid-ring by a context suspend clicks harder than a tone does.
     this.renderer?.beginStopFade(0.25);
+    this.organic?.duck(0, 0.25);
     await delay(280);
     await this.backend.suspend();
     this.state = 'paused';
@@ -396,6 +532,13 @@ export class SessionController implements RenderSource {
 
     const fade = Math.max(STOP_FADE_SEC, fadeSec);
     this.renderer?.beginStopFade(fade);
+    // Both buses recede over the same fade, so a stop is one sound getting
+    // quieter rather than two things ending at different moments. The organic
+    // half is an `AudioParam` ramp on the audio thread, which means it completes
+    // on time regardless of what the JS thread is doing — and it also cancels
+    // the voices already scheduled into the future, so nothing surfaces after
+    // the fade has finished (§28).
+    this.organic?.beginStopFade(fade);
     // Rendered is not the same as heard: a backend plays out of a look-ahead
     // window, so tearing down when the *renderer* reaches silence would cut off
     // the quietest part of the fade before it left the speaker.
@@ -521,9 +664,11 @@ export class SessionController implements RenderSource {
       detail: [stage, timer].filter(Boolean).join('  ·  ') || 'Frequency Lab',
       durationSec: snapshot.telemetry?.durationSec ?? this.durationSec,
       elapsedSec: snapshot.telemetry?.positionSec ?? 0,
-      // Still 'playing' through a stop: the fade is audible, and a transport
-      // that flipped to paused while sound was still coming out would be lying.
-      playing: this.state === 'playing' || this.state === 'stopping',
+      // Still 'playing' through a stop and through the finishing tails: sound
+      // is still coming out in both, and a transport that flipped to paused
+      // while it was would be lying.
+      playing:
+        this.state === 'playing' || this.state === 'stopping' || this.state === 'finishing',
     };
   }
 
@@ -545,7 +690,7 @@ export class SessionController implements RenderSource {
       if (this.state === 'playing') void this.pause('user');
       return;
     }
-    if (this.state === 'playing' || this.state === 'paused') {
+    if (this.state === 'playing' || this.state === 'paused' || this.state === 'finishing') {
       void this.stop('remote');
     }
   }
@@ -574,6 +719,13 @@ export class SessionController implements RenderSource {
     // Taken down before the backend, so the lock screen never offers a
     // transport for a session that no longer exists.
     this.transport.release();
+    // Before the backend, and before its context is closed: the organic graph
+    // holds source nodes scheduled against that context, and disposing them
+    // afterwards would be disposing them against nothing.
+    this.organic?.dispose();
+    this.organic = null;
+    this.finishingFiring = false;
+    this.finishingEndsAt = 0;
     await this.disposeBackend();
     this.stopReason = reason;
     this.pendingStop = null;
@@ -621,6 +773,12 @@ export class SessionController implements RenderSource {
     renderer.render(left, right, frames);
     if (this.state === 'playing') this.playedFrames += frames;
     if (this.sleepTimerEndsAt !== null) this.checkSleepTimer();
+    // Two number writes and a comparison. The organic look-ahead's *deadline*
+    // comes from here — the protocol clock, which advances by the frames the
+    // backend actually pulled — and the work it triggers is done elsewhere,
+    // because `render` may not allocate and may not await (§54, §55).
+    this.organic?.noteRendered(renderer.positionSec);
+    if (this.state === 'finishing') this.checkFinishing();
 
     // Visualiser tap.
     for (let i = 0; i < frames; i++) {
@@ -633,9 +791,70 @@ export class SessionController implements RenderSource {
       this.pendingStop = 'completed';
       // Completion is handled off the render path: this method must not await.
       setTimeout(() => {
-        void this.teardown('completed');
+        void this.completeOrFinish();
       }, 0);
     }
+  }
+
+  /**
+   * The protocol has reached zero (§76).
+   *
+   * Without an organic layer this is what it always was: tear down, emit
+   * `completed`, and let the player store write the record. With one, the
+   * session enters `finishing` instead and gives the tails the time the plan
+   * says they need — a forty-second bowl started before the end is the case this
+   * exists for, and cutting it is exactly what §45 and §76 both forbid.
+   *
+   * The core is faded out on the way in. In practice it is already silent: the
+   * master chain's raised-cosine fade-out reaches zero at the protocol's end and
+   * stays there. The fade is applied anyway because `fadeOutSec` is a protocol
+   * setting and can be zero, and a protocol that set it to zero would otherwise
+   * hold its last tone at full level for the whole finishing period.
+   */
+  private async completeOrFinish(): Promise<void> {
+    const organic = this.organic;
+    if (!organic) {
+      await this.teardown('completed');
+      return;
+    }
+
+    organic.beginFinish();
+    const remaining = organic.finishingRemainingSec(this.positionSec);
+    if (organic.isFinished(this.positionSec) || remaining <= 0) {
+      await this.teardown('completed');
+      return;
+    }
+
+    this.state = 'finishing';
+    this.finishingFiring = false;
+    this.renderer?.beginStopFade(STOP_FADE_SEC);
+    // Wall clock, for the same reason the sleep timer's deadline is: it is
+    // re-read from whichever clock happens to be running rather than counted
+    // down by one that may be throttled. The backend's look-ahead is added
+    // because the last of the tail still has to leave the speaker.
+    const lookaheadSec = this.backend?.stats().outputLatencySec ?? 0;
+    this.finishingEndsAt = Date.now() + (remaining + lookaheadSec) * 1000 + 60;
+    this.emit();
+  }
+
+  /**
+   * Ends the finishing period once the tails are done or the bound has passed.
+   *
+   * Called from the render path and from the telemetry tick — two independent
+   * clocks, neither of which is a UI timer. Latched, so a deadline that has
+   * passed can only ever produce one teardown, and re-checked inside the
+   * dispatch because a stop by hand may have overtaken it in the meantime.
+   */
+  private checkFinishing(): boolean {
+    if (this.state !== 'finishing' || this.finishingFiring) return false;
+    const done = this.organic?.isFinished(this.positionSec) ?? true;
+    if (!done && Date.now() < this.finishingEndsAt) return false;
+    this.finishingFiring = true;
+    setTimeout(() => {
+      if (this.state !== 'finishing') return;
+      void this.teardown('completed');
+    }, 0);
+    return true;
   }
 
   /**
@@ -681,6 +900,8 @@ export class SessionController implements RenderSource {
     if (this.telemetryTimer) return;
     this.telemetryTimer = setInterval(() => {
       this.checkSleepTimer();
+      this.checkFinishing();
+      this.governOrganicLoad();
       const telemetry = this.renderer?.telemetry();
       if (telemetry) {
         this.peakGainReductionDb = Math.max(this.peakGainReductionDb, telemetry.gainReductionDb);
@@ -692,6 +913,31 @@ export class SessionController implements RenderSource {
   private stopTelemetry(): void {
     if (this.telemetryTimer) clearInterval(this.telemetryTimer);
     this.telemetryTimer = null;
+  }
+
+  /**
+   * Gives the core priority over the decoration, in a number (§52).
+   *
+   * Two signals, and the second is the stronger one. `load` is the fraction of a
+   * buffer's duration the renderer spends producing it, which is the early
+   * warning; an underrun is a gap that has already been heard, which is the
+   * proof. Either one narrows the organic voice cap, and it widens again once
+   * the device recovers.
+   *
+   * What this never does is touch the core. The renderer does not know the
+   * organic layer exists, is never asked to do less, and is never given a
+   * smaller block. Under load the thing that is given up is a bowl.
+   */
+  private governOrganicLoad(): void {
+    const organic = this.organic;
+    const stats = this.backend?.stats();
+    if (!organic || !stats) return;
+    const newUnderruns = stats.underruns - this.lastUnderruns;
+    this.lastUnderruns = stats.underruns;
+    // The web backend does not measure render time and reports a load of zero,
+    // so on that path the underrun count is the only signal there is — which is
+    // exactly why it is treated as decisive rather than as a tiebreak.
+    organic.governFor(newUnderruns > 0 ? 1 : stats.load);
   }
 
   /**
@@ -764,6 +1010,8 @@ export class SessionController implements RenderSource {
     await this.teardown('replaced');
     this.renderer = null;
     this.protocol = null;
+    this.organicProgram = null;
+    this.organicUnavailable = undefined;
     this.listeners.clear();
   }
 }

@@ -78,7 +78,15 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       set({ snapshot });
       // Completion is detected here rather than in the render path, so writing
       // the session record never happens on the audio thread.
-      if (previousState === 'playing' && snapshot.state === 'completed' && !get().recorded) {
+      //
+      // `finishing` counts as a previous state as much as `playing` does. A
+      // session with an organic layer passes through it on the way out — the
+      // protocol has reached zero and the last tails are decaying (§76) — and
+      // matching only on `playing` would mean that every such session finished
+      // without a record, taking its rating, its insight and its experiment
+      // result with it.
+      const wasSounding = previousState === 'playing' || previousState === 'finishing';
+      if (wasSounding && snapshot.state === 'completed' && !get().recorded) {
         set({ recorded: true });
         void writeSessionRecord(snapshot, 'completed', get().experimentContext)
           .then((session) => set({ lastCompletedSessionId: session ? session.id : null }))

@@ -1,3 +1,5 @@
+import type { OrganicAudioGraph } from './organic/graph';
+
 /**
  * The audio backend seam.
  *
@@ -59,6 +61,25 @@ export interface AudioBackend {
   stop(): Promise<void>;
   dispose(): Promise<void>;
   stats(): BackendStats;
+  /**
+   * The second path into the master mixer, where this backend has one.
+   *
+   * §1 and §39. A backend that produces sound builds two buses, not one: the
+   * *precision* bus carries the self-rendered PCM from `RenderSource` and the
+   * *organic* bus carries scheduled sample playback. They meet at the master
+   * gain and nowhere earlier.
+   *
+   * What comes back is only ever the organic half. The precision bus stays
+   * private to the backend, so the organic layer has no reference it could pan,
+   * widen or crossfeed the core with — which is the property that keeps a
+   * binaural session binaural, since a binaural pair *is* the difference
+   * between the two channels and any operation that mixes them destroys the
+   * effect while leaving something that still sounds like a tone.
+   *
+   * Optional, and null before `start`. `NullAudioBackend` never offers one:
+   * a backend that makes no sound must not appear to have somewhere to send it.
+   */
+  organicGraph?(): OrganicAudioGraph | null;
 }
 
 export class AudioBackendUnavailableError extends Error {
