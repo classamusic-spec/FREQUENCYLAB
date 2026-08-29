@@ -34,7 +34,8 @@ export type PresetMatchField =
   | 'tag'
   | 'intent'
   | 'collection'
-  | 'summary';
+  | 'summary'
+  | 'popular-claim';
 
 export interface PresetSearchResult {
   preset: FrequencyPreset;
@@ -258,6 +259,26 @@ function scoreOne(
     if (summary.includes(term)) {
       score += 8;
       matchedOn.add('summary');
+    }
+
+    /*
+     * The claims people make about a frequency are searchable too.
+     *
+     * Someone types "DNA repair" because that is the phrase they met, and if
+     * the library answers with nothing they go back to whatever told them the
+     * claim in the first place — which is the one outcome worth avoiding. 528 Hz
+     * carries the DNA claim *and* the paragraph explaining that nothing has
+     * demonstrated it, so finding it here is how the answer reaches the person
+     * asking the question.
+     *
+     * It scores below every other field, so a claim phrase never outranks a
+     * real name or number, and it reports as `popular-claim` rather than
+     * hiding among the rest: the row can then say it was found by something
+     * somebody claims about it, not by something the app asserts.
+     */
+    if (row.associations.some((entry) => entry.claim.toLowerCase().includes(term))) {
+      score += 6;
+      matchedOn.add('popular-claim');
     }
   }
 

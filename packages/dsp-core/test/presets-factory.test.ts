@@ -608,3 +608,51 @@ describe('search finds what people type', () => {
     expect(presetsAtFrequency(220).map((row) => row.id)).toEqual(['af-220']);
   });
 });
+
+describe('a claim is findable, and answered when it is found', () => {
+  /*
+   * Someone types "DNA repair" because that is the phrase they met. If the
+   * library answers with nothing, they go back to whatever told them the claim
+   * in the first place — which is the one outcome worth avoiding. 528 Hz
+   * carries the claim *and* the paragraph explaining that nothing has
+   * demonstrated it, so being findable is how the answer reaches the person
+   * asking the question.
+   *
+   * Search indexed names, aliases, tags and summaries but not the claims, so
+   * before this the app's best-argued rebuttal was unreachable by the only
+   * words anybody would use to look for it.
+   */
+  it('finds 528 Hz from the claim attached to it, not just its number', () => {
+    for (const query of ['dna', 'dna repair', 'repairs dna']) {
+      const results = searchPresets(query);
+      expect(results.length, `"${query}" found nothing`).toBeGreaterThan(0);
+      const found = results.find((result) => result.preset.id === 'solf-528');
+      expect(found, `"${query}" did not reach 528 Hz`).toBeDefined();
+      expect(found!.matchedOn).toContain('popular-claim');
+    }
+  });
+
+  it('says the match came from a claim rather than from anything the app asserts', () => {
+    const [top] = searchPresets('dna repair');
+    // The row has to be able to say *why* it is here. A claim phrase reaching a
+    // preset silently would read as the app agreeing with the phrase.
+    expect(top.matchedOn).toContain('popular-claim');
+    expect(top.classification).toBe('traditional');
+  });
+
+  it('never lets a claim phrase outrank a real name or number', () => {
+    // '528' is an alias and a frequency; it must beat the claim match.
+    const byNumber = searchPresets('528');
+    expect(byNumber[0].matchedOn.some((field) => field !== 'popular-claim')).toBe(true);
+  });
+
+  it('answers every claim it can be found by', () => {
+    // The pairing rule, at the point it actually matters: anything reachable by
+    // a claim carries the sentence that answers that claim.
+    for (const result of searchPresets('dna repair')) {
+      for (const association of result.preset.associations) {
+        expect(association.currentEvidence.trim().length).toBeGreaterThan(0);
+      }
+    }
+  });
+});
