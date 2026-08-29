@@ -15,6 +15,8 @@ import { Label, Text } from '../../src/design/components/Text';
 import { colors, layout, MIN_TOUCH_TARGET, radius, space } from '../../src/design/tokens';
 import { usePresetShelf } from '../../src/state/presets';
 import { useProtocolLibrary } from '../../src/state/library';
+import { NotAtThisLevel } from '../../src/design/components/NotAtThisLevel';
+import { useTier } from '../../src/features/tier';
 
 /**
  * The collection browser (§3).
@@ -40,6 +42,7 @@ import { useProtocolLibrary } from '../../src/state/library';
  * starred, played and built.
  */
 export default function CollectionsScreen() {
+  const { canSee } = useTier();
   const router = useRouter();
   const hydrate = usePresetShelf((state) => state.hydrate);
   const hydrated = usePresetShelf((state) => state.hydrated);
@@ -62,6 +65,24 @@ export default function CollectionsScreen() {
       })),
     [],
   );
+
+  /*
+   * The library is off at Simple, and its tab does not exist there — so this
+   * screen is only ever reached by a link or a typed address. The door says
+   * what is behind it rather than rendering a version of the page with the
+   * numbers taken out, which would leave nothing (§80, and the rule in
+   * `features/tier`: a tier hides vocabulary and controls, never honesty).
+   */
+  if (!canSee('library')) {
+    return (
+      <NotAtThisLevel
+        eyebrow="Library"
+        title="Collections"
+        subtitle="The shelves this library is arranged on."
+        explanation="The collections are the frequency library's shelves — every one of them a list of numbers and the claims attached to them. They belong to Explorer and Lab. Simple plays sessions without naming the numbers inside them."
+      />
+    );
+  }
 
   return (
     <Screen bottomInset={layout.transportHeight}>

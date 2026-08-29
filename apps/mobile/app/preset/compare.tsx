@@ -17,6 +17,8 @@ import { PresetCard, presetReadout, formatPresetHz } from '../../src/design/comp
 import { Label, Text } from '../../src/design/components/Text';
 import { colors, layout, space } from '../../src/design/tokens';
 import { representationOptions } from '../../src/features/presetPlayback';
+import { NotAtThisLevel } from '../../src/design/components/NotAtThisLevel';
+import { useTier } from '../../src/features/tier';
 
 /**
  * Comparing two presets (§28).
@@ -32,6 +34,7 @@ import { representationOptions } from '../../src/features/presetPlayback';
  * output rather than the label.
  */
 export default function PresetCompareScreen() {
+  const { canSee } = useTier();
   const router = useRouter();
   const params = useLocalSearchParams<{ a?: string; b?: string }>();
   const [query, setQuery] = useState('');
@@ -47,6 +50,24 @@ export default function PresetCompareScreen() {
       ),
     [left?.id, query],
   );
+
+  /*
+   * The library is off at Simple, and its tab does not exist there — so this
+   * screen is only ever reached by a link or a typed address. The door says
+   * what is behind it rather than rendering a version of the page with the
+   * numbers taken out, which would leave nothing (§80, and the rule in
+   * `features/tier`: a tier hides vocabulary and controls, never honesty).
+   */
+  if (!canSee('library')) {
+    return (
+      <NotAtThisLevel
+        eyebrow="Compare"
+        title="Compare"
+        subtitle="What each one holds and what each one actually emits."
+        explanation="Comparing two presets is a comparison of frequencies, engines and evidence ratings, which belongs to Explorer and Lab. Simple does not show the library, so this screen was reached from a link or a typed address."
+      />
+    );
+  }
 
   if (!left) {
     return (

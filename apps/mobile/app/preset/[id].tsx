@@ -40,6 +40,8 @@ import { useProtocolLibrary, summariseLibrary } from '../../src/state/library';
 import { useSessionStart } from '../../src/state/sessionStart';
 import { useHistory } from '../../src/state/history';
 import { usePlayer } from '../../src/state/player';
+import { NotAtThisLevel } from '../../src/design/components/NotAtThisLevel';
+import { useTier } from '../../src/features/tier';
 
 /**
  * One preset (§25, §43).
@@ -59,6 +61,7 @@ import { usePlayer } from '../../src/state/player';
  * gap.
  */
 export default function PresetScreen() {
+  const { canSee } = useTier();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const preset = factoryPreset(id);
@@ -116,6 +119,24 @@ export default function PresetScreen() {
         : [],
     [preset, sessions],
   );
+
+  /*
+   * The library is off at Simple, and its tab does not exist there — so this
+   * screen is only ever reached by a link or a typed address. The door says
+   * what is behind it rather than rendering a version of the page with the
+   * numbers taken out, which would leave nothing (§80, and the rule in
+   * `features/tier`: a tier hides vocabulary and controls, never honesty).
+   */
+  if (!canSee('library')) {
+    return (
+      <NotAtThisLevel
+        eyebrow="Frequency"
+        title="Preset"
+        subtitle="Where a number came from and what is claimed about it."
+        explanation="A preset page is a page about a number: the value itself, the shelf it sits on, who claims what about it, and how strong the evidence is. Remove the number and there is no page left, so this one belongs to Explorer and Lab. Simple does not show the library at all — this screen was reached from a link or a typed address."
+      />
+    );
+  }
 
   if (!preset || !option) {
     return (

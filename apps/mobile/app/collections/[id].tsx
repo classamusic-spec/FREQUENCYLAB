@@ -20,6 +20,8 @@ import { Text } from '../../src/design/components/Text';
 import { layout, space } from '../../src/design/tokens';
 import { usePresetShelf } from '../../src/state/presets';
 import { useProtocolLibrary, summariseLibrary } from '../../src/state/library';
+import { NotAtThisLevel } from '../../src/design/components/NotAtThisLevel';
+import { useTier } from '../../src/features/tier';
 
 /**
  * One shelf (§3).
@@ -40,6 +42,7 @@ import { useProtocolLibrary, summariseLibrary } from '../../src/state/library';
  * what makes the one it is mean anything.
  */
 export default function CollectionScreen() {
+  const { canSee } = useTier();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const collection = findCollection(id as CollectionId);
@@ -60,6 +63,24 @@ export default function CollectionScreen() {
     () => (collection && !collection.sourcedElsewhere ? presetsInCollection(collection.id) : []),
     [collection],
   );
+
+  /*
+   * The library is off at Simple, and its tab does not exist there — so this
+   * screen is only ever reached by a link or a typed address. The door says
+   * what is behind it rather than rendering a version of the page with the
+   * numbers taken out, which would leave nothing (§80, and the rule in
+   * `features/tier`: a tier hides vocabulary and controls, never honesty).
+   */
+  if (!canSee('library')) {
+    return (
+      <NotAtThisLevel
+        eyebrow="Library"
+        title="Collection"
+        subtitle="What is on this shelf, and where it came from."
+        explanation="A collection lists frequencies by value and by the claims attached to them, which belongs to Explorer and Lab. Simple plays sessions without naming the numbers inside them."
+      />
+    );
+  }
 
   if (!collection) {
     return (
