@@ -57,6 +57,20 @@ export default function CalibrationScreen() {
    */
   const ownsPlayback = useRef(false);
 
+  /**
+   * Where this screen exits to.
+   *
+   * It is reached two ways and they want different destinations: onboarding
+   * `replace`s into it, so there is nothing behind it and the player is the
+   * only sensible next screen, while Profile `push`es it, and dropping that
+   * user on the player tab loses their place for no reason. `canGoBack`
+   * distinguishes the two without either caller having to say which it is.
+   */
+  const leave = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  }, [router]);
+
   const stopOwnPlayback = useCallback(async () => {
     if (!ownsPlayback.current) return;
     ownsPlayback.current = false;
@@ -115,7 +129,11 @@ export default function CalibrationScreen() {
               onPress={() => {
                 haptics.confirm();
                 setConfirmed((current) => ({ ...current, [channel]: true }));
-                void stop();
+                // `stopOwnPlayback`, not `stop`: confirming a channel without
+                // having played its test tone would otherwise end whatever the
+                // user already had running — the same defect the ownership flag
+                // was added for, at the one call site that had been missed.
+                void stopOwnPlayback();
                 setPlayingChannel(null);
               }}
             />
@@ -172,7 +190,7 @@ export default function CalibrationScreen() {
             comfortableOutputLevel: level,
             calibrationCompletedAt: new Date().toISOString(),
           });
-          router.replace('/');
+          leave();
         }}
       />
       <HardwareButton
@@ -180,7 +198,7 @@ export default function CalibrationScreen() {
         variant="ghost"
         onPress={async () => {
           await stopOwnPlayback();
-          router.replace('/');
+          leave();
         }}
       />
     </Screen>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
@@ -105,6 +105,24 @@ export default function SessionScreen() {
     if (snapshot.state === 'completed') haptics.complete();
   }, [snapshot.state]);
 
+  /**
+   * Leaving this screen.
+   *
+   * `router.back()` is a no-op when the history is empty, and this is a Stack
+   * screen with no tab bar of its own — so a deep link, a PWA reload or a cold
+   * start restored to `/session` used to strand the user here with every exit
+   * doing nothing. The player tab is the one destination that always exists,
+   * so it is the fallback rather than a second `back()` and a hope.
+   *
+   * Used by all four exits — the chevron, the stop button, and the two effects
+   * that leave on a session ending from outside the component tree — because a
+   * dead end that only three of them avoid is still a dead end.
+   */
+  const leave = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  }, [router]);
+
   /*
    * The sleep timer and the lock-screen stop button both end the session from
    * outside the component tree, so the screen leaves on the state rather than on
@@ -116,8 +134,8 @@ export default function SessionScreen() {
   useEffect(() => {
     if (!externallyStopped) return;
     if (snapshot.state !== 'idle') return;
-    router.back();
-  }, [router, externallyStopped, snapshot.state]);
+    leave();
+  }, [leave, externallyStopped, snapshot.state]);
 
   useEffect(() => {
     if (snapshot.state !== 'completed') return;
@@ -125,8 +143,8 @@ export default function SessionScreen() {
     // that value is what used to skip the rating screen entirely.
     if (lastCompletedSessionId === undefined) return;
     if (lastCompletedSessionId) router.replace(`/rate/${lastCompletedSessionId}`);
-    else router.back();
-  }, [lastCompletedSessionId, router, snapshot.state]);
+    else leave();
+  }, [lastCompletedSessionId, leave, router, snapshot.state]);
 
   const beat = useMemo(() => {
     if (!telemetry) return 0;
@@ -188,7 +206,7 @@ export default function SessionScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={leave}
             accessibilityRole="button"
             accessibilityLabel="Back"
             style={styles.headerButton}
@@ -212,7 +230,25 @@ export default function SessionScreen() {
           </Pressable>
         </View>
 
-        {!snapshot.backend.audible ? (
+        {/*
+            Two different things used to read as one. `audible` is false when the
+            build has no audio engine *and* when there is no backend at all,
+            which is the ordinary state of an idle screen — so arriving here
+            with nothing playing accused the build of a missing engine. The
+            state decides which sentence is true.
+          */}
+        {snapshot.state === 'idle' ? (
+          <SafetyBanner
+            check={{
+              id: 'nothing-playing',
+              level: 'info',
+              title: 'Nothing is playing',
+              message:
+                'This screen shows a session while it runs. Nothing is running now — start one from the player.',
+            }}
+            style={styles.banner}
+          />
+        ) : !snapshot.backend.audible ? (
           <SafetyBanner
             check={{
               id: 'no-audio',
@@ -348,7 +384,7 @@ export default function SessionScreen() {
             <Pressable
               onPress={async () => {
                 await stop();
-                router.back();
+                leave();
               }}
               accessibilityRole="button"
               accessibilityLabel="Stop the session"
