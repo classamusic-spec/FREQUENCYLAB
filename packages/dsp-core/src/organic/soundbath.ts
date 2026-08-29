@@ -163,10 +163,10 @@ export interface SoundBathEvent {
   detuneCents: number;
 }
 
-export function lerp(range: Range, t: number): number {
+export function lerpRange(range: Range, t: number): number {
   return range.min + (range.max - range.min) * t;
 }
 
-export function sample(range: Range, rng: Rng): number {
-  return lerp(range, rng.nextFloat());
+export function sampleRange(range: Range, rng: Rng): number {
+  return lerpRange(range, rng.nextFloat());
 }

@@ -79,8 +79,6 @@ export * from './organic/manifest.generated.js';
 export * from './organic/registry.js';
 export * from './organic/presets.js';
 export * from './organic/validate.js';
-// `organic/soundbath.js` and `organic/scheduler.js` are deliberately absent:
-// `soundbath.ts` exports a `lerp` over `Range`, and `math/util.ts` already
-// exports a `lerp` over two numbers, so a star export of either would collide
-// and fail the build. Consumers reach those two by path until one is renamed.
+export * from './organic/soundbath.js';
+export * from './organic/scheduler.js';
 

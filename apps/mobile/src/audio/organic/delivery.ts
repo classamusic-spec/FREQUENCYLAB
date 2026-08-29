@@ -3,31 +3,40 @@
  * do not.
  *
  * This is the honest centre of the organic layer, so it is stated here rather
- * than left to be discovered. The library is 369 licensed WAV files, 1.5 GB,
- * committed to this repository at `Healing Sounds - Bells & Chimes/`. It is a
- * development-time input: the pipeline measures it offline and the app ships
- * the *manifest*, not the audio (see `docs/audio-asset-pipeline.md`). Nothing
- * bundles those files, nothing serves them, and nothing downloads them:
+ * than left to be discovered by whoever wonders why nothing is playing.
  *
- *  - **Bundling** them is not an option in either build. `assetBundlePatterns`
- *    would put 1.5 GB inside an app binary, and the web export would put the
- *    same 1.5 GB behind a static host and ask a browser to fetch it.
- *  - **Serving** them needs a host that does not exist. There is no server in
- *    this product at all (`docs/BACKEND.md`), and the licence on the library is
- *    a redistribution question before it is an engineering one.
- *  - **Downloading** them on first run is the shape that would work — a curated
- *    subset, fetched to `expo-file-system` and cached by content hash, which
- *    the manifest already gives every asset. That is a product decision with a
- *    cost attached, and it has not been taken.
+ * **What exists.** 369 licensed source files, 1.5 GB of 24-bit WAV, at
+ * `Healing Sounds - Bells & Chimes/`. The pipeline measures them offline and
+ * the app ships the *manifest*, not the audio. `index_audio.py derive` now also
+ * writes compressed runtime copies to `generated/audio/runtime/<codec>/`, one
+ * file per asset and named by asset id — the whole library at 66 MB, which
+ * answers the size objection that used to make this question unanswerable.
  *
- * So the seam exists and the implementation behind it does not. That is
- * deliberate: §92 says a stub that pretends to play is worse than a documented
- * gap, and the failure mode a fake would create here is the worst kind — a
- * session that reports it is playing a sound bath while producing silence.
- * `UNCONFIGURED_DELIVERY` refuses every asset with a reason a person can read,
- * every refusal is counted, and the core frequency session is untouched by it
- * (§56). Install a real delivery with `setOrganicAssetDelivery` and the rest of
- * the layer — cache, voices, look-ahead, mixer — works against it unchanged.
+ * **What does not.** Those derivatives are not committed, and `derive` writes
+ * only approved assets by default because shipping a derivative of an asset no
+ * curator has passed would put unreviewed audio in front of a listener. One of
+ * the 369 is approved. So there is currently nothing to ship, and nothing that
+ * ships it:
+ *
+ *  - **Bundling.** 66 MB is a plausible bundle, but nothing declares it. There
+ *    is no map from an asset id to a `require`d module and no
+ *    `assetBundlePatterns` entry, and Metro bundles what is referenced.
+ *  - **Serving.** There is no server in this product at all
+ *    (`docs/BACKEND.md`), and the licence on the library is a redistribution
+ *    question before it is an engineering one.
+ *  - **Downloading.** Fetching a curated subset on first run into
+ *    `expo-file-system`, keyed by the content hash the manifest already carries
+ *    for every asset, is the shape that would work on device. It is a product
+ *    decision with a cost attached and it has not been taken.
+ *
+ * So the seam exists and the implementation behind it does not, deliberately.
+ * §92 says a stub that pretends to play is worse than a documented gap, and the
+ * fake here would be the worst kind — a session reporting that it is playing a
+ * sound bath while producing silence. `UNCONFIGURED_DELIVERY` refuses every
+ * asset with a reason a person can read, every refusal is counted and shown in
+ * diagnostics, and the core frequency session is untouched by all of it (§56).
+ * Install a real delivery with `setOrganicAssetDelivery` and the rest of the
+ * layer — cache, voices, look-ahead, mixer — works against it unchanged.
  */
 
 /**

@@ -1,7 +1,7 @@
 import { Rng } from '../math/rng.js';
 import { clamp } from '../math/util.js';
 import {
-  sample,
+  sampleRange,
   type AssetPool,
   type SchedulableAsset,
   type SoundBathEvent,
@@ -126,7 +126,7 @@ export function planSoundBath(options: PlanOptions): Plan {
       pool,
       // Layers do not all wake at once. Staggering the first attempt is what
       // stops a session opening with every layer firing together (§77).
-      nextAttemptAtSec: arrivalSec + sample(layer.intervalSec, rng) * rng.nextFloat(),
+      nextAttemptAtSec: arrivalSec + sampleRange(layer.intervalSec, rng) * rng.nextFloat(),
       recent: [],
       active: [],
     });
@@ -150,7 +150,7 @@ export function planSoundBath(options: PlanOptions): Plan {
 
       // Schedule the next attempt first, so a refusal below still advances the
       // layer's clock and cannot produce a tight retry loop.
-      const interval = sample(state.layer.intervalSec, rng);
+      const interval = sampleRange(state.layer.intervalSec, rng);
       state.nextAttemptAtSec = now + densityInterval(interval, density);
 
       const probability = densityProbability(state.layer.probability, density);
@@ -167,8 +167,8 @@ export function planSoundBath(options: PlanOptions): Plan {
       const tail = asset.durationSeconds;
       if (now + tail > durationSec + tailAllowanceSec) continue;
 
-      const gainDb = sample(state.layer.gainDb, rng) + (asset.recommendedGainDb ?? 0);
-      const pan = sample(state.layer.panRange, rng);
+      const gainDb = sampleRange(state.layer.gainDb, rng) + (asset.recommendedGainDb ?? 0);
+      const pan = sampleRange(state.layer.panRange, rng);
       const detuneCents = retuneFor(asset, preset);
 
       events.push({

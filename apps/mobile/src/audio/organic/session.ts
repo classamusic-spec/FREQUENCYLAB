@@ -1,11 +1,4 @@
-// The plan's types come from the DSP core, which does not export its organic
-// module from the package entry yet. Reaching into the source directly is
-// deliberate and temporary: the alternative is re-declaring `Plan` and
-// `SoundBathEvent` here, and a hand-kept copy of a type is the second schema
-// §25 exists to prevent. Collapse this to `@frequencylab/dsp-core` the day the
-// core exports `organic/`.
-import type { Plan } from '../../../../../packages/dsp-core/src/organic/scheduler';
-import type { SoundBathEvent } from '../../../../../packages/dsp-core/src/organic/soundbath';
+import type { Plan, SoundBathEvent } from '@frequencylab/dsp-core';
 import { OrganicAssetCache, type OrganicCacheStats, type OrganicRuntimeAsset } from './assets';
 import { organicAssetDelivery } from './delivery';
 import { gainFromDb, type OrganicAudioGraph } from './graph';

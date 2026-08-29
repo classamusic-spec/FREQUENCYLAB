@@ -7,6 +7,7 @@ import {
   routeChangeAction,
   totalDurationSec,
   type OutputRoute,
+  type Plan,
   type Protocol,
   type SessionTelemetry,
 } from '@frequencylab/dsp-core';
@@ -31,10 +32,6 @@ import {
   type OrganicDiagnostics,
   type OrganicLayerRuntime,
 } from './organic/session';
-// Deep import for the same reason `organic/session.ts` uses one: the DSP core
-// does not export its organic module from the package entry yet, and copying
-// the type would be a second schema (§25).
-import type { Plan } from '../../../../packages/dsp-core/src/organic/scheduler';
 
 /**
  * `finishing` is the organic layer's (§76).
