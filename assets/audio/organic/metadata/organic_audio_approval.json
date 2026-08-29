@@ -1,0 +1,7 @@
+{
+  "policy": "approve-all",
+  "approvedAt": "2026-08-29",
+  "approvedBy": "library owner",
+  "basis": "The owner of the licensed pack cleared the whole library to ship. This is a rights and suitability decision taken over the pack as a whole; it is not a record of anybody having listened to each of the 369 files. Every asset approved this way carries review.approvalSource = \"library\" so that distinction survives into the app, and the three assets with named entries in organic_audio_overrides.json keep approvalSource = \"curator\" because a person did check those individually.",
+  "excludedAssetIds": []
+}

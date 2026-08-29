@@ -39,6 +39,88 @@ def load_overrides(path: Path) -> tuple[dict[str, Any], list[ValidationIssue]]:
     return data, []
 
 
+def load_approval(path: Path) -> tuple[dict[str, Any], list[ValidationIssue]]:
+    """The library-wide approval policy, if the owner has written one.
+
+    Separate from the overrides file because it answers a different question.
+    An override says *this asset's record was wrong and here is the correction*;
+    the policy says *this pack is cleared to ship*. Writing the second as 369
+    override entries would set `manualOverride` on every asset in the library
+    and claim a per-file review that did not happen, which is the one thing the
+    review section exists to keep straight (§18).
+    """
+    if not path.exists():
+        return {}, []
+    try:
+        data = json.loads(path.read_text())
+    except json.JSONDecodeError as error:
+        return {}, [
+            ValidationIssue(
+                True,
+                None,
+                f"{path.name} is not valid JSON: {error.msg} at line {error.lineno}, column {error.colno}.",
+            )
+        ]
+    if not isinstance(data, dict):
+        return {}, [ValidationIssue(True, None, f"{path.name} must hold an object.")]
+
+    policy = data.get("policy")
+    if policy not in {None, "approve-all"}:
+        return data, [
+            ValidationIssue(
+                True,
+                None,
+                f"{path.name} has policy {policy!r}. The only policy this pipeline implements is "
+                '"approve-all"; anything narrower belongs in the overrides file, one asset at a time.',
+            )
+        ]
+    issues: list[ValidationIssue] = []
+    if policy == "approve-all":
+        for name in ("approvedAt", "approvedBy", "basis"):
+            if not data.get(name):
+                issues.append(
+                    ValidationIssue(
+                        True, None,
+                        f"{path.name} approves the whole library but has no {name}. A blanket approval "
+                        "with nobody's name and no date on it is not a record of a decision.",
+                    )
+                )
+    return data, issues
+
+
+def apply_approval(assets: list[dict[str, Any]], approval: dict[str, Any]) -> int:
+    """Marks the library approved, leaving individually reviewed assets alone.
+
+    Returns how many assets the policy itself approved. An asset already
+    approved by name in the overrides file keeps `approvalSource = "curator"`:
+    the blanket policy is the weaker claim of the two, and overwriting the
+    stronger one with it would lose the fact that somebody checked that file.
+    """
+    if approval.get("policy") != "approve-all":
+        # Approval still has to be *sourced*, even without a policy: an asset
+        # approved in the overrides file was approved by a curator.
+        for asset in assets:
+            review = asset.setdefault("review", {})
+            review["approvalSource"] = "curator" if review.get("approved") else None
+        return 0
+
+    excluded = set(approval.get("excludedAssetIds") or [])
+    approved_here = 0
+    for asset in assets:
+        review = asset.setdefault("review", {})
+        if asset.get("assetId") in excluded:
+            review["approved"] = False
+            review["approvalSource"] = None
+            continue
+        if review.get("approved"):
+            review["approvalSource"] = "curator"
+            continue
+        review["approved"] = True
+        review["approvalSource"] = "library"
+        approved_here += 1
+    return approved_here
+
+
 def apply_overrides(asset: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     """Manual values win (§21).
 
@@ -126,7 +208,26 @@ def validate(assets: list[dict[str, Any]], overrides: dict[str, Any], source_roo
 
         # An approved asset is one the app will actually ship, so it is held to
         # a higher standard than one still under review (§26).
-        if asset.get("review", {}).get("approved"):
+        review = asset.get("review", {})
+        source = review.get("approvalSource")
+        if review.get("approved") and not source:
+            issues.append(
+                ValidationIssue(
+                    True, asset_id,
+                    "is approved but records no approval source. Approval has to say where it came "
+                    "from, or a later screen cannot tell a checked file from a whole pack cleared at once.",
+                )
+            )
+        if source and not review.get("approved"):
+            issues.append(
+                ValidationIssue(
+                    True, asset_id,
+                    f"is not approved but records an approval source of {source!r}. That is a record of "
+                    "a decision that was not taken.",
+                )
+            )
+
+        if review.get("approved"):
             if classification.get("instrument") == "UNKNOWN":
                 issues.append(
                     ValidationIssue(True, asset_id, "is approved but has no instrument. Approve it with a classification, or set one in the overrides.")

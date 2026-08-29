@@ -27,6 +27,10 @@ class Paths:
         return self.metadata / "organic_audio_overrides.json"
 
     @property
+    def approval(self) -> Path:
+        return self.metadata / "organic_audio_approval.json"
+
+    @property
     def cache(self) -> Path:
         return self.generated / "organic_audio_analysis_cache.json"
 

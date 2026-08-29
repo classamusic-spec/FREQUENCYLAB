@@ -438,8 +438,19 @@ describe('organic asset registry: approval (§26)', () => {
   it('reports approval honestly, whatever the library currently says', () => {
     expect(registry.approvedCount).toBe(manifest.assets.filter((asset) => asset.review.approved).length);
     expect(registry.query({ approvedOnly: true })).toEqual(scan((asset) => asset.review.approved));
-    // Curation is barely started, so approval is a real filter and not a no-op.
-    expect(registry.count({ approvedOnly: true })).toBeLessThan(registry.size);
+    /*
+     * The library is approved in full, so this filter currently selects
+     * everything — and a filter that cannot exclude anything is one this
+     * library can no longer test. Asserted as the equality it now is, with the
+     * filter's actual behaviour proved on a two-record manifest in the test
+     * below, which is why that test was written this way in the first place.
+     */
+    expect(registry.count({ approvedOnly: true })).toBe(registry.size);
+    // Approval is sourced, never a bare flag: nothing is approved by nobody.
+    for (const asset of manifest.assets) {
+      if (asset.review.approved) expect(asset.review.approvalSource, asset.assetId).toBeTruthy();
+      else expect(asset.review.approvalSource, asset.assetId).toBeNull();
+    }
   });
 
   it('does not offer an unapproved asset to a caller that asked for approved ones', () => {

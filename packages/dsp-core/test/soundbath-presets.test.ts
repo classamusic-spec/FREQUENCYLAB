@@ -763,36 +763,67 @@ describe('the four presets the spec gave parameters for', () => {
 // ---------------------------------------------------------------------------
 
 describe('approval', () => {
-  it('reports every preset as designed but not yet approved', () => {
-    /*
-     * Curation has not started: one asset in the manifest is approved and it is
-     * the worked example in the overrides file, not a decision anybody made
-     * about the library. So the design-time validator passes everything and the
-     * approval check passes nothing, which is the correct state of the world
-     * and the reason the two are separate functions.
-     */
-    expect(LIBRARY.filter((asset) => asset.approved)).toHaveLength(1);
+  /*
+   * The library is now approved in full — 368 assets under the owner's blanket
+   * policy and one by an individual curator entry — so every preset here is
+   * shippable and the scheduler's own default produces sound.
+   *
+   * That makes the approval *filter* a no-op on this library, and a filter that
+   * cannot currently exclude anything is a filter no test can check by looking
+   * at the library. So the gate is proved the other way round: by taking the
+   * approval away and watching everything stop. Both directions are asserted,
+   * because "everything ships" and "the gate works" are different claims and
+   * only one of them survives a future pack arriving unapproved.
+   */
+  it('reports every preset as ready, and the scheduler ships without being asked twice', () => {
+    expect(LIBRARY.every((asset) => asset.approved)).toBe(true);
     for (const preset of buildSoundBathPresets()) {
       const report = validateSoundBathApproval(preset, LIBRARY);
-      expect(report.ready, preset.id).toBe(false);
+      expect(report.ready, preset.id).toBe(true);
       for (const layer of report.layers) {
-        expect(layer.size, `${preset.id}/${layer.layerId}`).toBeGreaterThanOrEqual(MINIMUM_POOL_SIZE);
-        expect(layer.approvedSize, `${preset.id}/${layer.layerId}`).toBeLessThan(MINIMUM_POOL_SIZE);
+        expect(layer.approvedSize, `${preset.id}/${layer.layerId}`).toBeGreaterThanOrEqual(
+          MINIMUM_POOL_SIZE,
+        );
+        expect(layer.approvedSize, `${preset.id}/${layer.layerId}`).toBe(layer.size);
       }
+      // `requireApproved` left at its shipping default rather than opted out of,
+      // which is the whole point: this is what the app itself will call.
+      expect(
+        planSoundBath({ preset, library: LIBRARY, durationSec: SESSION_SEC, seed: 4242 }).events.length,
+        preset.id,
+      ).toBeGreaterThan(5);
     }
   });
 
-  it('would become ready if a curator approved enough of a pool', () => {
-    // The same preset, the same library, one field changed on enough assets.
+  it('still refuses a library nobody has approved', () => {
+    // The same presets against the same audio with one field cleared. If a
+    // future pack arrives unapproved this is what must happen to it.
+    const unapproved = LIBRARY.map((asset) => ({ ...asset, approved: false }));
+    for (const preset of buildSoundBathPresets()) {
+      expect(validateSoundBathApproval(preset, unapproved).ready, preset.id).toBe(false);
+      expect(
+        planSoundBath({ preset, library: unapproved, durationSec: SESSION_SEC, seed: 1 }).events,
+        preset.id,
+      ).toEqual([]);
+    }
+  });
+
+  it('becomes ready again one pool at a time', () => {
+    // Partial approval is the state a pack is in while it is being reviewed,
+    // and it must neither ship a thin pool nor refuse a complete one.
     const preset = soundBathPreset('soundbath.pure_bowls')!;
-    const approved = LIBRARY.map((asset) =>
-      asset.instrument === 'SINGING_BOWL' ? { ...asset, approved: true } : asset,
-    );
-    expect(validateSoundBathApproval(preset, approved).ready).toBe(true);
-    // And only then does the scheduler's shipping default produce anything.
+    const bowlsOnly = LIBRARY.map((asset) => ({
+      ...asset,
+      approved: asset.instrument === 'SINGING_BOWL',
+    }));
+    expect(validateSoundBathApproval(preset, bowlsOnly).ready).toBe(true);
     expect(
-      planSoundBath({ preset, library: approved, durationSec: SESSION_SEC, seed: 1 }).events.length,
+      planSoundBath({ preset, library: bowlsOnly, durationSec: SESSION_SEC, seed: 1 }).events.length,
     ).toBeGreaterThan(0);
+
+    // A chime preset against the same half-approved library is not ready.
+    const chimes = soundBathPreset('soundbath.silver_chimes')!;
+    expect(validateSoundBathApproval(chimes, bowlsOnly).ready).toBe(false);
   });
 });
 

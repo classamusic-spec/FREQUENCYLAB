@@ -126,7 +126,7 @@ def _assemble(found: Discovered, measured: dict[str, Any], config: PipelineConfi
             "characterTags": suggest_tags(spectral, measured["levels"], seconds, hints),
         },
         "runtime": runtime_hints(seconds, instrument, hints, spectral),
-        "review": {"approved": False, "manualOverride": False, "notes": None},
+        "review": {"approved": False, "approvalSource": None, "manualOverride": False, "notes": None},
         "_hints": {**hints.as_json(), "instrumentReason": reason, "noteConflict": name_note_conflict},
         "_warnings": measured.get("warnings", []),
         "_waveform": measured.get("waveform", []),
@@ -204,6 +204,30 @@ def stage_overrides(config: PipelineConfig, assets: list[dict[str, Any]]):
     return merged, overrides, issues
 
 
+def stage_approval(config: PipelineConfig, assets: list[dict[str, Any]]):
+    """Applies the library approval policy, after the overrides have had theirs.
+
+    Order matters and is the whole reason this is its own stage: an override
+    that approves one asset by name is a curator's judgement about that file,
+    and it has to already be on the record before the blanket policy runs, or
+    the policy would relabel it as its own weaker claim.
+    """
+    approval, issues = manifest_module.load_approval(config.paths.approval)
+    approved_here = manifest_module.apply_approval(assets, approval)
+    total = sum(1 for asset in assets if asset["review"].get("approved"))
+    if approval.get("policy") == "approve-all":
+        excluded = len(approval.get("excludedAssetIds") or [])
+        print(
+            f"approval   {total} of {len(assets)} approved "
+            f"({approved_here} by library policy, {total - approved_here} by curator"
+            + (f", {excluded} excluded" if excluded else "")
+            + ")"
+        )
+    else:
+        print(f"approval   {total} of {len(assets)} approved (no library policy; curator entries only)")
+    return assets, approval, issues
+
+
 def duplicate_groups(found: list[Discovered]) -> list[list[str]]:
     by_hash: dict[str, list[str]] = defaultdict(list)
     for item in found:
@@ -221,8 +245,13 @@ def run(config: PipelineConfig, jobs: int, write_html: bool, strict: bool) -> in
 
     assets, failures = stage_analyze(config, found, jobs)
     assets, overrides, override_issues = stage_overrides(config, assets)
+    assets, _approval, approval_issues = stage_approval(config, assets)
 
-    issues = [*override_issues, *manifest_module.validate(assets, overrides, config.paths.source)]
+    issues = [
+        *override_issues,
+        *approval_issues,
+        *manifest_module.validate(assets, overrides, config.paths.source),
+    ]
     fatal = [issue for issue in issues if issue.fatal]
     warnings = [issue for issue in issues if not issue.fatal]
 

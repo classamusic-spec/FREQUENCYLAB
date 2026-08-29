@@ -1547,7 +1547,7 @@
   ],
   "summary": {
     "analysisFailures": 0,
-    "approved": 1,
+    "approved": 369,
     "bitDepths": {
       "24": 369
     },
@@ -1581,7 +1581,7 @@
     ],
     "loopable": 65,
     "manualOverrides": 3,
-    "needsReview": 368,
+    "needsReview": 0,
     "peakDbFSRange": [
       -1.0,
       -1.0

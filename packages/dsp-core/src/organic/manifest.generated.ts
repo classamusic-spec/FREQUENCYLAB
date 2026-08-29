@@ -143,6 +143,12 @@ export const ORGANIC_NOTE_SOURCES = [
 ] as const;
 export type OrganicNoteSource = (typeof ORGANIC_NOTE_SOURCES)[number];
 
+export const ORGANIC_APPROVAL_SOURCES = [
+  'curator',
+  'library',
+] as const;
+export type OrganicApprovalSource = (typeof ORGANIC_APPROVAL_SOURCES)[number];
+
 /**
  * One duration class and the range that puts an asset in it. Bounds are seconds,
  * lower-inclusive and upper-exclusive, so an asset of exactly 2.0 s lands in SHORT
@@ -356,6 +362,7 @@ export interface OrganicAssetRuntime {
 export interface OrganicAssetReview {
   /** Cleared to ship. False until a person says otherwise. */
   readonly approved: boolean;
+  readonly approvalSource: OrganicApprovalSource | null;
   /** True when a curator's overrides were merged into this record (§21). */
   readonly manualOverride: boolean;
   /** A curator's note, for a human reader. */

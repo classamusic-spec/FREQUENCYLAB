@@ -89,6 +89,19 @@ PITCH_CLASSES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
 # measurement (§18), so the distinction is a closed set rather than free text.
 NOTE_SOURCES = ("measured", "filename")
 
+# How an asset came to be approved, and never a bare boolean's worth of that.
+#
+# `curator` means an entry in the overrides file approved this asset by name,
+# with a note saying what was checked. `library` means it was approved as part
+# of a blanket approval of the whole pack — the owner clearing their own
+# material to ship, which is a real decision and a different one.
+#
+# Both set `approved`, because the scheduler's question is only ever "may this
+# ship". The distinction is kept because the other question — "did somebody
+# listen to *this file*" — has a different answer for the two, and a single
+# boolean would let a later screen answer it wrongly (§18).
+APPROVAL_SOURCES = ("curator", "library")
+
 # Formats libsndfile decodes without help. M4A/AAC need ffmpeg, which the
 # pipeline treats as optional and reports as a warning rather than a failure.
 NATIVE_EXTENSIONS = (".wav", ".wave", ".aif", ".aiff", ".aifc", ".flac", ".ogg", ".mp3", ".w64", ".caf")
@@ -200,6 +213,10 @@ FIELD_SPEC: dict[str, dict[str, tuple[str, bool]]] = {
     },
     "review": {
         "approved": ("boolean", False),
+        # Null whenever `approved` is false: an unapproved asset was not
+        # approved by anybody, and naming a source for it would be a record of
+        # something that did not happen.
+        "approvalSource": ("string", True),
         "manualOverride": ("boolean", False),
         "notes": ("string", True),
     },
@@ -277,6 +294,11 @@ ENUM_FIELDS: tuple[EnumBinding, ...] = (
         "spectral", "noteSource", NOTE_SOURCES,
         "OrganicNoteSource", "ORGANIC_NOTE_SOURCES", False, True,
         "has note source {value!r}; a note is either measured or read from the filename.",
+    ),
+    EnumBinding(
+        "review", "approvalSource", APPROVAL_SOURCES,
+        "OrganicApprovalSource", "ORGANIC_APPROVAL_SOURCES", False, True,
+        "has approval source {value!r}; approval comes from a curator or from a library policy.",
     ),
 )
 

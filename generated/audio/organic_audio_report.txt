@@ -2,8 +2,8 @@ AUDIO ASSET REPORT
 
 Totals
   Total discovered   369
-  Approved           1
-  Needs review       368
+  Approved           369
+  Needs review       0
   Manual overrides   3
   Loopable           65
   Analysis failures  0

@@ -252,11 +252,19 @@ describe('pools', () => {
     expect(plan({ preset: broken }).emptyLayers).toEqual(['nothing']);
   });
 
-  it('ships nothing until a curator has approved it', () => {
-    // Nothing in the library is approved yet, so the shipping default is an
-    // empty plan — the correct behaviour, and the reason every other test here
-    // has to opt out of it explicitly.
-    expect(plan({ requireApproved: true }).events).toEqual([]);
+  it('gates on approval, in both directions', () => {
+    /*
+     * The library is approved in full now, so the shipping default produces a
+     * real session — which is what the app will do — and the gate itself can no
+     * longer be seen by looking at this library. It is checked by removing the
+     * approval instead: same preset, same audio, one field cleared.
+     */
+    expect(plan({ requireApproved: true }).events.length).toBeGreaterThan(0);
+
+    const unapproved = LIBRARY.map((asset) => ({ ...asset, approved: false }));
+    expect(plan({ requireApproved: true, library: unapproved }).events).toEqual([]);
+    // And the layers say why, rather than the session simply being quiet.
+    expect(plan({ requireApproved: true, library: unapproved }).emptyLayers.length).toBeGreaterThan(0);
   });
 
   it('honours an explicit asset list', () => {
