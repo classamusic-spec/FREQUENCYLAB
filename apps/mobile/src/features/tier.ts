@@ -217,14 +217,46 @@ export function presetInPlainWords(preset: FrequencyPreset): string {
   return paceInPlainWords(value);
 }
 
-/** A protocol's pace, taken from its first stage that states a beat. */
+/**
+ * The rate parameters a generator node can carry.
+ *
+ * `beat` on the binaural and monaural engines, `rate` on the isochronic one.
+ * Named here rather than guessed at, because the first version of this function
+ * looked for `beatHz` and `rateHz` — which are the names used by the *builder's*
+ * options, not by the nodes it builds. Every protocol therefore came back
+ * `Steady tone`, and nothing noticed because the function had no call site yet.
+ */
+const RATE_KEYS = ['beat', 'rate'] as const;
+
+/**
+ * A protocol's pace, in words, taken from the stage it spends longest in.
+ *
+ * The longest stage rather than the first, because these protocols are arcs:
+ * `Wind Down` opens at 8 Hz and spends most of its length at 3. Reading the
+ * opening would call it a gentle pulse when what a listener is mostly hearing
+ * is a very slow one — and the number it replaces on screen is the plateau, so
+ * the words have to describe the same thing the number did.
+ *
+ * Ties go to the earlier stage, which is the one a listener meets first.
+ */
 export function protocolInPlainWords(protocol: Protocol): string {
+  let bestRate = 0;
+  let bestSeconds = -1;
+
   for (const stage of protocol.stages) {
     for (const node of stage.graph.nodes) {
       const params = node.params as Record<string, unknown> | undefined;
-      const beat = params?.beatHz ?? params?.rateHz;
-      if (typeof beat === 'number' && beat > 0) return paceInPlainWords(beat);
+      if (!params) continue;
+      for (const key of RATE_KEYS) {
+        const rate = params[key];
+        if (typeof rate !== 'number' || rate <= 0) continue;
+        if (stage.durationSec > bestSeconds) {
+          bestSeconds = stage.durationSec;
+          bestRate = rate;
+        }
+      }
     }
   }
-  return 'Steady tone';
+
+  return bestRate > 0 ? paceInPlainWords(bestRate) : 'Steady tone';
 }
