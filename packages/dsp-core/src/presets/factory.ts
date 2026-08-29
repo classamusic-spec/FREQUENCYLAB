@@ -1,4 +1,5 @@
 import { LAB_PRESETS } from './factoryLab.js';
+import { PSYCHOACOUSTIC_PRESETS } from './factoryPsychoacoustics.js';
 import { TONE_PRESETS } from './factoryTones.js';
 import { preset } from './make.js';
 import { FACTORY_COLLECTIONS } from './types.js';
@@ -286,8 +287,18 @@ const WELLNESS: FrequencyPreset[] = [
 /**
  * Every factory preset, shelf by shelf in the order the collections are
  * declared. Order is data, not styling: the browser renders this sequence.
+ *
+ * The psychoacoustics rows come last because `TONE_PRESETS` ends with the
+ * arithmetic half of Acoustic Fundamentals and these are the demonstration half
+ * of the same shelf: appending them here keeps one collection contiguous, and
+ * puts the octaves and intervals before the phenomena built on top of them.
  */
-export const FACTORY_PRESETS: FrequencyPreset[] = [...WELLNESS, ...LAB_PRESETS, ...TONE_PRESETS];
+export const FACTORY_PRESETS: FrequencyPreset[] = [
+  ...WELLNESS,
+  ...LAB_PRESETS,
+  ...TONE_PRESETS,
+  ...PSYCHOACOUSTIC_PRESETS,
+];
 
 export function factoryPreset(id: string): FrequencyPreset | undefined {
   return FACTORY_PRESETS.find((row) => row.id === id);
@@ -335,6 +346,17 @@ export function referencedEvidenceIds(): { library: string[]; archive: string[] 
 export { BAND_BOUNDARY_NOTE, BAND_STATE_NOTE, BRAINWAVE_BANDS, bandForRate, brainwaveBand } from './bands.js';
 export type { BandRange, BrainwaveBand, BrainwaveBandId } from './bands.js';
 export { LAB_CARRIER_HZ, NO_SOURCE_FREQUENCY, SAFETY_LIBRARY_ENTRY_ID } from './make.js';
+export {
+  AB_BEAT_HZ,
+  EQUAL_LOUDNESS_HIGH_HZ,
+  EQUAL_LOUDNESS_LOW_HZ,
+  LADDER_BASE_HZ,
+  LADDER_SEPARATIONS_HZ,
+  RESIDUE_CARRIER_HZ,
+  RESIDUE_FUNDAMENTAL_HZ,
+  RESIDUE_HARMONIC_NUMBERS,
+  RESIDUE_PARTIALS_HZ,
+} from './factoryPsychoacoustics.js';
 export {
   COSMIC_OCTAVE_DERIVATIONS,
   COSMIC_OCTAVE_TOLERANCE_HZ,

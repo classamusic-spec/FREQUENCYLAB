@@ -81,7 +81,9 @@ describe('factory preset library', () => {
       'harmonic-traditional': 7,
       'cosmic-octave': 4,
       'noise-lab': 10,
-      'acoustic-fundamentals': 6,
+      // Six rows of arithmetic in factoryTones.ts, eight demonstrations in
+      // factoryPsychoacoustics.ts.
+      'acoustic-fundamentals': 14,
     });
   });
 
