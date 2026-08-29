@@ -29,6 +29,7 @@ from pipeline.classify import choose_instrument, read_hints, runtime_hints, sugg
 from pipeline.config import AnalysisConfig, PipelineConfig, default_paths  # noqa: E402
 from pipeline.decode import DecodeError, decode, ffmpeg_available  # noqa: E402
 from pipeline.discovery import Discovered, asset_id, discover  # noqa: E402
+from pipeline import emit_ts  # noqa: E402
 from pipeline import manifest as manifest_module  # noqa: E402
 from pipeline import report as report_module  # noqa: E402
 from pipeline.schema import duration_class  # noqa: E402
@@ -245,6 +246,12 @@ def run(config: PipelineConfig, jobs: int, write_html: bool, strict: bool) -> in
         public.append(clean)
 
     manifest_module.write_json(config.paths.manifest, manifest_module.build(public, summary))
+
+    # The app's types come out of the same run that writes the manifest, from the
+    # same schema, so the two cannot be out of step with each other (§25). Emitted
+    # here rather than in a separate command precisely because a separate command
+    # is one somebody forgets to run.
+    types_changed = emit_ts.write(config.paths.types, config.analysis.duration_bands)
     manifest_module.write_json(
         config.paths.report_json,
         {
@@ -267,6 +274,7 @@ def run(config: PipelineConfig, jobs: int, write_html: bool, strict: bool) -> in
     print()
     print(report_module.render_text(summary))
     print(f"manifest   {config.paths.manifest}")
+    print(f"types      {config.paths.types}{'' if types_changed else '  (unchanged)'}")
     print(f"report     {config.paths.report_json}")
     if write_html:
         print(f"           {config.paths.report_html}")

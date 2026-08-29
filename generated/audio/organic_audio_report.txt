@@ -2,17 +2,17 @@ AUDIO ASSET REPORT
 
 Totals
   Total discovered   369
-  Approved           0
-  Needs review       369
-  Manual overrides   0
+  Approved           1
+  Needs review       368
+  Manual overrides   3
   Loopable           65
   Analysis failures  0
   Duplicate content  0
   Ignored files      0
 
 Instruments
-  BELL          103
-  CHIME         88
+  BELL          102
+  CHIME         89
   KALIMBA       100
   SINGING_BOWL  68
   TUNING_FORK   10

@@ -83,6 +83,12 @@ CHARACTER_TAGS = (
 
 PITCH_CLASSES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 
+# Where a note came from. Two values and never a third: either the spectrum
+# corroborated the pitch or the library's own filename supplied it. A consumer
+# that cannot tell those apart is one that will present a vendor's label as a
+# measurement (§18), so the distinction is a closed set rather than free text.
+NOTE_SOURCES = ("measured", "filename")
+
 # Formats libsndfile decodes without help. M4A/AAC need ffmpeg, which the
 # pipeline treats as optional and reports as a warning rather than a failure.
 NATIVE_EXTENSIONS = (".wav", ".wave", ".aif", ".aiff", ".aifc", ".flac", ".ogg", ".mp3", ".w64", ".caf")
@@ -163,10 +169,17 @@ FIELD_SPEC: dict[str, dict[str, tuple[str, bool]]] = {
         "pitchConfidence": ("number", True),
         "note": ("string", True),
         "pitchClass": ("string", True),
-        # Where the note came from. `measured` means the spectrum corroborated
-        # it; `filename` means the library labelled it and the audio could not
-        # confirm or deny. Never blank when a note is present: a consumer has to
-        # be able to tell an analysis from a vendor's label.
+        # What the *analysis* concluded about the note. `measured` means the
+        # spectrum corroborated it; `filename` means the library labelled it and
+        # the audio could neither confirm nor deny; null means the analysis
+        # reached no conclusion at all.
+        #
+        # It stays null when a curator sets a pitch by hand, even though a note
+        # is then present — this field records what the pipeline did, and
+        # `review.manualOverride` records that a person intervened. Keeping them
+        # separate is what lets a consumer ask the question it actually cares
+        # about: retuning is applied only on `measured`, so a human's judgement
+        # call and a vendor's label are both correctly left alone.
         "noteSource": ("string", True),
         "tonality": ("string", False),
         "spectralCentroidHz": ("number", True),
@@ -197,6 +210,110 @@ LIST_FIELDS = {
     "classification": ("recommendedRoles", "characterTags"),
     "spectral": ("resonantPeaksHz",),
 }
+
+
+@dataclass(frozen=True)
+class EnumBinding:
+    """Ties one field to the closed set its values are drawn from.
+
+    `FIELD_SPEC` can only say that `classification.instrument` holds a string.
+    This table says *which* strings, which is what lets the validator reject an
+    unknown instrument and lets the emitted TypeScript declare a union type
+    rather than `string`. Both read this one table; a list kept by hand on
+    either side would be the second schema §25 exists to prevent, and the side
+    that drifts is always the one nobody is looking at.
+
+    `message` is per field rather than generated, because it is read by a
+    curator in a terminal (§51) and "which is not a note name" tells them more
+    than a uniform sentence would.
+    """
+
+    section: str
+    field: str
+    values: tuple[str, ...]
+    #: Name of the emitted TypeScript union type.
+    ts_type: str
+    #: Name of the emitted `as const` array the union is derived from.
+    ts_const: str
+    #: True when the field holds a list of these values rather than one of them.
+    is_list: bool
+    #: Whether an unknown value fails preprocessing or only warns (§27).
+    fatal: bool
+    message: str
+
+
+ENUM_FIELDS: tuple[EnumBinding, ...] = (
+    EnumBinding(
+        "classification", "instrument", INSTRUMENTS,
+        "OrganicInstrument", "ORGANIC_INSTRUMENTS", False, True,
+        "has instrument {value!r}, which is not a known category.",
+    ),
+    EnumBinding(
+        "classification", "durationClass", DURATION_CLASSES,
+        "OrganicDurationClass", "ORGANIC_DURATION_CLASSES", False, True,
+        "has duration class {value!r}, which is not known.",
+    ),
+    EnumBinding(
+        "classification", "recommendedRoles", ROLES,
+        "OrganicRole", "ORGANIC_ROLES", True, False,
+        "has an unrecognised role {value!r}.",
+    ),
+    EnumBinding(
+        "classification", "characterTags", CHARACTER_TAGS,
+        "OrganicCharacterTag", "ORGANIC_CHARACTER_TAGS", True, False,
+        "has an unrecognised tag {value!r}.",
+    ),
+    EnumBinding(
+        "spectral", "tonality", TONALITY,
+        "OrganicTonality", "ORGANIC_TONALITY", False, True,
+        "has tonality {value!r}, which is not known.",
+    ),
+    EnumBinding(
+        "spectral", "pitchClass", PITCH_CLASSES,
+        "OrganicPitchClass", "ORGANIC_PITCH_CLASSES", False, True,
+        "has pitch class {value!r}, which is not a note name.",
+    ),
+    EnumBinding(
+        "spectral", "noteSource", NOTE_SOURCES,
+        "OrganicNoteSource", "ORGANIC_NOTE_SOURCES", False, True,
+        "has note source {value!r}; a note is either measured or read from the filename.",
+    ),
+)
+
+
+@dataclass(frozen=True)
+class ListElement:
+    """The shape of one item in a list field that holds objects."""
+
+    ts_type: str
+    fields: dict[str, tuple[str, bool]]
+
+
+# The lists in `LIST_FIELDS` that hold objects rather than enum values. Declared
+# because `FIELD_SPEC` stops at the list itself: without this the validator
+# would accept `[{"hz": "loud"}]` and the emitter would have no choice but to
+# write `unknown[]` or have a person type the element out by hand.
+LIST_ELEMENT_SPEC: dict[tuple[str, str], ListElement] = {
+    ("spectral", "resonantPeaksHz"): ListElement(
+        "OrganicResonantPeak",
+        {"hz": ("number", False), "strength": ("number", False)},
+    ),
+}
+
+
+# The envelope the asset list is written inside, in the order it is written.
+# `manifest.build` assembles the file from these names, so a field that exists
+# in the JSON and not here cannot happen: it would be dropped on the way out and
+# noticed on the next run.
+MANIFEST_FIELDS: tuple[tuple[str, str, str], ...] = (
+    ("_comment", "string", "Why this file must never be hand-edited (§22)."),
+    ("schemaVersion", "integer", "The record shape. Refuse a manifest whose version you do not know (§33)."),
+    ("analysisVersion", "string", "What the measuring code did. Changes when a measured number would."),
+    ("organicLibraryVersion", "string", "The content of the sample library, as a curatorial fact (§34)."),
+    ("assetCount", "integer", "`assets.length`, carried so a truncated file is obvious."),
+    ("counts", "counts", "The summary block; see the type."),
+    ("assets", "assets", "Sorted by `assetId`, so two runs over the same library are byte-identical (§56)."),
+)
 
 
 @dataclass

@@ -8,17 +8,15 @@ from typing import Any
 
 from .schema import (
     ANALYSIS_VERSION,
-    CHARACTER_TAGS,
-    DURATION_CLASSES,
+    ENUM_FIELDS,
     FIELD_SPEC,
-    INSTRUMENTS,
     LIBRARY_VERSION,
+    LIST_ELEMENT_SPEC,
     LIST_FIELDS,
+    ListElement,
+    MANIFEST_FIELDS,
     MANIFEST_HEADER,
-    PITCH_CLASSES,
-    ROLES,
     SCHEMA_VERSION,
-    TONALITY,
     ValidationIssue,
 )
 
@@ -112,29 +110,10 @@ def validate(assets: list[dict[str, Any]], overrides: dict[str, Any], source_roo
             )
 
         issues.extend(_check_types(asset_id, asset))
+        issues.extend(_check_enums(asset_id, asset))
 
         classification = asset.get("classification", {})
-        if classification.get("instrument") not in INSTRUMENTS:
-            issues.append(
-                ValidationIssue(True, asset_id, f"has instrument {classification.get('instrument')!r}, which is not a known category.")
-            )
-        if classification.get("durationClass") not in DURATION_CLASSES:
-            issues.append(
-                ValidationIssue(True, asset_id, f"has duration class {classification.get('durationClass')!r}, which is not known.")
-            )
-        for role in classification.get("recommendedRoles", []):
-            if role not in ROLES:
-                issues.append(ValidationIssue(False, asset_id, f"has an unrecognised role {role!r}."))
-        for tag in classification.get("characterTags", []):
-            if tag not in CHARACTER_TAGS:
-                issues.append(ValidationIssue(False, asset_id, f"has an unrecognised tag {tag!r}."))
-
         spectral = asset.get("spectral", {})
-        if spectral.get("tonality") not in TONALITY:
-            issues.append(ValidationIssue(True, asset_id, f"has tonality {spectral.get('tonality')!r}, which is not known."))
-        pitch_class = spectral.get("pitchClass")
-        if pitch_class is not None and pitch_class not in PITCH_CLASSES:
-            issues.append(ValidationIssue(True, asset_id, f"has pitch class {pitch_class!r}, which is not a note name."))
 
         # Advisory only: an unknown pitch is a fact about a bell, not a defect
         # in the library (§27).
@@ -171,6 +150,40 @@ def validate(assets: list[dict[str, Any]], overrides: dict[str, Any], source_roo
 _PY_TYPES = {"string": str, "number": (int, float), "integer": int, "boolean": bool}
 
 
+def _check_enums(asset_id: str, asset: dict[str, Any]) -> list[ValidationIssue]:
+    """Every closed-set field, checked against the one table that defines it.
+
+    Walking `ENUM_FIELDS` rather than naming the sets here is the point: the
+    validator, the emitted TypeScript union types and the classifier's output
+    are then three readings of the same declaration instead of three lists that
+    have to be remembered together (§25).
+    """
+    issues: list[ValidationIssue] = []
+    for binding in ENUM_FIELDS:
+        block = asset.get(binding.section)
+        if not isinstance(block, dict):
+            continue  # `_check_types` already reported the missing section.
+        value = block.get(binding.field)
+
+        if binding.is_list:
+            items = value if isinstance(value, list) else []
+        else:
+            # A null in a field that allows one is not an unknown value. A null
+            # in a field that does not is reported here as well as by the type
+            # check, because both sentences are true and a curator reading
+            # either one learns what to fix.
+            nullable = FIELD_SPEC[binding.section][binding.field][1]
+            if value is None and nullable:
+                continue
+            items = [value]
+
+        for item in items:
+            if item not in binding.values:
+                issues.append(ValidationIssue(binding.fatal, asset_id, binding.message.format(value=item)))
+    return issues
+
+
+
 def _check_types(asset_id: str, asset: dict[str, Any]) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     for section, fields in FIELD_SPEC.items():
@@ -195,8 +208,51 @@ def _check_types(asset_id: str, asset: dict[str, Any]) -> list[ValidationIssue]:
                     ValidationIssue(True, asset_id, f"has {section}.{name} = {value!r}, which is not a {kind}.")
                 )
         for name in LIST_FIELDS.get(section, ()):  # noqa: PERF203
-            if not isinstance(block.get(name), list):
+            items = block.get(name)
+            if not isinstance(items, list):
                 issues.append(ValidationIssue(True, asset_id, f"is missing the list {section}.{name}."))
+                continue
+            element = LIST_ELEMENT_SPEC.get((section, name))
+            if element is not None:
+                issues.extend(_check_elements(asset_id, section, name, items, element))
+    return issues
+
+
+def _check_elements(
+    asset_id: str,
+    section: str,
+    name: str,
+    items: list[Any],
+    element: ListElement,
+) -> list[ValidationIssue]:
+    """The objects inside a list field.
+
+    Fatal, like the scalar checks: `resonantPeaksHz` is read as numbers by
+    anything that draws or tunes to it, and a string where a hertz value should
+    be is not a degraded reading, it is a crash somewhere further downstream.
+    """
+    issues: list[ValidationIssue] = []
+    for position, item in enumerate(items):
+        if not isinstance(item, dict):
+            issues.append(
+                ValidationIssue(True, asset_id, f"has {section}.{name}[{position}] = {item!r}, which is not an object.")
+            )
+            continue
+        for field_name, (kind, nullable) in element.fields.items():
+            if field_name not in item:
+                issues.append(ValidationIssue(True, asset_id, f"is missing {section}.{name}[{position}].{field_name}."))
+                continue
+            value = item[field_name]
+            if value is None:
+                if not nullable:
+                    issues.append(
+                        ValidationIssue(True, asset_id, f"has a null {section}.{name}[{position}].{field_name}, which may not be null.")
+                    )
+                continue
+            if isinstance(value, bool) or not isinstance(value, _PY_TYPES[kind]):
+                issues.append(
+                    ValidationIssue(True, asset_id, f"has {section}.{name}[{position}].{field_name} = {value!r}, which is not a {kind}.")
+                )
     return issues
 
 
@@ -226,7 +282,7 @@ def build(assets: list[dict[str, Any]], counts: dict[str, Any]) -> dict[str, Any
     generation timestamp would change the file on every run and make it
     impossible to tell a real change from a re-run.
     """
-    return {
+    values = {
         "_comment": MANIFEST_HEADER,
         "schemaVersion": SCHEMA_VERSION,
         "analysisVersion": ANALYSIS_VERSION,
@@ -235,6 +291,12 @@ def build(assets: list[dict[str, Any]], counts: dict[str, Any]) -> dict[str, Any
         "counts": _round(counts),
         "assets": _round(sorted(assets, key=lambda item: item["assetId"])),
     }
+    # Assembled through the declared envelope rather than returned directly, so
+    # the file and the emitted `OrganicAudioManifest` type cannot come apart: a
+    # key added here and not to `MANIFEST_FIELDS` never reaches the JSON, and one
+    # declared there and not built here fails on the next run instead of
+    # silently arriving as `undefined` in the app.
+    return {name: values[name] for name, _kind, _doc in MANIFEST_FIELDS}
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:

@@ -1,0 +1,30 @@
+name: Audio manifest
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  manifest:
+    name: Validate the organic audio manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # The checkout pulls the licensed WAV library with it — about 1.3 GiB of
+      # pack, because the audio is committed as ordinary git blobs and nothing
+      # here uses Git LFS. That cost is why this job stats the files rather than
+      # reading them, and it is documented in docs/audio-asset-pipeline.md.
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # No `pip install`. The checker imports the pipeline's own schema and
+      # validator, which are pure standard library; only the measuring code
+      # needs numpy, scipy, soundfile and pyloudnorm, and the measuring code is
+      # exactly what this job refuses to run.
+      - name: Validate the manifest, the overrides and the report
+        run: python tools/audio_pipeline/check_manifest.py

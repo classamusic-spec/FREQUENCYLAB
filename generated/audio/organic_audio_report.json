@@ -1547,7 +1547,7 @@
   ],
   "summary": {
     "analysisFailures": 0,
-    "approved": 0,
+    "approved": 1,
     "bitDepths": {
       "24": 369
     },
@@ -1569,8 +1569,8 @@
     "filenameNoteConflicts": 26,
     "ignoredFiles": 0,
     "instruments": {
-      "BELL": 103,
-      "CHIME": 88,
+      "BELL": 102,
+      "CHIME": 89,
       "KALIMBA": 100,
       "SINGING_BOWL": 68,
       "TUNING_FORK": 10
@@ -1580,8 +1580,8 @@
       -6.25
     ],
     "loopable": 65,
-    "manualOverrides": 0,
-    "needsReview": 369,
+    "manualOverrides": 3,
+    "needsReview": 368,
     "peakDbFSRange": [
       -1.0,
       -1.0

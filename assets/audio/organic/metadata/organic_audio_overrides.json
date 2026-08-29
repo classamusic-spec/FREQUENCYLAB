@@ -1,0 +1,27 @@
+{
+  "organic.b038ead23555": {
+    "review": {
+      "approved": true,
+      "notes": "Approving an asset. GIO_HEAL_forks_tuning_128hz_C.wav is the most checkable file in the library: the vendor printed the frequency in the filename and the analysis measured 127.8733 Hz, 1.7 cents flat of 128 Hz, at full pitch confidence. Nothing about the automatic record needed correcting, so this entry only says a person listened and agreed."
+    }
+  },
+
+  "organic.17cab606e89a": {
+    "classification": {
+      "instrument": "CHIME",
+      "recommendedRoles": ["CHIME_STRIKE", "ACCENT"]
+    },
+    "review": {
+      "notes": "Correcting an instrument. The vendor filed this under One_Shots/Bells/Tibetan_Bells and the filename is the only reason it reads BELL. The strike measures a 3573 Hz inharmonic ring with a transient strength of 0.96 and a 3.8 s decay, which is what this pipeline's own acoustic rule calls a chime when no filename tells it otherwise. Roles are set in the same entry on purpose: an override replaces fields, it does not re-run the classifier, so BELL_STRIKE would otherwise have survived the correction."
+    }
+  },
+
+  "organic.0b071d7d9fa7": {
+    "spectral": {
+      "pitchClass": "A"
+    },
+    "review": {
+      "notes": "Setting a pitch class the analysis could not determine. This is a 100 BPM kalimba loop the vendor named _A, and the pipeline deliberately refuses to read a loop's key as a measured pitch — on a passage that letter names the key, and the strongest partial is routinely the fifth. The spectrum could not corroborate a fundamental either, so pitchClass came out empty. Accepting the pack's own key is a curator's call, not a measurement: spectral.noteSource stays null because it records what the analysis did, and review.manualOverride is what tells a consumer a person put this value here."
+    }
+  }
+}
