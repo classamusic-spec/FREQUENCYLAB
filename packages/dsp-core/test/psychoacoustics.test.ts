@@ -441,3 +441,70 @@ describe('the same level is not the same loudness', () => {
     expect(factoryPreset('af-loudness-3000')!.summary).toMatch(/volume/i);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The harmonic series, which used to be four partials calling itself eight
+// ---------------------------------------------------------------------------
+
+describe('Harmonic series on 110 Hz sounds every partial it names', () => {
+  /*
+   * A row that had been shipping wrong. Its summary names eight partials —
+   * 110 through 880 Hz — and explains that partial 5 is a major third and that
+   * the seventh sits 31 cents flat of a tempered note. The harmonic node
+   * carries `h1` to `h8`, but nothing could set them, so every stack in the
+   * product took the descriptor's defaults, which are exactly zero from the
+   * fifth partial up. The row produced four partials and described eight, and
+   * the note about the seventh described a frequency that was not there.
+   *
+   * The test measures every partial the summary names, so the copy and the
+   * audio cannot drift apart again in either direction.
+   */
+  const FUNDAMENTAL_HZ = 110;
+  const PARTIALS = 8;
+
+  it('emits all eight, in a falling series', () => {
+    const { left, sampleRate } = render('af-harmonics-110');
+    const levels = Array.from({ length: PARTIALS }, (_, index) =>
+      at(left, FUNDAMENTAL_HZ * (index + 1), sampleRate),
+    );
+
+    for (const [index, level] of levels.entries()) {
+      expect(level, `partial ${index + 1} at ${FUNDAMENTAL_HZ * (index + 1)} Hz`).toBeGreaterThan(
+        ABSENT,
+      );
+    }
+    // Each partial quieter than the one below it: a 1/n series, which is what
+    // makes the stack read as one tone with a timbre rather than eight tones.
+    for (let index = 1; index < levels.length; index++) {
+      expect(levels[index], `partial ${index + 1} against ${index}`).toBeLessThan(levels[index - 1]);
+    }
+  });
+
+  it('places them where integer multiplication puts them, and nowhere between', () => {
+    const { left, sampleRate } = render('af-harmonics-110');
+    // Half-way between partials: if the stack were mistuned, or if the levels
+    // were being applied to the wrong node, energy would show up off the grid.
+    for (let index = 1; index < PARTIALS; index++) {
+      const between = FUNDAMENTAL_HZ * index + FUNDAMENTAL_HZ / 2;
+      expect(at(left, between, sampleRate), `${between} Hz, between partials`).toBeLessThan(ABSENT);
+    }
+    // And nothing above the eighth, which is where the series is declared to stop.
+    expect(at(left, FUNDAMENTAL_HZ * 9, sampleRate), '990 Hz').toBeLessThan(ABSENT);
+  });
+
+  it('names in its summary exactly the frequencies it emits', () => {
+    // The assertion that ties the two halves together. Every frequency the copy
+    // states is measured; a summary edit that adds a partial without adding the
+    // level, or vice versa, fails here.
+    const { row, left, sampleRate } = render('af-harmonics-110');
+    const named = [...row.summary.matchAll(/(\d{3})\s*(?:,|and|Hz)/g)].map((m) => Number(m[1]));
+    const partials = new Set(
+      Array.from({ length: PARTIALS }, (_, index) => FUNDAMENTAL_HZ * (index + 1)),
+    );
+    const namedPartials = [...new Set(named)].filter((hz) => partials.has(hz));
+    expect(namedPartials.length, 'the summary names partials by number').toBeGreaterThanOrEqual(7);
+    for (const hz of namedPartials) {
+      expect(at(left, hz, sampleRate), `${hz} Hz is named in the summary`).toBeGreaterThan(ABSENT);
+    }
+  });
+});

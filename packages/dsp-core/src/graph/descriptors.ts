@@ -375,7 +375,25 @@ export const NODE_DESCRIPTORS: Record<NodeKind, NodeDescriptor> = {
         unit: 'ratio',
         min: 0,
         max: 1,
-        default: index === 0 ? 1 : index < 4 ? 0.5 / (index + 1) : 0,
+        /*
+         * A half-amplitude 1/n series, the natural ratio of a sawtooth's
+         * partials — and running to all eight rather than stopping at four.
+         *
+         * It used to stop: partials 5 through 8 defaulted to exactly zero, on a
+         * node whose own description is "a fundamental plus seven independently
+         * levelled partials". Nothing could override them either, because
+         * `buildStandardGraph` passes only the fundamental and the amplitude.
+         * So `Harmonic series on 110 Hz` named eight partials, rendered four,
+         * and its note about the seventh sitting 31 cents flat described a
+         * frequency that was not in the output.
+         *
+         * Changing a default cannot disturb a protocol already saved:
+         * `makeNode` bakes every default into `params` when a node is built, so
+         * existing graphs carry their own values. And share codes still round
+         * trip, because both the encode and the decode side reach this same
+         * default through the same builder.
+         */
+        default: index === 0 ? 1 : 0.5 / (index + 1),
         precision: 3,
         taper: 'linear',
         automatable: true,
