@@ -95,10 +95,21 @@ function InstrumentTabBar({ activeIndex }: { activeIndex: number }) {
             router.push('/session');
           }}
           accessibilityRole="button"
-          accessibilityLabel={`Return to the running session, ${snapshot.protocolName}`}
+          // The dot beside this is the only thing that says playing or paused,
+          // and it says it in colour alone. The label has to carry the state
+          // too, or a screen reader announces a paused session as a running one.
+          accessibilityLabel={`Return to the ${
+            snapshot.state === 'paused' ? 'paused' : 'running'
+          } session, ${snapshot.protocolName}`}
           style={styles.transport}
         >
-          <View style={[styles.pulse, snapshot.state === 'paused' ? styles.pulsePaused : null]} />
+          <View
+            style={[styles.pulse, snapshot.state === 'paused' ? styles.pulsePaused : null]}
+            // Announced by the label above; a second node here would make a
+            // screen reader read the state twice.
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
           <View style={styles.transportText}>
             <Text variant="readoutSm" numberOfLines={1}>
               {snapshot.protocolName ?? 'Session'}

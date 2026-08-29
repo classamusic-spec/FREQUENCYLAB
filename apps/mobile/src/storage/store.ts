@@ -29,6 +29,7 @@ export const StorageKeys = {
   archiveAcknowledgedAt: 'archive-acknowledged-at',
   presetFavorites: 'preset-favorites',
   presetPlays: 'preset-plays',
+  protocolSnapshots: 'protocol-snapshots',
 } as const;
 
 export type StorageKey = (typeof StorageKeys)[keyof typeof StorageKeys];
@@ -58,9 +59,36 @@ export async function readValue<T>(key: StorageKey, fallback: T): Promise<T> {
   }
 }
 
+/**
+ * A write that did not land.
+ *
+ * Named rather than left as whatever the storage layer threw, because the one
+ * thing a caller has to be able to do with it is tell the user that what they
+ * are looking at is not what is on disk. The key is carried so the message can
+ * say which record, and the cause so a diagnostics screen can say why.
+ */
+export class StorageWriteError extends Error {
+  constructor(
+    readonly key: StorageKey,
+    override readonly cause: unknown,
+  ) {
+    super(
+      `Could not save ${key}: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+    this.name = 'StorageWriteError';
+  }
+}
+
 export async function writeValue<T>(key: StorageKey, data: T): Promise<void> {
   const envelope: Envelope<T> = { version: 1, savedAt: new Date().toISOString(), data };
-  await AsyncStorage.setItem(fullKey(key), JSON.stringify(envelope));
+  try {
+    await AsyncStorage.setItem(fullKey(key), JSON.stringify(envelope));
+  } catch (error) {
+    // Rethrown as this module's own type rather than swallowed. A write that
+    // fails and says nothing leaves the in-memory list disagreeing with disk,
+    // which is the failure the user discovers on their next launch.
+    throw new StorageWriteError(key, error);
+  }
 }
 
 export async function removeValue(key: StorageKey): Promise<void> {

@@ -120,6 +120,7 @@ export default function ArchiveEntryScreen() {
             accessibilityRole="button"
             accessibilityState={{ selected: saved }}
             accessibilityLabel={saved ? 'Remove from saved' : 'Save this frequency'}
+            hitSlop={4}
             style={[styles.star, saved ? styles.starOn : null]}
           >
             <Text variant="readoutSm" tone={saved ? 'signal' : 'tertiary'}>
@@ -409,6 +410,8 @@ export default function ArchiveEntryScreen() {
 
 const styles = StyleSheet.create({
   star: {
+    // Drawn at 36 and tappable at 44: the mark stays the size the
+    // layout wants, and `hitSlop` on the Pressable makes up the rest.
     width: 36,
     height: 36,
     borderRadius: 18,

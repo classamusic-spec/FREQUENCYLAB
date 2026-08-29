@@ -26,10 +26,18 @@ import { colors, MIN_TOUCH_TARGET, space } from '../../src/design/tokens';
 import * as haptics from '../../src/design/haptics';
 import { confirm, notify } from '../../src/design/dialogs';
 import { useProtocolLibrary } from '../../src/state/library';
+import { useExperiments } from '../../src/state/experiments';
 import { useLab } from '../../src/state/lab';
 import { useSessionStart } from '../../src/state/sessionStart';
 import { usePreferences } from '../../src/state/preferences';
-import { estimateBytes, exportDnaFile, exportProtocolToWav, formatBytes, share } from '../../src/features/export';
+import {
+  SharingUnavailableError,
+  estimateBytes,
+  exportDnaFile,
+  exportProtocolToWav,
+  formatBytes,
+  share,
+} from '../../src/features/export';
 
 const EXPORT_LENGTHS = [
   { value: '60', label: '1 min' },
@@ -53,6 +61,7 @@ export default function ProtocolScreen() {
   const lineageOf = useProtocolLibrary((state) => state.lineageOf);
   const fork = useProtocolLibrary((state) => state.fork);
   const remove = useProtocolLibrary((state) => state.remove);
+  const experiments = useExperiments((state) => state.experiments);
   const rename = useProtocolLibrary((state) => state.rename);
   const openInLab = useLab((state) => state.open);
   const requestStart = useSessionStart((state) => state.request);
@@ -101,7 +110,16 @@ export default function ProtocolScreen() {
         onProgress: setProgress,
       });
       haptics.confirm();
-      await share(result.uri, 'audio/wav', result.filename);
+      try {
+        await share(result.uri, 'audio/wav', result.filename);
+      } catch (error) {
+        // The render succeeded and the file exists; only the hand-off failed.
+        // Saying "Export failed" here would be wrong, and would send somebody
+        // back to re-run a render that already worked.
+        if (error instanceof SharingUnavailableError) {
+          notify(`Exported ${result.filename}`, error.message);
+        } else throw error;
+      }
     } catch (error) {
       notify('Export failed', error instanceof Error ? error.message : 'Unknown error.');
     } finally {
@@ -182,7 +200,13 @@ export default function ProtocolScreen() {
         protocol={protocol}
         onShareFile={async () => {
           const result = await exportDnaFile(protocol);
-          await share(result.uri, 'application/json', result.filename);
+          try {
+            await share(result.uri, 'application/json', result.filename);
+          } catch (error) {
+            if (error instanceof SharingUnavailableError) {
+              notify(`Saved ${result.filename}`, error.message);
+            } else throw error;
+          }
         }}
       />
 
@@ -350,7 +374,9 @@ export default function ProtocolScreen() {
         />
         <Text variant="caption" tone={estimated > 100 * 1024 * 1024 ? 'warning' : 'tertiary'}>
           About {formatBytes(estimated)}
-          {estimated > 100 * 1024 * 1024 ? ' — large files can take a while and may fail on a low-memory device.' : ''}
+          {estimated > 100 * 1024 * 1024
+            ? ' — the render is written a second at a time, so length costs time and storage rather than memory. Check you have the space.'
+            : ''}
         </Text>
         {exporting ? (
           <View style={styles.progressTrack}>
@@ -380,9 +406,34 @@ export default function ProtocolScreen() {
           variant="danger"
           style={styles.actionButton}
           onPress={async () => {
+            /*
+             * A protocol an unfinished experiment still needs is not an
+             * ordinary delete. Removing it used to leave "Start next session"
+             * doing nothing for ever, with no way to complete or reveal the
+             * trial — and in a blinded one the user could not even be told
+             * which arm had gone. The experiment is named here, and the arm is
+             * not, because naming it would unblind the trial from a delete
+             * dialog.
+             */
+            const blocking = experiments.filter(
+              (experiment) =>
+                experiment.status === 'running' &&
+                [experiment.protocolA, experiment.protocolB, experiment.protocolControl].includes(
+                  protocol.id,
+                ),
+            );
             const agreed = await confirm({
               title: 'Delete protocol?',
-              message: `"${protocol.name}" will be removed from this device.`,
+              message:
+                blocking.length > 0
+                  ? `"${protocol.name}" is an arm of ${
+                      blocking.length === 1
+                        ? `the running trial "${blocking[0].name}"`
+                        : `${blocking.length} running trials`
+                    }. Deleting it leaves ${
+                      blocking.length === 1 ? 'that trial' : 'those trials'
+                    } unable to run another session, be completed, or be revealed.`
+                  : `"${protocol.name}" will be removed from this device.`,
               confirmLabel: 'Delete',
               destructive: true,
             });

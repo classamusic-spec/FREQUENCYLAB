@@ -682,7 +682,11 @@ describe('the four presets the spec gave parameters for', () => {
         `a chime is tagged ${tag}, so "no low chime exists" is no longer true`,
       ).toBe(0);
     }
-    expect(Math.min(...chimes.map((asset) => asset.brightness))).toBeGreaterThan(0.5);
+    const brightness = chimes
+      .map((asset) => asset.brightness)
+      .filter((value): value is number => value !== null);
+    expect(brightness).toHaveLength(chimes.length);
+    expect(Math.min(...brightness)).toBeGreaterThan(0.5);
 
     // The sparse upper chime is sparse by interval *and* probability.
     expect(spacing(preset, 'upper-chimes').min).toBeGreaterThanOrEqual(100);

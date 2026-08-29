@@ -203,7 +203,9 @@ export function DnaChip({ human, fingerprint, onPress, style }: DnaChipProps) {
       accessibilityRole="button"
       accessibilityLabel={`Protocol DNA ${human}`}
       accessibilityHint={fingerprint ? 'Long press to copy the full fingerprint.' : undefined}
-      style={style}
+      // The glass inside stays 32 pt; the pressable around it is padded to 44.
+      // Padding rather than `hitSlop`, which React Native Web ignores.
+      style={[styles.dnaTouch, style]}
     >
       <DisplayGlass cornerRadius={radius.engraved + 1}>
         <View style={styles.dna}>
@@ -236,6 +238,7 @@ function withAlpha(hex: string, alpha: number): string {
 }
 
 const styles = StyleSheet.create({
+  dnaTouch: { paddingVertical: 6, justifyContent: 'center' },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',

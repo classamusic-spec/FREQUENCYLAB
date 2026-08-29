@@ -122,13 +122,26 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: MIN_TOUCH_TARGET - 6,
+    // Was `MIN_TOUCH_TARGET - 6`, which undercut the app's own constant by six
+    // pixels for the sake of a slightly trimmer control. 38 pt is below every
+    // platform minimum there is, and a segmented control is one of the most
+    // tapped things in this app.
+    minHeight: MIN_TOUCH_TARGET,
     paddingHorizontal: space.lg,
     borderRadius: radius.pill,
   },
   segmentFlex: { flex: 1 },
   segmentScroll: { minWidth: 76 },
-  segmentSm: { minHeight: 30 },
+  /*
+   * `sm` is a lighter *look*, not a smaller target.
+   *
+   * It used to draw at 30 pt, under every platform minimum and under this
+   * app's own `MIN_TOUCH_TARGET`. `hitSlop` is not the fix: React Native Web
+   * ignores it entirely, so it would have quietly left the web build exactly
+   * as it was. What still distinguishes the variant is the type size and the
+   * horizontal padding, which is most of what it was ever for.
+   */
+  segmentSm: { minHeight: MIN_TOUCH_TARGET, paddingHorizontal: space.md },
   selected: {
     shadowColor: '#33486A',
     shadowOpacity: 0.16,

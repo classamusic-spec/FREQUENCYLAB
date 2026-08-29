@@ -63,12 +63,58 @@ export async function seedPresetsIfEmpty(): Promise<Protocol[]> {
   return presets;
 }
 
+/**
+ * Sessions, with the protocol snapshots stored once each rather than per session.
+ *
+ * A session embeds the whole protocol it ran, so history stays reproducible
+ * after the protocol is edited or deleted. Stored inline that came to about
+ * 4 KB per session in one AsyncStorage row rewritten on every session end and
+ * every rating — around 500 sessions before Android's 2 MB CursorWindow starts
+ * refusing to read the row back, which is inside the lifetime of a daily user.
+ *
+ * Splitting the snapshots out by fingerprint fixes it without throwing any
+ * history away: somebody who runs the same protocol two hundred times stores
+ * one copy of it. A session record is then a few hundred bytes.
+ *
+ * **Why identity is restored from the session and not the snapshot.** The
+ * fingerprint is a hash of what the protocol *does* and deliberately excludes
+ * its id, name and description — that is what lets a renamed protocol keep its
+ * history. So two differently named protocols with identical DSP share one
+ * stored snapshot, and reading the name off it would show the wrong one. The
+ * session already carries `protocolId` and `protocolName`; those are put back
+ * on the way out, and the snapshot supplies only the part the fingerprint
+ * actually guarantees.
+ */
 export async function loadSessions(): Promise<Session[]> {
-  return readValue<Session[]>(StorageKeys.sessions, []);
+  const sessions = await readValue<Session[]>(StorageKeys.sessions, []);
+  const snapshots = await readValue<Record<string, Protocol>>(StorageKeys.protocolSnapshots, {});
+  return sessions.map((session) => {
+    // A record written before the split still carries its own snapshot.
+    if (session.protocolSnapshot) return session;
+    const stored = snapshots[session.protocolFingerprint];
+    if (!stored) return session;
+    return {
+      ...session,
+      protocolSnapshot: { ...stored, id: session.protocolId, name: session.protocolName },
+    };
+  });
 }
 
 export async function saveSessions(sessions: Session[]): Promise<void> {
-  await writeValue(StorageKeys.sessions, sessions);
+  const snapshots: Record<string, Protocol> = {};
+  const stripped = sessions.map((session) => {
+    if (!session.protocolSnapshot) return session;
+    snapshots[session.protocolFingerprint] ??= session.protocolSnapshot;
+    const { protocolSnapshot: _snapshot, ...rest } = session;
+    return rest as Session;
+  });
+  // Snapshots are written first: a crash between the two writes then leaves a
+  // snapshot nothing references, which is waste, rather than a session whose
+  // protocol has vanished, which is data loss. The map is rebuilt from the
+  // sessions each time, so an unreferenced snapshot is collected on the next
+  // save rather than accumulating for ever.
+  await writeValue(StorageKeys.protocolSnapshots, snapshots);
+  await writeValue(StorageKeys.sessions, stripped);
 }
 
 export async function loadExperiments(): Promise<Experiment[]> {

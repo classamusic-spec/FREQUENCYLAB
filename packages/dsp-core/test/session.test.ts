@@ -4,7 +4,10 @@ import {
   SessionRenderer,
   buildStage,
   createProtocol,
+  WavPcmEncoder,
   encodeWav,
+  wavHeader,
+  wavPadding,
   makeSweepLane,
   protocolFromSimple,
   renderProtocolOffline,
@@ -518,5 +521,96 @@ describe('the sleep timer fade', () => {
     for (let i = 0; i < 200; i++) renderer.render(left, right, 4096);
     expect(renderer.stopFadeComplete).toBe(false);
     expect(peak(left)).toBeGreaterThan(0.2);
+  });
+});
+
+describe('streaming a WAV produces the same bytes as encoding one', () => {
+  /*
+   * The property the streaming export depends on, and the reason `encodeWav`
+   * is now built out of the same three pieces rather than being a second
+   * implementation. A 60-minute export at 48 kHz is 1.7 GB of Float32 and
+   * encoded buffer if it is assembled in memory, so the app writes it a chunk
+   * at a time — and a chunked file that is not byte-identical to the one-shot
+   * one is a different export, not the same export delivered differently.
+   *
+   * The dither is what makes this a real risk. It is a deterministic sequence
+   * so two renders match, which means its state has to survive a chunk
+   * boundary: an encoder restarted per chunk produces a file that depends on
+   * the chunk size.
+   */
+  const SR = 48000;
+  const frames = 5000;
+
+  function signal(): { left: Float32Array; right: Float32Array } {
+    const left = new Float32Array(frames);
+    const right = new Float32Array(frames);
+    for (let i = 0; i < frames; i++) {
+      left[i] = Math.sin((2 * Math.PI * 220 * i) / SR) * 0.5;
+      // Quiet, where dither actually matters, and asymmetric so the channels
+      // cannot pass by being identical.
+      right[i] = Math.sin((2 * Math.PI * 227 * i) / SR) * 0.0004;
+    }
+    return { left, right };
+  }
+
+  function streamed(chunkFrames: number, bitDepth: 16 | 24 | 32): Uint8Array {
+    const { left, right } = signal();
+    const options = { bitDepth, metadata: { title: 'Chunked', software: 'test' } };
+    const parts: Uint8Array[] = [wavHeader(frames, SR, options)];
+    const encoder = new WavPcmEncoder(bitDepth);
+    for (let at = 0; at < frames; at += chunkFrames) {
+      const count = Math.min(chunkFrames, frames - at);
+      parts.push(
+        encoder.encode(left.subarray(at, at + count), right.subarray(at, at + count), count),
+      );
+    }
+    parts.push(wavPadding(frames, bitDepth));
+
+    const total = parts.reduce((sum, part) => sum + part.length, 0);
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const part of parts) {
+      bytes.set(part, offset);
+      offset += part.length;
+    }
+    return bytes;
+  }
+
+  for (const bitDepth of [16, 24, 32] as const) {
+    it(`matches at ${bitDepth}-bit, whatever the chunk size`, () => {
+      const { left, right } = signal();
+      const whole = encodeWav(left, right, SR, {
+        bitDepth,
+        metadata: { title: 'Chunked', software: 'test' },
+      });
+      // Chunk sizes that divide the length and one that deliberately does not,
+      // so the last short chunk is exercised too.
+      for (const chunkFrames of [frames, 2500, 1000, 333, 1]) {
+        expect(Array.from(streamed(chunkFrames, bitDepth)), `chunk ${chunkFrames}`).toEqual(
+          Array.from(whole),
+        );
+      }
+    });
+  }
+
+  it('writes a header whose declared size matches the samples that follow', () => {
+    for (const bitDepth of [16, 24, 32] as const) {
+      const bytes = streamed(1000, bitDepth);
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      expect(view.getUint32(4, true), `RIFF size at ${bitDepth}`).toBe(bytes.length - 8);
+
+      // Find the data chunk and check its declared length against what is left.
+      let at = 12;
+      while (at < bytes.length - 8) {
+        const id = String.fromCharCode(...bytes.subarray(at, at + 4));
+        const size = view.getUint32(at + 4, true);
+        if (id === 'data') {
+          expect(size, `data size at ${bitDepth}`).toBe(frames * 2 * (bitDepth / 8));
+          expect(at + 8 + size).toBeLessThanOrEqual(bytes.length);
+          break;
+        }
+        at += 8 + size + (size % 2);
+      }
+    }
   });
 });

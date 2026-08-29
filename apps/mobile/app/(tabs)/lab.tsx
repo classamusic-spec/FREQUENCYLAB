@@ -263,7 +263,10 @@ function LabWorkspace() {
       <SectionHeader
         label="Modules"
         right={
-          <Pressable onPress={() => setShowAddModule((value) => !value)} hitSlop={10}>
+          <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Add module"
+          onPress={() => setShowAddModule((value) => !value)} hitSlop={10}>
             <Label tone="signal">{showAddModule ? 'Done' : 'Add module'}</Label>
           </Pressable>
         }
@@ -311,7 +314,11 @@ function LabWorkspace() {
               headerRight={
                 <View style={styles.moduleHeaderActions}>
                   {node.bypass ? <Tag label="Bypassed" /> : null}
-                  <Pressable onPress={() => selectNode(expanded ? null : node.id)} hitSlop={8}>
+                  <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded }}
+                  accessibilityLabel={expanded ? "Collapse this module" : "Edit this module"}
+                  onPress={() => selectNode(expanded ? null : node.id)} hitSlop={8}>
                     <Label tone={expanded ? 'signal' : 'tertiary'}>{expanded ? 'Collapse' : 'Edit'}</Label>
                   </Pressable>
                 </View>
@@ -374,7 +381,10 @@ function LabWorkspace() {
       <SectionHeader
         label="Routing"
         right={
-          <Pressable onPress={() => setShowRouting((value) => !value)} hitSlop={10}>
+          <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Edit routing"
+          onPress={() => setShowRouting((value) => !value)} hitSlop={10}>
             <Label tone="signal">{showRouting ? 'Done' : 'Edit'}</Label>
           </Pressable>
         }

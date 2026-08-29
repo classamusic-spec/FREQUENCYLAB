@@ -112,6 +112,7 @@ export default function ArchiveScreen() {
             onPress={() => router.push('/archive/scope')}
             accessibilityRole="button"
             accessibilityLabel="What this archive is"
+            hitSlop={6}
             style={styles.infoButton}
           >
             <Text variant="label" tone="secondary">
@@ -313,6 +314,8 @@ function round(hz: number): number {
 
 const styles = StyleSheet.create({
   infoButton: {
+    // Drawn at 32 and tappable at 44: the mark stays the size the
+    // layout wants, and `hitSlop` on the Pressable makes up the rest.
     width: 32,
     height: 32,
     borderRadius: 16,

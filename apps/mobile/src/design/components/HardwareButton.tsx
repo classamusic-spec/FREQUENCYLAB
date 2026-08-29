@@ -28,6 +28,13 @@ export interface HardwareButtonProps {
   selected?: boolean;
   icon?: ReactNode;
   style?: ViewStyle;
+  /**
+   * What a screen reader says instead of `label`.
+   *
+   * For the buttons whose label is a glyph. `label="◀"` announces as "black
+   * left-pointing triangle", which is not what the button does.
+   */
+  accessibilityLabel?: string;
   accessibilityHint?: string;
   testID?: string;
 }
@@ -49,6 +56,7 @@ export function HardwareButton({
   selected,
   icon,
   style,
+  accessibilityLabel,
   accessibilityHint,
   testID,
 }: HardwareButtonProps) {
@@ -93,7 +101,7 @@ export function HardwareButton({
     <Pressable
       testID={testID}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: !!inactive, selected: !!selected, busy: !!loading }}
       disabled={inactive}
@@ -150,7 +158,7 @@ export function HardwareButton({
 }
 
 const SIZE_STYLE: Record<ButtonSize, ViewStyle> = {
-  sm: { minHeight: 34, paddingHorizontal: space.md },
+  sm: { minHeight: MIN_TOUCH_TARGET, paddingHorizontal: space.md },
   md: { minHeight: MIN_TOUCH_TARGET, paddingHorizontal: space.lg },
   lg: { minHeight: 54, paddingHorizontal: space.xl },
 };

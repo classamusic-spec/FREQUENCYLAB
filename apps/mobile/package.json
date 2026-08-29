@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "build:web": "expo export --platform web",
-    "deploy:web": "npm run build:web && cp vercel.json dist/vercel.json && vercel deploy --prod --yes ./dist"
+    "deploy:web": "npm run build:web && cp vercel.json dist/vercel.json && vercel deploy --prod --yes ./dist",
+    "test": "vitest run"
   },
   "dependencies": {
     "@expo-google-fonts/ibm-plex-mono": "^0.4.1",

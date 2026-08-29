@@ -149,6 +149,7 @@ export default function BuilderScreen() {
         <HardwareButton label="Duplicate" size="sm" onPress={() => duplicateStage(stageIndex)} />
         <HardwareButton
           label="◀"
+              accessibilityLabel="Move stage earlier"
           size="sm"
           variant="ghost"
           disabled={stageIndex === 0}
@@ -156,6 +157,7 @@ export default function BuilderScreen() {
         />
         <HardwareButton
           label="▶"
+              accessibilityLabel="Move stage later"
           size="sm"
           variant="ghost"
           disabled={stageIndex >= draft.stages.length - 1}
@@ -239,7 +241,10 @@ export default function BuilderScreen() {
       <SectionHeader
         label="Automation"
         right={
-          <Pressable onPress={() => setAddingLane((value) => !value)} hitSlop={10}>
+          <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Add automation lane"
+              onPress={() => setAddingLane((value) => !value)} hitSlop={10}>
             <Label tone="signal">{addingLane ? 'Done' : 'Add lane'}</Label>
           </Pressable>
         }

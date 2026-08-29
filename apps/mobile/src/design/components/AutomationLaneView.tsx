@@ -141,13 +141,22 @@ export function AutomationLaneView({
           </Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable onPress={() => onChange({ ...lane, enabled: !lane.enabled })} hitSlop={8}>
+          <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ checked: lane.enabled }}
+          accessibilityLabel={lane.enabled ? "Disable this lane" : "Enable this lane"}
+          onPress={() => onChange({ ...lane, enabled: !lane.enabled })} hitSlop={8}>
             <Label tone={lane.enabled ? 'tertiary' : 'warning'}>
               {lane.enabled ? 'Disable' : 'Enable'}
             </Label>
           </Pressable>
           {onRemove ? (
-            <Pressable onPress={onRemove} hitSlop={8}>
+            <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Remove this lane"
+          onPress={onRemove}
+          hitSlop={8}
+        >
               <Label tone="warning">Delete lane</Label>
             </Pressable>
           ) : null}

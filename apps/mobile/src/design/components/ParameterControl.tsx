@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { clamp, type ParamDescriptor } from '@frequencylab/dsp-core';
-import { colors, space } from '../tokens';
+import { colors, MIN_TOUCH_TARGET, space } from '../tokens';
 import * as haptics from '../haptics';
 import { NumericEntrySheet } from './NumericEntrySheet';
 import { Label, Text } from './Text';
@@ -93,7 +93,10 @@ export function ParameterControl({
           disabled={disabled}
           accessibilityRole="button"
           accessibilityLabel={`${descriptor.label}, ${format(value, descriptor)}. Double tap to type a value.`}
-          hitSlop={8}
+          // The readout is a line of text about 17 pt tall. Padded rather than
+          // given `hitSlop`, which React Native Web ignores — the web build is
+          // shipped, so a native-only fix is not a fix.
+          style={styles.readoutTouch}
         >
           <Text variant="readoutSm" tone={disabled ? 'disabled' : 'primary'}>
             {format(value, descriptor)}
@@ -220,6 +223,7 @@ function snap(value: number, step: number, descriptor: ParamDescriptor): number 
 }
 
 const styles = StyleSheet.create({
+  readoutTouch: { minHeight: MIN_TOUCH_TARGET, justifyContent: 'center', paddingHorizontal: space.xs },
   row: { gap: space.xs, paddingVertical: space.xs },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   labelGroup: { flexDirection: 'row', gap: space.xs, alignItems: 'center' },

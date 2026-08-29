@@ -59,10 +59,25 @@ export default function ExperimentScreen() {
   const scheduleValid = verifySchedule(experiment);
   const complete = analysis.completedSessions === analysis.totalSessions;
 
+  /*
+   * The protocol the next assignment needs, or nothing.
+   *
+   * Nothing stops a protocol being deleted while an experiment still refers to
+   * it, and when that happened "Start next session" returned at this line: no
+   * message, no navigation, not even a haptic. In a blinded trial that is as
+   * bad as it gets — the user cannot be told which arm is missing, so they
+   * cannot work out what went wrong, and the experiment can never complete or
+   * be revealed. Resolved once, here, so the screen can say so and the button
+   * can refuse rather than the handler silently doing nothing.
+   */
+  const nextProtocol = plan
+    ? protocols.find((candidate) => candidate.id === plan.protocolId)
+    : undefined;
+  const missingProtocol = plan !== null && nextProtocol === undefined;
+
   const runNext = async () => {
-    if (!plan) return;
-    const protocol = protocols.find((candidate) => candidate.id === plan.protocolId);
-    if (!protocol) return;
+    if (!plan || !nextProtocol) return;
+    const protocol = nextProtocol;
     haptics.confirm();
     // The assignment is marked complete by the player once a session record
     // actually exists — starting one is not the same as running one.
@@ -96,13 +111,21 @@ export default function ExperimentScreen() {
           <Text variant="bodySm" tone="secondary" style={styles.paragraph}>
             {experiment.blinded && !plan.arm
               ? 'Which protocol runs is decided and sealed. You will not be told until the experiment is complete and you choose to reveal it.'
-              : `Running ${protocols.find((candidate) => candidate.id === plan.protocolId)?.name ?? plan.protocolId}.`}
+              : `Running ${nextProtocol?.name ?? plan.protocolId}.`}
           </Text>
+          {missingProtocol ? (
+            <Text variant="bodySm" tone="limit" style={styles.paragraph}>
+              {experiment.blinded && !experiment.revealedAt
+                ? 'The protocol this session needs is no longer on this device, so it cannot be run. Naming it would unblind the trial. Restore it from an export, or discard this experiment — its results cannot be completed as they stand.'
+                : `The protocol this session needs (${plan.protocolId}) is no longer on this device, so it cannot be run. Restore it from an export, or discard this experiment.`}
+            </Text>
+          ) : null}
           <HardwareButton
             label="Start next session"
             variant="primary"
             size="lg"
             style={styles.action}
+            disabled={missingProtocol}
             onPress={runNext}
           />
         </InstrumentPanel>

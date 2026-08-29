@@ -3,10 +3,12 @@ import * as Sharing from 'expo-sharing';
 import {
   DSP_VERSION,
   SessionRenderer,
-  encodeWav,
+  WavPcmEncoder,
   exportDnaDocument,
   protocolDna,
   totalDurationSec,
+  wavHeader,
+  wavPadding,
   type Protocol,
   type WavBitDepth,
 } from '@frequencylab/dsp-core';
@@ -19,6 +21,18 @@ import {
  * carries the protocol name, the DSP version and the full DNA document in the
  * WAV's INFO chunk — which is what makes the file a reproducible artefact
  * rather than just audio.
+ *
+ * **Each chunk is written to disk and then dropped.** It used to accumulate
+ * into two whole-render Float32Arrays and then encode those into a third
+ * buffer: a sixty-minute protocol at 48 kHz is 172.8 M frames, so 2 × 691 MB
+ * of float plus the encoded WAV, with no `try` around the allocation. The
+ * failure mode was the process being killed, not the export error the UI is
+ * written to show. Nothing is held now but one second of audio, so length
+ * costs disk and time and not memory.
+ *
+ * The encoder's dither state carries across chunks, which is what keeps the
+ * streamed file byte-identical to a one-shot encode of the same render —
+ * asserted in `session.test.ts` at every bit depth and five chunk sizes.
  */
 
 export interface ExportOptions {
@@ -62,28 +76,8 @@ export async function exportProtocolToWav(
   const totalFrames = Math.round(durationSec * sampleRate);
 
   const renderer = new SessionRenderer(protocol, { sampleRate, compile: 'eager' });
-  const left = new Float32Array(totalFrames);
-  const right = new Float32Array(totalFrames);
-
-  // One second of audio per chunk, then yield: long enough to be efficient,
-  // short enough that progress stays responsive.
-  const chunkFrames = sampleRate;
-  const blockL = new Float32Array(chunkFrames);
-  const blockR = new Float32Array(chunkFrames);
-
-  let produced = 0;
-  while (produced < totalFrames) {
-    const frames = Math.min(chunkFrames, totalFrames - produced);
-    renderer.render(blockL, blockR, frames);
-    left.set(blockL.subarray(0, frames), produced);
-    right.set(blockR.subarray(0, frames), produced);
-    produced += frames;
-    options.onProgress?.(produced / totalFrames);
-    await yieldToUi();
-  }
-
   const dna = protocolDna(protocol);
-  const bytes = encodeWav(left, right, sampleRate, {
+  const wavOptions = {
     bitDepth,
     metadata: {
       title: protocol.name,
@@ -91,7 +85,7 @@ export async function exportProtocolToWav(
       artist: protocol.meta.author,
       comment: JSON.stringify(exportDnaDocument(protocol)),
     },
-  });
+  };
 
   const directory = new Directory(Paths.document, 'exports');
   if (!directory.exists) directory.create({ intermediates: true });
@@ -100,12 +94,51 @@ export async function exportProtocolToWav(
   const file = new File(directory, filename);
   if (file.exists) file.delete();
   file.create();
-  file.write(bytes);
+
+  // One second of audio per chunk, then yield: long enough to be efficient,
+  // short enough that progress stays responsive.
+  const chunkFrames = sampleRate;
+  const blockL = new Float32Array(chunkFrames);
+  const blockR = new Float32Array(chunkFrames);
+  const encoder = new WavPcmEncoder(bitDepth);
+
+  const writer = file.writableStream().getWriter();
+  let bytesWritten = 0;
+  try {
+    const header = wavHeader(totalFrames, sampleRate, wavOptions);
+    await writer.write(header);
+    bytesWritten += header.length;
+
+    let produced = 0;
+    while (produced < totalFrames) {
+      const frames = Math.min(chunkFrames, totalFrames - produced);
+      renderer.render(blockL, blockR, frames);
+      const pcm = encoder.encode(blockL, blockR, frames);
+      await writer.write(pcm);
+      bytesWritten += pcm.length;
+      produced += frames;
+      options.onProgress?.(produced / totalFrames);
+      await yieldToUi();
+    }
+
+    const pad = wavPadding(totalFrames, bitDepth);
+    if (pad.length > 0) {
+      await writer.write(pad);
+      bytesWritten += pad.length;
+    }
+    await writer.close();
+  } catch (error) {
+    // A half-written file is worse than none: it has a valid header claiming a
+    // length it does not have, so it opens and plays silence at the end.
+    await writer.abort(error).catch(() => {});
+    if (file.exists) file.delete();
+    throw error;
+  }
 
   return {
     uri: file.uri,
     filename,
-    bytes: bytes.byteLength,
+    bytes: bytesWritten,
     durationSec,
     truncated: durationSec < fullDuration,
   };
@@ -133,8 +166,26 @@ export async function exportDnaFile(protocol: Protocol): Promise<ExportResult> {
   };
 }
 
+/**
+ * Hands a finished file to the system share sheet.
+ *
+ * Throws rather than returning quietly when sharing is unavailable — which it
+ * is on the web build. A silent return here follows a render that may have
+ * taken minutes, and from the outside it is indistinguishable from the export
+ * having failed: the file is written and sitting in the app's documents
+ * directory, and the user is told nothing at all. The caller shows this.
+ */
+export class SharingUnavailableError extends Error {
+  constructor(readonly uri: string) {
+    super(
+      'This platform has no share sheet, so the file could not be handed on. It was written and is in the app’s documents folder.',
+    );
+    this.name = 'SharingUnavailableError';
+  }
+}
+
 export async function share(uri: string, mimeType: string, title: string): Promise<void> {
-  if (!(await Sharing.isAvailableAsync())) return;
+  if (!(await Sharing.isAvailableAsync())) throw new SharingUnavailableError(uri);
   await Sharing.shareAsync(uri, { mimeType, dialogTitle: title, UTI: mimeType });
 }
 

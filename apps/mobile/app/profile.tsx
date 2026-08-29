@@ -20,10 +20,11 @@ import { HardwareButton } from '../src/design/components/HardwareButton';
 import { ListeningTrend } from '../src/design/components/ListeningTrend';
 import { SegmentSelector } from '../src/design/components/SegmentSelector';
 import { Label, Text } from '../src/design/components/Text';
-import { colors, layout, radius, space } from '../src/design/tokens';
+import { MIN_TOUCH_TARGET, colors, layout, radius, space } from '../src/design/tokens';
 import * as haptics from '../src/design/haptics';
 import { confirm, notify } from '../src/design/dialogs';
 import { usePreferences } from '../src/state/preferences';
+import { SafetyBanner } from '../src/design/components/SafetyBanner';
 import { useHistory } from '../src/state/history';
 import { useProtocolLibrary } from '../src/state/library';
 import { buildExport } from '../src/storage/repositories';
@@ -45,6 +46,7 @@ export default function ProfileScreen() {
   const preferences = usePreferences((state) => state.preferences);
   const update = usePreferences((state) => state.update);
   const sessions = useHistory((state) => state.sessions);
+  const storageError = useHistory((state) => state.storageError);
   const protocols = useProtocolLibrary((state) => state.protocols);
   const [exporting, setExporting] = useState(false);
 
@@ -108,6 +110,22 @@ export default function ProfileScreen() {
         right={<HardwareButton label="Done" size="sm" onPress={() => router.back()} />}
       />
 
+      {/*
+          A write that failed, said out loud. The list below is the in-memory
+          one and is what the user's session actually was; if it did not reach
+          disk they need to know before they close the app, not after.
+        */}
+      {storageError ? (
+        <SafetyBanner
+          check={{
+            id: 'history-write-failed',
+            level: 'warning',
+            title: 'Not saved to this device',
+            message: storageError,
+          }}
+        />
+      ) : null}
+
       <InstrumentPanel
         tone="raised"
         label="History"
@@ -165,7 +183,13 @@ export default function ProfileScreen() {
             <PanelRow label="Protocols" value={String(protocols.length)} />
 
             <PanelDivider />
-            <Pressable onPress={() => router.push('/history')} accessibilityRole="button">
+            <Pressable
+              onPress={() => router.push('/history')}
+              accessibilityRole="button"
+              accessibilityLabel="View all sessions"
+              // A bare `Pressable` around a `Label` measured 358 × 13.
+              style={styles.viewAll}
+            >
               <Label tone="signal">View all sessions</Label>
             </Pressable>
           </>
@@ -345,6 +369,7 @@ function ToggleRow({
 }
 
 const styles = StyleSheet.create({
+  viewAll: { minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' },
   statRow: { flexDirection: 'row', justifyContent: 'space-between', gap: space.sm },
   stat: { gap: 2, flex: 1 },
   statValue: { flexDirection: 'row', alignItems: 'baseline', gap: space.xxs },
