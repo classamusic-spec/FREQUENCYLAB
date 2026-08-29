@@ -9,7 +9,7 @@ import type {
 /**
  * The factory sound baths.
  *
- * Seventeen presets, written against the 369 assets actually in this
+ * Nineteen presets, written against the 369 assets actually in this
  * repository. Every pool below was resolved against that library before it was
  * committed and every count in a comment here is a real one — a preset whose
  * query is plausible and returns four assets is worse than no preset at all,
@@ -85,7 +85,7 @@ import type {
  * (§84). Every description ends with `ACOUSTIC_LAYER_NOTICE`, appended by
  * `soundBath()` rather than by hand, because §25's distinction — the bowl is
  * not producing the modulation — is the one sentence a preset must never be
- * shipped without, and remembering to type it seventeen times is not a control.
+ * shipped without, and remembering to type it nineteen times is not a control.
  */
 
 /**
@@ -102,13 +102,14 @@ export const ACOUSTIC_LAYER_NOTICE =
 /**
  * Bumped when a preset's parameters change, so a session record stays readable.
  *
- * One number for all seventeen, so a change to any of them moves all of them.
+ * One number for all nineteen, so a change to any of them moves all of them.
  * That is coarser than it could be and is the right trade: the version exists
- * so a stored session can say which parameters produced it, and seventeen
- * separately drifting counters would be seventeen things to forget.
+ * so a stored session can say which parameters produced it, and nineteen
+ * separately drifting counters would be nineteen things to forget.
  *
  * 2 — `Deep Calm`, `Earth Resonance`, `528 Organic` and `Theta Bath` were
- * brought onto §27–§30's stated parameters.
+ * brought onto §27–§30's stated parameters; `Kalimba Passages` and `Chime
+ * Drift` were added to reach the fifteen assets no pool could play.
  */
 const FACTORY_VERSION = 2;
 
@@ -223,6 +224,40 @@ const SOFT_KALIMBA: AssetPool = {
   instruments: ['KALIMBA'],
   durationClasses: ['SHORT', 'MEDIUM'],
   excludedTags: ['bright'],
+};
+
+/*
+ * The three pools that hold a whole instrument.
+ *
+ * Every other pool above narrows by duration class, which is usually right —
+ * a bell layer wants strikes and not the one-second MICRO — and had one
+ * consequence nobody had counted: fifteen assets were in no preset's pool at
+ * all. Nine long kalimba passages of twenty to forty-six seconds, the four
+ * longest Koshi chimes at fifty-seven to seventy-two, and two medium bowls.
+ * They were shipped, measured, approved, and unreachable.
+ *
+ * These three exist so `Kalimba Passages` and `Chime Drift` can reach them.
+ * They are the material those two presets are *about*, not a widening of an
+ * existing preset's net: a long chime is a different instrument from a chime
+ * strike, and putting one in `Silver Chimes` would change what that preset is.
+ */
+
+/** All 100 kalimba, including the 9 LONG phrases nothing else reaches. */
+const ALL_KALIMBA: AssetPool = {
+  instruments: ['KALIMBA'],
+  durationClasses: ['SHORT', 'MEDIUM', 'LONG'],
+};
+
+/** All 89 chimes, including the 3 EXTENDED and 1 LONG Koshi ring-outs. */
+const ALL_CHIMES: AssetPool = {
+  instruments: ['CHIME'],
+  durationClasses: ['SHORT', 'MEDIUM', 'LONG', 'EXTENDED'],
+};
+
+/** All 68 bowls, including the 2 MEDIUM ones the LONG pools exclude. */
+const ALL_BOWLS: AssetPool = {
+  instruments: ['SINGING_BOWL'],
+  durationClasses: ['MEDIUM', 'LONG', 'EXTENDED'],
 };
 
 /**
@@ -1328,6 +1363,152 @@ function tuningForkSpace(): SoundBathPreset {
   });
 }
 
+/**
+ * Kalimba Passages.
+ *
+ * The library's nine long kalimba recordings are not strikes, they are played
+ * passages of twenty to forty-six seconds — the only material here with a
+ * melodic line in it. Every other preset treats kalimba as an accent and draws
+ * on `SHORT`/`MEDIUM`, so those nine were in no pool at all. This is the preset
+ * they are for.
+ *
+ * The pool is all hundred with the long ones preferred rather than the nine
+ * alone: nine clears the count floor and would leave a half-hour session
+ * playing the same nine files, which is the audible rotation this file exists
+ * to avoid. Preferring `sustained` and `long_decay` puts them in front while
+ * eighty of the hundred stay genuinely in play.
+ */
+function kalimbaPassages(): SoundBathPreset {
+  return soundBath({
+    id: 'soundbath.kalimba_passages',
+    name: 'Kalimba Passages',
+    copy:
+      'The long kalimba recordings, which are played passages rather than single notes, with bowls kept well behind them and soft bells between. The most melodic thing this library can be arranged into, and the only preset where the kalimba leads.',
+    globals: {
+      density: 0.34,
+      energy: 0.4,
+      brightness: 0.55,
+      reverbPreset: 'hall',
+      width: 0.7,
+    },
+    layers: (every) => [
+      {
+        id: 'passages',
+        role: 'MELODIC_ACCENT',
+        pool: { ...ALL_KALIMBA, preferredTags: ['sustained', 'long_decay'] },
+        intervalSec: every(34, 66),
+        probability: 0.8,
+        // −4 rather than lower: this layer is the subject, and the pool's
+        // loudest recommendation is +2.21 dB.
+        gainDb: { min: -9, max: -4 },
+        panRange: { min: -0.35, max: 0.35 },
+        maxVoices: 2,
+        reverbSend: 0.35,
+      },
+      {
+        id: 'bowls',
+        role: 'PRIMARY_BOWL',
+        pool: { ...ALL_BOWLS, preferredTags: ['warm'] },
+        intervalSec: every(50, 90),
+        probability: 0.65,
+        // Stops at −9: `ALL_BOWLS` holds the +8.44 dB bowl.
+        gainDb: { min: -14, max: -9 },
+        panRange: { min: -0.3, max: 0.3 },
+        maxVoices: 1,
+        reverbSend: 0.5,
+      },
+      {
+        id: 'bells',
+        role: 'BELL',
+        pool: { ...SOFT_BELLS, preferredTags: ['gentle'] },
+        intervalSec: every(46, 84),
+        probability: 0.45,
+        gainDb: { min: -18, max: -13 },
+        panRange: { min: -0.7, max: 0.7 },
+        maxVoices: 2,
+        reverbSend: 0.4,
+      },
+    ],
+  });
+}
+
+/**
+ * Chime Drift.
+ *
+ * The four longest chimes in the library ring for fifty-seven to seventy-two
+ * seconds. Every chime preset before this drew on `SHORT` and `MEDIUM`, because
+ * a chime is usually a strike, so those four were unreachable — the closest
+ * thing this library has to sustained material and nothing could play them.
+ *
+ * Written around what they are: few events, long overlaps, and a bowl
+ * underneath rather than beside. It is the sparsest preset on the shelf, and
+ * the one where two sounds are most often ringing at once.
+ */
+function chimeDrift(): SoundBathPreset {
+  return soundBath({
+    id: 'soundbath.chime_drift',
+    name: 'Chime Drift',
+    copy:
+      'The longest chimes this library holds — Koshi ring-outs of a minute and more — left to overlap each other over a single warm bowl. Fewer events than anything else here, and more of the time with two sounds decaying at once.',
+    globals: {
+      density: 0.3,
+      energy: 0.3,
+      brightness: 0.62,
+      reverbPreset: 'cathedral',
+      width: 0.85,
+    },
+    layers: (every) => [
+      {
+        id: 'drift',
+        role: 'AIR',
+        pool: { ...ALL_CHIMES, preferredTags: ['airy', 'long_decay'] },
+        /*
+         * 32–62 rather than the 40–80 this was drafted at. At the wider
+         * spacing the sparsest of two hundred seeds produced exactly ten
+         * events, which is the floor below which a layer stops reading as a
+         * room rather than as isolated sounds — a preset one unlucky draw
+         * from its own limit is sparse by accident, not by design.
+         *
+         * The interval is the lever and density is not: `every()` divides by
+         * the same factor the scheduler multiplies back, so the declared
+         * spacing is what is heard at any density. Raising density here moved
+         * the mean by one event and the floor by none.
+         */
+        intervalSec: every(32, 62),
+        probability: 0.8,
+        // The pool's loudest recommendation is +1.65 dB.
+        gainDb: { min: -12, max: -7 },
+        panRange: { min: -0.8, max: 0.8 },
+        // Three, because the point of this preset is the overlap.
+        maxVoices: 3,
+        reverbSend: 0.6,
+      },
+      {
+        id: 'under',
+        role: 'SECONDARY_BOWL',
+        pool: { ...ALL_BOWLS, preferredTags: ['warm'] },
+        intervalSec: every(58, 104),
+        probability: 0.6,
+        gainDb: { min: -15, max: -9 },
+        panRange: { min: -0.2, max: 0.2 },
+        maxVoices: 1,
+        reverbSend: 0.55,
+      },
+      {
+        id: 'bells',
+        role: 'BELL',
+        pool: { ...SOFT_BELLS, preferredTags: ['gentle'] },
+        intervalSec: every(78, 140),
+        probability: 0.3,
+        gainDb: { min: -20, max: -15 },
+        panRange: { min: -0.85, max: 0.85 },
+        maxVoices: 1,
+        reverbSend: 0.5,
+      },
+    ],
+  });
+}
+
 // ---------------------------------------------------------------------------
 // The set
 // ---------------------------------------------------------------------------
@@ -1358,6 +1539,8 @@ export function buildSoundBathPresets(): SoundBathPreset[] {
     morningClarity(),
     focusMinimal(),
     gammaLight(),
+    kalimbaPassages(),
+    chimeDrift(),
   ];
 }
 
@@ -1380,6 +1563,8 @@ export const SOUND_BATH_PRESET_IDS = [
   'soundbath.morning_clarity',
   'soundbath.focus_minimal',
   'soundbath.gamma_light',
+  'soundbath.kalimba_passages',
+  'soundbath.chime_drift',
 ] as const;
 
 export function soundBathPreset(id: string): SoundBathPreset | undefined {

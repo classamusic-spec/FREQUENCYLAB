@@ -19,7 +19,7 @@ import {
 import type { SchedulableAsset, SoundBathPreset } from '../src/organic/soundbath.js';
 
 /**
- * The seventeen factory sound baths, against the library they will actually be
+ * The nineteen factory sound baths, against the library they will actually be
  * given.
  *
  * The same choice `soundbath.test.ts` made, for the same reason and with more
@@ -107,7 +107,7 @@ function peakConcurrency(events: Array<{ atSec: number; durationSec: number }>):
 // ---------------------------------------------------------------------------
 
 describe('the factory set', () => {
-  it('ships exactly the seventeen declared, in the declared order', () => {
+  it('ships exactly the nineteen declared, in the declared order', () => {
     const presets = buildSoundBathPresets();
     expect(presets.map((preset) => preset.id)).toEqual([...SOUND_BATH_PRESET_IDS]);
     expect(new Set(presets.map((preset) => preset.id)).size).toBe(presets.length);
@@ -276,18 +276,19 @@ describe('the pool floor catches a library that has been cut from under a preset
  * ```
  *   Gamma Light        187    8 s      Tuning Fork Space   31   48 s
  *   Morning Clarity    134   11 s      Earth Resonance     30   50 s
- *   Silver Chimes      107   14 s      Sleep Descent       29   52 s
- *   Chime Garden       105   14 s      Focus Minimal       27   55 s
- *   Alpha Air           78   19 s      Pure Bowls          26   57 s
- *   Float               60   25 s      Inner Space         23   64 s
- *   432 Meditation      44   35 s      Theta Bath          22   68 s
- *   528 Organic         36   42 s      Deep Calm           21   71 s
- *   Deep Bowls          32   48 s
+ *   Silver Chimes      107   14 s      Kalimba Passages    30   50 s
+ *   Chime Garden       105   14 s      Sleep Descent       29   52 s
+ *   Alpha Air           78   19 s      Focus Minimal       27   55 s
+ *   Float               60   25 s      Pure Bowls          26   57 s
+ *   432 Meditation      44   35 s      Chime Drift         24   63 s
+ *   528 Organic         36   42 s      Inner Space         23   64 s
+ *   Deep Bowls          32   48 s      Theta Bath          22   68 s
+ *                                      Deep Calm           21   71 s
  * ```
  *
  * Each figure is the mean over two hundred seeds, which is what a preset is: a
  * distribution, not a value. Everything asserted below is derived from these
- * seventeen numbers, so there is one place to change when a preset changes.
+ * nineteen numbers, so there is one place to change when a preset changes.
  *
  * The spread that band has to allow is real. `Sleep Descent` runs from 13 to 43
  * events across two hundred seeds — more than three to one — because a layer
@@ -324,6 +325,8 @@ const DESIGN_EVENTS: Record<string, number> = {
   'soundbath.morning_clarity': 134,
   'soundbath.focus_minimal': 27,
   'soundbath.gamma_light': 187,
+  'soundbath.kalimba_passages': 30,
+  'soundbath.chime_drift': 24,
 };
 
 /** Sparsest and busiest a twenty-five minute session may be, as event counts. */
@@ -488,7 +491,7 @@ describe('what a preset says about itself', () => {
 
   it('keeps the acoustic layer and the core signal separate, in every description', () => {
     // §25. The bowl is not producing the modulation, and every preset has to
-    // say so — appended by the builder rather than typed seventeen times, so
+    // say so — appended by the builder rather than typed nineteen times, so
     // the one that gets forgotten cannot exist.
     for (const preset of buildSoundBathPresets()) {
       expect(preset.description.endsWith(ACOUSTIC_LAYER_NOTICE), preset.id).toBe(true);
@@ -571,11 +574,116 @@ describe('the two retuned presets', () => {
 });
 
 // ---------------------------------------------------------------------------
+// What the shelf can actually reach
+// ---------------------------------------------------------------------------
+
+describe('the shelf reaches the library it ships with', () => {
+  /**
+   * Every asset the factory presets can play, across all their pools.
+   *
+   * The question nothing asked before, and the answer was 353 of 369. Nine
+   * long kalimba passages, the four longest Koshi chimes and two medium bowls
+   * were shipped, measured, approved — and in no preset's pool, because every
+   * pool narrows by duration class and none of them included those classes.
+   * Unreachable is not a thing a count of presets or a validator can see.
+   */
+  const reachable = (): Set<string> => {
+    const found = new Set<string>();
+    for (const preset of buildSoundBathPresets()) {
+      for (const layer of preset.layers) {
+        for (const asset of resolvePool(layer.pool, LIBRARY, true)) found.add(asset.assetId);
+      }
+    }
+    return found;
+  };
+
+  it('leaves nothing behind but the one asset too short to place', () => {
+    const missed = LIBRARY.filter((asset) => !reachable().has(asset.assetId));
+
+    /*
+     * One, and it is a decision rather than an oversight: a 1.3 s MICRO bell.
+     * Every bell pool is `SHORT`/`MEDIUM` because a strike that short cannot be
+     * placed as an event — it reads as a click, not a bell. Asserted by id so
+     * that a *second* asset falling out of the shelf fails here, and so that
+     * this one being fixed or removed also fails here rather than leaving a
+     * comment describing a library that has moved on.
+     */
+    expect(missed.map((asset) => `${asset.instrument}/${asset.durationClass}`)).toEqual([
+      'BELL/MICRO',
+    ]);
+    expect(missed[0].durationSeconds).toBeLessThan(2);
+  });
+
+  it('reaches every duration class the library actually holds, per instrument', () => {
+    // The shape of the original mistake: a class present in the library and
+    // absent from every pool. Checked per instrument, because "some bowl is
+    // reachable" was true the whole time the two medium ones were not.
+    const held = new Map<string, Set<string>>();
+    for (const asset of LIBRARY) {
+      if (asset.durationClass === 'MICRO') continue;
+      const key = asset.instrument;
+      if (!held.has(key)) held.set(key, new Set());
+      held.get(key)!.add(asset.durationClass);
+    }
+
+    const found = reachable();
+    const covered = new Map<string, Set<string>>();
+    for (const asset of LIBRARY) {
+      if (!found.has(asset.assetId)) continue;
+      const key = asset.instrument;
+      if (!covered.has(key)) covered.set(key, new Set());
+      covered.get(key)!.add(asset.durationClass);
+    }
+
+    for (const [instrument, classes] of held) {
+      const reached = covered.get(instrument) ?? new Set();
+      for (const durationClass of classes) {
+        expect(
+          reached.has(durationClass),
+          `no preset can play a ${durationClass} ${instrument}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('plans the two new presets onto the material they were written for', () => {
+    // A pool that *contains* the long material is not the same as a scheduler
+    // that ever picks it. These two exist for those assets, so they have to
+    // reach them in practice and not merely in principle.
+    const longKalimba = new Set(
+      LIBRARY.filter((a) => a.instrument === 'KALIMBA' && a.durationClass === 'LONG').map(
+        (a) => a.assetId,
+      ),
+    );
+    const longChimes = new Set(
+      LIBRARY.filter(
+        (a) => a.instrument === 'CHIME' && (a.durationClass === 'LONG' || a.durationClass === 'EXTENDED'),
+      ).map((a) => a.assetId),
+    );
+    expect(longKalimba.size).toBe(9);
+    expect(longChimes.size).toBe(4);
+
+    const playedBy = (id: string) => {
+      const played = new Set<string>();
+      for (const seed of SEEDS) {
+        for (const event of plan(soundBathPreset(id)!, seed).events) played.add(event.assetId);
+      }
+      return played;
+    };
+
+    const kalimba = playedBy('soundbath.kalimba_passages');
+    const drift = playedBy('soundbath.chime_drift');
+    expect([...longKalimba].filter((id) => kalimba.has(id)).length).toBeGreaterThanOrEqual(6);
+    expect([...longChimes].filter((id) => drift.has(id)).length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // §27–§30 — the four presets whose parameters were given
 // ---------------------------------------------------------------------------
 
 /**
- * Thirteen of the seventeen presets were designed against the library. Four
+ * Fifteen of the nineteen presets were designed against the library. Four
  * were specified: §27 Deep Calm, §28 Earth Resonance, §29 528 Organic and §30
  * Theta Bath each arrived with a layer roster, and Deep Calm with intervals,
  * weights and globals as numbers.
