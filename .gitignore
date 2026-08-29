@@ -12,3 +12,7 @@ ios/
 .env
 .env.local
 out/
+
+# Vercel
+.vercel
+apps/mobile/dist
