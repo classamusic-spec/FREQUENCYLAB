@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -9,6 +9,7 @@ import {
   searchLibrary,
   searchPresets,
   type EvidenceLevel,
+  type FrequencyPreset,
   type LibraryCategory,
   type PresetClassification,
 } from '@frequencylab/dsp-core';
@@ -21,10 +22,14 @@ import { ClassificationBadge, EvidenceBadge } from '../../src/design/components/
 import { ClassificationSheet, EvidenceSheet } from '../../src/design/components/ClassificationSheet';
 import { SoundBathSheet } from '../../src/design/components/SoundBathSheet';
 import { PresetCard } from '../../src/design/components/PresetCard';
+import { PlayRow } from '../../src/design/components/PlayRow';
 import { Label, Text } from '../../src/design/components/Text';
 import { colors, MIN_TOUCH_TARGET, radius, space } from '../../src/design/tokens';
 import { plainWord, useTier } from '../../src/features/tier';
 import { usePresetShelf } from '../../src/state/presets';
+import { useSessionStart } from '../../src/state/sessionStart';
+import { usePlayer } from '../../src/state/player';
+import { compileRepresentation, protocolIdFor } from '../../src/features/presetPlayback';
 
 const CATEGORIES: { value: LibraryCategory | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -106,6 +111,9 @@ type OpenSheet =
 export default function LibraryScreen() {
   const router = useRouter();
   const { level, canSee, opensRoute } = useTier();
+  const request = useSessionStart((state) => state.request);
+  const recordPlay = usePresetShelf((state) => state.recordPlay);
+  const snapshot = usePlayer((state) => state.snapshot);
   const [category, setCategory] = useState<LibraryCategory | 'all'>('all');
   const [query, setQuery] = useState('');
   const [sheet, setSheet] = useState<OpenSheet | null>(null);
@@ -130,6 +138,32 @@ export default function LibraryScreen() {
   // Unlimited so the count is the real one, then cut for display: "42 matching"
   // followed by twelve rows is honest, "12 matching" would not be.
   const presets = useMemo(() => (searching ? searchPresets(query) : []), [query, searching]);
+
+  /**
+   * Starts a search result, for the levels where a result plays rather than
+   * opens. The same call the shelf and the preset screen make, so the preflight
+   * safety sheet still stands in front of a first session.
+   */
+  const play = useCallback(
+    (preset: FrequencyPreset) => {
+      const kind = preset.representation.kind;
+      const compiled = compileRepresentation(preset, kind, { id: protocolIdFor(preset, kind) });
+      if (!compiled.ok) return;
+      void recordPlay(preset, kind);
+      void request(compiled.protocol, { onStarted: () => router.push('/session') });
+    },
+    [recordPlay, request, router],
+  );
+
+  const playingId = useMemo(() => {
+    if (snapshot.state !== 'playing' && snapshot.state !== 'paused') return null;
+    return (
+      presets.find(
+        ({ preset }) =>
+          protocolIdFor(preset, preset.representation.kind) === snapshot.protocolId,
+      )?.preset.id ?? null
+    );
+  }, [presets, snapshot.protocolId, snapshot.state]);
 
   const soundBaths = useMemo(() => buildSoundBathPresets(), []);
 
@@ -181,9 +215,8 @@ export default function LibraryScreen() {
           <SectionHeader label={`Presets · ${presets.length} matching`} />
           {!opensRoute('/preset') && presets.length > 0 ? (
             <Text variant="caption" tone="tertiary">
-              Simple lists what matched. The page behind a result is about the number itself —
-              where it came from and who claims what about it — so these rows name and classify
-              rather than open. Profile changes the level.
+              Tap a result to play it. The page explaining where a number came from is part of
+              Explorer and Lab; what is here plays at any level.
             </Text>
           ) : null}
           {presets.length === 0 ? (
@@ -195,21 +228,32 @@ export default function LibraryScreen() {
                 : '.'}
             </Text>
           ) : (
-            presets.slice(0, PRESET_RESULT_LIMIT).map((result) => (
-              <PresetCard
-                key={result.preset.id}
-                preset={result.preset}
-                favorite={favorites.includes(result.preset.id)}
-                matchReason={`Matched on ${result.matchedOn.join(', ')} · ${
-                  result.classificationNote
-                }`}
-                onPress={
-                  opensRoute(`/preset/${result.preset.id}`)
-                    ? () => router.push(`/preset/${result.preset.id}`)
-                    : undefined
-                }
-              />
-            ))
+            presets.slice(0, PRESET_RESULT_LIMIT).map((result) =>
+              /*
+               * A result leads to the page about its number where that page
+               * exists, and plays where it does not. Both are a working tap,
+               * which is the rule; what changes is which question the level is
+               * in a position to ask.
+               */
+              opensRoute(`/preset/${result.preset.id}`) ? (
+                <PresetCard
+                  key={result.preset.id}
+                  preset={result.preset}
+                  favorite={favorites.includes(result.preset.id)}
+                  matchReason={`Matched on ${result.matchedOn.join(', ')} · ${
+                    result.classificationNote
+                  }`}
+                  onPress={() => router.push(`/preset/${result.preset.id}`)}
+                />
+              ) : (
+                <PlayRow
+                  key={result.preset.id}
+                  preset={result.preset}
+                  playing={playingId === result.preset.id}
+                  onPress={() => play(result.preset)}
+                />
+              ),
+            )
           )}
           {opensRoute('/collections') && presets.length > PRESET_RESULT_LIMIT ? (
             <HardwareButton
@@ -231,13 +275,6 @@ export default function LibraryScreen() {
               it would not show. The rows stay, with their counts and their
               classifications, because what the app holds is a fact about the
               app. What goes is the promise of a tap. */}
-          {!opensRoute('/collections') ? (
-            <Text variant="caption" tone="tertiary">
-              The shelves and how much is on each. What is inside one is a list of frequencies by
-              value, which Simple does not name — so these rows count rather than open. Profile
-              changes the level.
-            </Text>
-          ) : null}
           {shelves.map(({ collection, count }) => {
             const spoken = `${collection.name}. ${count} presets. ${collection.summary}`;
             const row = (

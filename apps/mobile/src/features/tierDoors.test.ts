@@ -31,18 +31,27 @@ import { DOORED_SECTIONS, levelOpensRoute } from './tierCapabilities';
 const LEVELS: ExperienceLevel[] = ['simple', 'explorer', 'lab'];
 
 describe('which routes a level opens', () => {
-  it('doors the collection and preset screens at Simple, and only there', () => {
-    const doored = [
-      '/collections',
-      '/collections/wellness',
-      '/collections/acoustic-fundamentals',
-      '/preset/solf-528',
-      '/preset/compare',
-    ];
+  it('doors the preset screens at Simple, and only there', () => {
+    const doored = ['/preset/solf-528', '/preset/compare'];
     for (const route of doored) {
       expect(levelOpensRoute('simple', route), route).toBe(false);
       expect(levelOpensRoute('explorer', route), route).toBe(true);
       expect(levelOpensRoute('lab', route), route).toBe(true);
+    }
+  });
+
+  it('leaves the shelves open at every level, because they play', () => {
+    /*
+     * These were doored, and that was the wrong call: it folded "pick something
+     * to hear" together with "read the page about this number" and withheld
+     * both. The shelf renders a play list at a level without `hertz`, so it
+     * opens everywhere — while the preset page, which cannot survive losing its
+     * number, keeps its door.
+     */
+    for (const level of LEVELS) {
+      for (const route of ['/collections', '/collections/wellness', '/collections/my-frequencies']) {
+        expect(levelOpensRoute(level, route), `${level} ${route}`).toBe(true);
+      }
     }
   });
 
@@ -128,8 +137,11 @@ describe('no screen offers a link into a door', () => {
     const found = screens(APP_DIR);
     expect(found.length).toBeGreaterThan(20);
     expect(found.some((path) => path.endsWith('(tabs)/library.tsx'))).toBe(true);
+    // The preset section is the only doored one now, and it is two screens:
+    // /preset/[id] and /preset/compare. A count below that means the walk has
+    // lost sight of the section this whole file is about.
     expect(
       found.filter((path) => DOORED_SECTIONS[sectionOf(path)] !== undefined).length,
-    ).toBeGreaterThanOrEqual(4);
+    ).toBeGreaterThanOrEqual(2);
   });
 });

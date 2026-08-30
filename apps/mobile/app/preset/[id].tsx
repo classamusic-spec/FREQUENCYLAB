@@ -13,7 +13,7 @@ import {
   libraryEntry,
   protocolDna,
   relatedFrequencies,
-  type FrequencyPreset,
+
   type Protocol,
   type ProtocolStage,
   type RepresentationKind,
@@ -34,7 +34,11 @@ import { DisplayGlass } from '../../src/design/components/Surface';
 import { Label, Text } from '../../src/design/components/Text';
 import { colors, layout, MIN_TOUCH_TARGET, radius, space } from '../../src/design/tokens';
 import * as haptics from '../../src/design/haptics';
-import { representationOptions, compileRepresentation } from '../../src/features/presetPlayback';
+import {
+  representationOptions,
+  compileRepresentation,
+  protocolIdFor,
+} from '../../src/features/presetPlayback';
 import { usePresetShelf, presetsMentioning } from '../../src/state/presets';
 import { useProtocolLibrary, summariseLibrary } from '../../src/state/library';
 import { useSessionStart } from '../../src/state/sessionStart';
@@ -693,18 +697,6 @@ function freshSuffix(): string {
   return Date.now().toString(36);
 }
 
-/**
- * The protocol id a preset compiles under.
- *
- * Deterministic, and carrying the representation, so that pressing Experiment
- * twice updates one protocol rather than growing a pile of near-identical ones,
- * and so the screen can tell whether the session currently running is this
- * preset heard this way. The DNA fingerprint excludes the id, so none of this
- * can move the fingerprint.
- */
-function protocolIdFor(preset: FrequencyPreset, kind: RepresentationKind): string {
-  return `preset-${preset.id}-v${preset.version}-${kind}`;
-}
 
 const styles = StyleSheet.create({
   star: {

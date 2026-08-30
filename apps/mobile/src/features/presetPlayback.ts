@@ -248,3 +248,16 @@ function explanationFor(issues: PresetIssue[]): PresetIssue | undefined {
   }
   return errors[0];
 }
+
+/**
+ * The protocol id a preset compiles under.
+ *
+ * Deterministic, and carrying the representation, so that pressing Experiment
+ * twice updates one protocol rather than growing a pile of near-identical ones,
+ * and so the screen can tell whether the session currently running is this
+ * preset heard this way. The DNA fingerprint excludes the id, so none of this
+ * can move the fingerprint.
+ */
+export function protocolIdFor(preset: FrequencyPreset, kind: RepresentationKind): string {
+  return `preset-${preset.id}-v${preset.version}-${kind}`;
+}

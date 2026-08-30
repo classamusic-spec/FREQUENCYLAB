@@ -166,7 +166,16 @@ export function levelCanSee(level: ExperienceLevel, capability: Capability): boo
  * both ask this table.
  */
 export const DOORED_SECTIONS: Readonly<Record<string, Capability>> = {
-  collections: 'library',
+  /*
+   * `collections` is deliberately absent. A shelf is two things folded together
+   * — a place to pick something to hear, and a page of frequencies with the
+   * claims attached to them — and dooring it withheld the first to protect the
+   * second. It now renders as a play list at a level without `hertz`, so it is
+   * open everywhere and honest at both.
+   *
+   * `preset` stays. That page is *about* a number and does not survive losing
+   * it, which is the only reason a door is ever the right answer here.
+   */
   preset: 'library',
 };
 
