@@ -12,50 +12,40 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NOT_MEDICAL_NOTICE, VOLUME_GUIDANCE } from '@frequencylab/dsp-core';
+import {
+  AMBIENT_AWARENESS_NOTICE,
+  NOT_MEDICAL_NOTICE,
+  VOLUME_GUIDANCE,
+  type ExperienceLevel,
+} from '@frequencylab/dsp-core';
 import { InstrumentPanel } from '../src/design/components/InstrumentPanel';
 import { HardwareButton } from '../src/design/components/HardwareButton';
 import { KnobFace } from '../src/design/components/KnobFace';
 import { BrushedGrain } from '../src/design/components/Surface';
+import { LiveCarrierBeat, LiveStereo } from '../src/design/components/OnboardingDiagrams';
 import { ChevronIcon } from '../src/design/components/Icons';
 import { Label, Text } from '../src/design/components/Text';
 import { LIGHT, SURFACES } from '../src/design/materials';
-import { colors, motion, space } from '../src/design/tokens';
+import { colors, motion, radius, space } from '../src/design/tokens';
 import * as haptics from '../src/design/haptics';
 import { useReducedMotion } from '../src/design/useReducedMotion';
 import { usePreferences } from '../src/state/preferences';
 
-const STEPS = 2;
+const STEPS = 5;
 const LAST = STEPS - 1;
 
 /**
  * Onboarding (§52).
  *
- * Two screens, and only two, because only two things have to be true before a
- * person is allowed to hear a tone: they have set a level they are comfortable
- * with, and they know this is not medicine. Everything else this screen used to
- * say — what a carrier is, what a beat is, why binaural needs two ears, the
- * environmental-awareness notice, and a request to classify themselves as
- * Simple, Explorer or Lab — was documentation delivered before it could mean
- * anything, and it is all still in the product where it is actually relevant:
+ * Five screens, no account, no questionnaire. The middle three exist because
+ * the product cannot work without the user understanding them: what a carrier
+ * and a beat actually are, what headphones are for, and what this is not.
  *
- *  - carrier vs beat, and headphones vs speaker, are explained on the Explore
- *    tab against the numbers the user is actually holding, and by the
- *    `headphones-required` preflight check at the moment it applies;
- *  - the environmental-awareness notice is in the pre-session sheet, in the
- *    `first-session` check, alongside this same medical notice — it is shown
- *    before the first tone either way, so saying it twice bought nothing;
- *  - both notices, and all three, are in Profile › Safety as a reference;
- *  - the experience level is a Profile control with a sane default. Nobody can
- *    answer "are you Simple, Explorer or Lab" before their first session, so we
- *    stop asking and leave `DEFAULT_PREFERENCES.experienceLevel` in place.
- *
- * The presentation is unchanged and deliberately kinetic: steps are swipeable,
- * content staggers in, the progress rail fills like a milled channel and the
- * dial on the first step breathes rather than sitting still. An instrument that
- * will spend its life animating measured values should introduce itself the
- * same way. Every motion here is suppressed under reduced motion, where the
- * content becomes immediate rather than merely faster.
+ * The presentation is deliberately kinetic — steps are swipeable, content
+ * staggers in, and the two teaching diagrams run live rather than sitting
+ * still. An instrument that will spend its life animating measured values
+ * should introduce itself the same way. Every motion here is suppressed under
+ * reduced motion, where the content becomes immediate rather than merely faster.
  */
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -64,18 +54,14 @@ export default function OnboardingScreen() {
   const update = usePreferences((state) => state.update);
 
   const [step, setStep] = useState(0);
+  const [level, setLevel] = useState<ExperienceLevel>('simple');
 
-  /*
-   * Marks onboarding done and hands off to calibration, which is where the
-   * level the first step just talked about actually gets set.
-   *
-   * Note what is *not* written here: `experienceLevel`. Leaving it alone is the
-   * point — the stored default stands until someone chooses otherwise in
-   * Profile, rather than being confirmed by a user who has no basis to choose.
-   */
   const finish = async () => {
     haptics.confirm();
-    await update({ onboardingCompletedAt: new Date().toISOString() });
+    await update({
+      experienceLevel: level,
+      onboardingCompletedAt: new Date().toISOString(),
+    });
     router.replace('/calibration');
   };
 
@@ -123,9 +109,12 @@ export default function OnboardingScreen() {
           {/* Keyed on the step so every transition remounts and replays the
               stagger, which is what makes paging feel like a new panel sliding
               into the instrument rather than text being swapped. */}
-          <StepPage key={step} reducedMotion={reducedMotion}>
-            {step === 0 ? <VolumeStep reducedMotion={reducedMotion} /> : null}
-            {step === 1 ? <ScopeStep /> : null}
+          <StepPage key={step} centred={step === 0} reducedMotion={reducedMotion}>
+            {step === 0 ? <WelcomeStep reducedMotion={reducedMotion} /> : null}
+            {step === 1 ? <CarrierStep /> : null}
+            {step === 2 ? <HeadphonesStep /> : null}
+            {step === 3 ? <SafetyStep /> : null}
+            {step === 4 ? <LevelStep level={level} onSelect={setLevel} /> : null}
           </StepPage>
         </View>
       </GestureDetector>
@@ -144,10 +133,8 @@ export default function OnboardingScreen() {
           <View style={styles.backSpacer} />
         )}
 
-        {/* The last label names where it goes. "Start" would promise a session
-            and deliver a calibration screen. */}
         <HardwareButton
-          label={step === LAST ? 'Set my level' : 'Continue'}
+          label={step === LAST ? 'Start' : 'Continue'}
           variant="primary"
           size="lg"
           style={styles.continueButton}
@@ -161,9 +148,12 @@ export default function OnboardingScreen() {
 /** Fades and lifts a step's content in, staggering its children. */
 function StepPage({
   children,
+  centred,
   reducedMotion,
 }: {
   children: ReactNode;
+  /** Centres the page vertically. Off for steps whose heading should anchor. */
+  centred?: boolean;
   reducedMotion: boolean;
 }) {
   const enter = useSharedValue(reducedMotion ? 1 : 0);
@@ -182,7 +172,7 @@ function StepPage({
   }));
 
   return (
-    <Animated.View style={[styles.page, style]}>
+    <Animated.View style={[styles.page, centred ? styles.pageCentred : styles.pageAnchored, style]}>
       <View style={styles.pageInner}>{children}</View>
     </Animated.View>
   );
@@ -212,8 +202,8 @@ function Stagger({ index = 0, children }: { index?: number; children: ReactNode 
 /**
  * The step indicator, as a row of milled channels that fill.
  *
- * Tappable, so a user who wants to re-read the first step is not forced to
- * swipe back to it.
+ * Tappable, so a user who wants to re-read the safety step is not forced to
+ * swipe back through the others.
  */
 function ProgressRail({
   step,
@@ -278,20 +268,15 @@ function RailFill({
   );
 }
 
-/**
- * Step one: the level.
- *
- * The dial is the animation that used to open the old welcome screen, kept and
- * given something to mean. It sweeps up to a value and then drifts gently
- * around it: a still knob would say "picture of an instrument", a moving one
- * says "the instrument is already running" — and here it is a *level* it is
- * resting at, sitting a little over half travel, which is the shape of the
- * advice underneath it rather than decoration beside it.
- */
-function VolumeStep({ reducedMotion }: { reducedMotion: boolean }) {
+function WelcomeStep({ reducedMotion }: { reducedMotion: boolean }) {
   const [ring, setRing] = useState(reducedMotion ? 0.62 : 0);
   const raf = useRef(0);
 
+  /*
+   * The dial breathes: it sweeps up to a value and then drifts gently around
+   * it. A still knob on the welcome screen would say "picture of an
+   * instrument"; a moving one says "the instrument is already running".
+   */
   useEffect(() => {
     if (reducedMotion) return;
     const begun = Date.now();
@@ -308,26 +293,27 @@ function VolumeStep({ reducedMotion }: { reducedMotion: boolean }) {
   }, [reducedMotion]);
 
   return (
-    <View style={styles.hero}>
+    <View style={styles.welcome}>
       <Stagger index={0}>
-        <View style={styles.heroDial}>
+        <View style={styles.welcomeDial}>
           <KnobFace size={192} normalised={ring} accent={colors.signal} showIndicator={false} />
         </View>
       </Stagger>
 
       <Stagger index={1}>
-        <Label style={styles.heroEyebrow}>Before you start</Label>
+        <Label style={styles.welcomeEyebrow}>Welcome to</Label>
       </Stagger>
 
       <Stagger index={2}>
-        <Text variant="title" style={styles.heroTitle}>
-          Set a comfortable level
+        <Text variant="title" uppercase style={styles.wordmark}>
+          Frequency Lab
         </Text>
       </Stagger>
 
       <Stagger index={3}>
         <Text variant="body" tone="secondary" style={styles.lede}>
-          {VOLUME_GUIDANCE}
+          A programmable psychoacoustic instrument. Precision sound, and an honest account of what
+          it does and does not do.
         </Text>
       </Stagger>
 
@@ -340,36 +326,189 @@ function VolumeStep({ reducedMotion }: { reducedMotion: boolean }) {
   );
 }
 
-/**
- * Step two: what this is not.
- *
- * The one claim the product has to make about itself before it makes a sound,
- * on the same raised panel the safety step used, so the transition from the
- * dial lands on a surface the user will meet again in the pre-session sheet.
- */
-function ScopeStep() {
+function CarrierStep() {
   return (
     <>
       <Stagger index={0}>
-        <Label>Before you start</Label>
+        <Label>How it works</Label>
         <Text variant="title" style={styles.heading}>
-          This is not medical treatment
+          Two numbers, doing different jobs
         </Text>
       </Stagger>
 
       <Stagger index={1}>
-        <InstrumentPanel tone="raised" style={styles.noticePanel}>
-          {/* The lit mark the safety panels carry, kept — but the notice is
-              stated once, on the panel, rather than titled above and repeated
-              inside it. */}
-          <View style={styles.noticeRow}>
-            <View style={styles.noticeMark} />
-            <Text variant="body" tone="secondary" style={styles.noticeBody}>
-              {NOT_MEDICAL_NOTICE}
-            </Text>
-          </View>
-        </InstrumentPanel>
+        <View style={styles.diagramWell}>
+          <LiveCarrierBeat />
+        </View>
       </Stagger>
+
+      <Stagger index={2}>
+        <Text variant="body" tone="secondary" style={styles.paragraph}>
+          The <Text variant="body">carrier</Text> is the tone you actually hear — usually a couple
+          of hundred hertz, like a low hum.
+        </Text>
+      </Stagger>
+
+      <Stagger index={3}>
+        <Text variant="body" tone="secondary" style={styles.paragraph}>
+          The <Text variant="body">beat</Text> is how fast that tone pulses or shifts. It is a rate,
+          not a pitch. A 7.83 Hz beat does not mean your headphones are producing a 7.83 Hz sound —
+          nothing can.
+        </Text>
+      </Stagger>
+    </>
+  );
+}
+
+function HeadphonesStep() {
+  return (
+    <>
+      <Stagger index={0}>
+        <Label>Headphones</Label>
+        <Text variant="title" style={styles.heading}>
+          Binaural mode needs two ears
+        </Text>
+      </Stagger>
+
+      <Stagger index={1}>
+        <View style={styles.diagramWell}>
+          <LiveStereo />
+        </View>
+      </Stagger>
+
+      <Stagger index={2}>
+        <Text variant="body" tone="secondary" style={styles.paragraph}>
+          Each ear gets its own tone, and the beat appears only once your hearing combines them.
+          Through a speaker the two mix in the air first, and the effect is gone.
+        </Text>
+      </Stagger>
+
+      <Stagger index={3}>
+        <Text variant="body" tone="secondary" style={styles.paragraph}>
+          No headphones? The monaural and isochronic engines work on any output, and the app will
+          offer them.
+        </Text>
+      </Stagger>
+    </>
+  );
+}
+
+const SAFETY = [
+  { title: 'Comfortable volume', body: VOLUME_GUIDANCE },
+  { title: 'Environmental awareness', body: AMBIENT_AWARENESS_NOTICE },
+  { title: 'Not medical treatment', body: NOT_MEDICAL_NOTICE },
+];
+
+function SafetyStep() {
+  return (
+    <>
+      <Stagger index={0}>
+        <Label>Safety</Label>
+        <Text variant="title" style={styles.heading}>
+          Three things before you start
+        </Text>
+      </Stagger>
+
+      {SAFETY.map((item, index) => (
+        <Stagger key={item.title} index={index + 1}>
+          <InstrumentPanel tone="raised" style={styles.safetyPanel}>
+            <View style={styles.safetyHeader}>
+              <View style={styles.safetyMark} />
+              <Text variant="heading">{item.title}</Text>
+            </View>
+            <Text variant="bodySm" tone="secondary" style={styles.safetyBody}>
+              {item.body}
+            </Text>
+          </InstrumentPanel>
+        </Stagger>
+      ))}
+    </>
+  );
+}
+
+/**
+ * The three levels, described by what each one actually shows.
+ *
+ * Kept in step with `features/tier`, which is where the capabilities are
+ * declared. These descriptions were written when the level changed nothing, so
+ * they said less than the level now does — Explorer's line named the encoder
+ * and stopped, without mentioning that it is also what opens the frequency
+ * library and the acoustic mixer. Somebody choosing Simple was not being told
+ * what they were turning off.
+ *
+ * What none of them says is that a level withholds a warning or a rating,
+ * because none of them does: classifications, evidence ratings and every safety
+ * statement are shown at all three.
+ */
+const LEVELS: { value: ExperienceLevel; title: string; body: string }[] = [
+  {
+    value: 'simple',
+    title: 'Simple',
+    body: 'Pick a goal and a length, press start. The same engine underneath — its controls, its numbers and the frequency library stay out of the way.',
+  },
+  {
+    value: 'explorer',
+    title: 'Explorer',
+    body: 'The numbers as well as the sounds: hertz everywhere, the encoder for beat and carrier, the frequency library and the acoustic mixer.',
+  },
+  {
+    value: 'lab',
+    title: 'Lab',
+    body: 'Everything Explorer has, plus every module and parameter, routing, automation, blinded trials, Protocol DNA and the timeline builder.',
+  },
+];
+
+function LevelStep({
+  level,
+  onSelect,
+}: {
+  level: ExperienceLevel;
+  onSelect: (value: ExperienceLevel) => void;
+}) {
+  return (
+    <>
+      <Stagger index={0}>
+        <Label>Choose a starting point</Label>
+        <Text variant="title" style={styles.heading}>
+          You can change this any time
+        </Text>
+      </Stagger>
+
+      {LEVELS.map((option, index) => {
+        const selected = level === option.value;
+        return (
+          <Stagger key={option.value} index={index + 1}>
+            <Pressable
+              onPress={() => {
+                haptics.engage();
+                onSelect(option.value);
+              }}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              accessibilityLabel={`${option.title}. ${option.body}`}
+            >
+              <InstrumentPanel
+                tone={selected ? 'raised' : 'flat'}
+                style={[styles.levelOption, selected ? styles.levelOptionSelected : null]}
+              >
+                <View style={styles.levelHeader}>
+                  <Text variant="heading" tone={selected ? 'primary' : 'secondary'}>
+                    {option.title}
+                  </Text>
+                  {/* Selection is a filled mark as well as a colour, so it is
+                      readable without colour vision (§50). */}
+                  <View style={[styles.radio, selected ? styles.radioOn : null]}>
+                    {selected ? <View style={styles.radioCore} /> : null}
+                  </View>
+                </View>
+                <Text variant="bodySm" tone="tertiary" style={styles.levelBody}>
+                  {option.body}
+                </Text>
+              </InstrumentPanel>
+            </Pressable>
+          </Stagger>
+        );
+      })}
     </>
   );
 }
@@ -405,31 +544,58 @@ const styles = StyleSheet.create({
   },
 
   body: { flex: 1 },
-  // Both steps are short, so both sit centred: paging between them is then a
-  // panel changing in place rather than content jumping up the screen.
-  page: { flex: 1, justifyContent: 'center' },
+  page: { flex: 1 },
+  pageCentred: { justifyContent: 'center' },
+  pageAnchored: { justifyContent: 'flex-start', paddingTop: space.huge },
   pageInner: { paddingHorizontal: space.xl, gap: space.md },
 
-  hero: { alignItems: 'center', gap: space.sm },
-  heroDial: { marginBottom: space.lg },
-  heroEyebrow: { textAlign: 'center' },
-  heroTitle: { textAlign: 'center', marginTop: space.xxs },
+  welcome: { alignItems: 'center', gap: space.sm },
+  welcomeDial: { marginBottom: space.lg },
+  welcomeEyebrow: { textAlign: 'center' },
+  wordmark: { letterSpacing: 6, textAlign: 'center', marginTop: space.xxs },
   lede: { textAlign: 'center', marginTop: space.md, maxWidth: 320 },
   swipeHint: { textAlign: 'center', marginTop: space.xxl },
 
   heading: { marginTop: space.xxs },
+  paragraph: { marginTop: space.xs },
 
-  noticePanel: { marginTop: space.sm },
-  noticeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
-  // Nudged onto the first line's optical centre rather than its box top.
-  noticeMark: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginTop: 9,
-    backgroundColor: colors.signal,
+  // The diagrams sit in a well, so they read as an instrument readout rather
+  // than a picture dropped onto the page.
+  diagramWell: {
+    marginVertical: space.lg,
+    paddingVertical: space.lg,
+    borderRadius: radius.panel,
+    backgroundColor: colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.edgeLight,
+    shadowColor: '#33486A',
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
   },
-  noticeBody: { flex: 1 },
+
+  safetyPanel: { marginTop: space.sm },
+  safetyHeader: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  safetyMark: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.signal },
+  safetyBody: { marginTop: space.xs },
+
+  levelOption: { marginTop: space.sm },
+  levelOptionSelected: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.signalDim },
+  levelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  levelBody: { marginTop: space.xs },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
+    backgroundColor: colors.surfaceRecessed,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioOn: { borderColor: colors.signal },
+  radioCore: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.signal },
 
   footer: {
     flexDirection: 'row',
