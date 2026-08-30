@@ -34,7 +34,7 @@ import { useTier } from '../../src/features/tier';
  * output rather than the label.
  */
 export default function PresetCompareScreen() {
-  const { canSee } = useTier();
+  const { opensRoute } = useTier();
   const router = useRouter();
   const params = useLocalSearchParams<{ a?: string; b?: string }>();
   const [query, setQuery] = useState('');
@@ -58,7 +58,7 @@ export default function PresetCompareScreen() {
    * numbers taken out, which would leave nothing (§80, and the rule in
    * `features/tier`: a tier hides vocabulary and controls, never honesty).
    */
-  if (!canSee('library')) {
+  if (!opensRoute('/preset/compare')) {
     return (
       <NotAtThisLevel
         eyebrow="Compare"

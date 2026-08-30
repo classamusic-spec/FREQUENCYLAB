@@ -87,10 +87,25 @@ type OpenSheet =
  * shelves, each with its classification, and the twenty sound baths, each with
  * a description of what is actually in it. So `simple` gets the catalogue and a
  * line saying plainly where the rest is.
+ *
+ * A catalogue, though, and not a set of links. `/collections/:id`,
+ * `/collections` and `/preset/:id` are all behind a level door at `simple`, so
+ * for a while every navigating control in this screen's Simple half — ten shelf
+ * rows announcing their preset counts, the "All twelve shelves" button, and
+ * every search result — landed on that door. Ten rows saying `8`, `12`, `9`
+ * and opening nothing is the exact shape of the bug that was reported: *under
+ * the sounds tab when I click a module there are no presets listed.*
+ *
+ * The fix is not to open the door, which would put a de-numbered preset screen
+ * in front of someone at a level that shows no hertz, and it is not to hide the
+ * shelves, which would take the catalogue away from the only level that has
+ * nothing else to browse. It is that at `simple` those rows are listings: the
+ * name, the count and the classification, announced as one node and pressing
+ * nowhere. Every control shown works, and nothing true is removed.
  */
 export default function LibraryScreen() {
   const router = useRouter();
-  const { level, canSee } = useTier();
+  const { level, canSee, opensRoute } = useTier();
   const [category, setCategory] = useState<LibraryCategory | 'all'>('all');
   const [query, setQuery] = useState('');
   const [sheet, setSheet] = useState<OpenSheet | null>(null);
@@ -164,6 +179,13 @@ export default function LibraryScreen() {
       {searching ? (
         <>
           <SectionHeader label={`Presets · ${presets.length} matching`} />
+          {!opensRoute('/preset') && presets.length > 0 ? (
+            <Text variant="caption" tone="tertiary">
+              Simple lists what matched. The page behind a result is about the number itself —
+              where it came from and who claims what about it — so these rows name and classify
+              rather than open. Profile changes the level.
+            </Text>
+          ) : null}
           {presets.length === 0 ? (
             <Text variant="bodySm" tone="tertiary">
               No preset holds that. That is a statement about this app&apos;s shelves, not about the
@@ -181,11 +203,15 @@ export default function LibraryScreen() {
                 matchReason={`Matched on ${result.matchedOn.join(', ')} · ${
                   result.classificationNote
                 }`}
-                onPress={() => router.push(`/preset/${result.preset.id}`)}
+                onPress={
+                  opensRoute(`/preset/${result.preset.id}`)
+                    ? () => router.push(`/preset/${result.preset.id}`)
+                    : undefined
+                }
               />
             ))
           )}
-          {presets.length > PRESET_RESULT_LIMIT ? (
+          {opensRoute('/collections') && presets.length > PRESET_RESULT_LIMIT ? (
             <HardwareButton
               label="Browse the collections"
               variant="ghost"
@@ -198,14 +224,24 @@ export default function LibraryScreen() {
           {/* The shelves themselves, not a button leading to them. Seventy-two
               presets behind one more tap is seventy-two presets nobody opens. */}
           <SectionHeader label={`Collections · ${totalPresets} presets`} />
-          {shelves.map(({ collection, count }) => (
-            <View key={collection.id} style={styles.shelf}>
-              <Pressable
-                onPress={() => router.push(`/collections/${collection.id}`)}
-                accessibilityRole="button"
-                accessibilityLabel={`${collection.name}. ${count} presets. ${collection.summary}`}
-                style={styles.shelfMain}
-              >
+          {/* At Simple the shelf is a catalogue entry rather than a door.
+              `/collections/:id` is a list of frequencies by value and is gated
+              at that level, so a row that navigated there was a control that
+              could not work — ten of them in a column, each announcing a count
+              it would not show. The rows stay, with their counts and their
+              classifications, because what the app holds is a fact about the
+              app. What goes is the promise of a tap. */}
+          {!opensRoute('/collections') ? (
+            <Text variant="caption" tone="tertiary">
+              The shelves and how much is on each. What is inside one is a list of frequencies by
+              value, which Simple does not name — so these rows count rather than open. Profile
+              changes the level.
+            </Text>
+          ) : null}
+          {shelves.map(({ collection, count }) => {
+            const spoken = `${collection.name}. ${count} presets. ${collection.summary}`;
+            const row = (
+              <>
                 <Label>{collection.ordinal}</Label>
                 <Text variant="heading" style={styles.shelfName}>
                   {collection.name}
@@ -213,22 +249,42 @@ export default function LibraryScreen() {
                 <Text variant="readoutSm" tone="secondary">
                   {String(count)}
                 </Text>
-              </Pressable>
-              {/* Sibling, never nested: one tap, one meaning. */}
-              <ClassificationBadge
-                classification={collection.classification}
-                onPress={() =>
-                  setSheet({ kind: 'classification', value: collection.classification })
-                }
-              />
-            </View>
-          ))}
-          <HardwareButton
-            label="All twelve shelves"
-            variant="ghost"
-            onPress={() => router.push('/collections')}
-            accessibilityHint="Includes the historical archive and your own frequencies."
-          />
+              </>
+            );
+            return (
+              <View key={collection.id} style={styles.shelf}>
+                {opensRoute(`/collections/${collection.id}`) ? (
+                  <Pressable
+                    onPress={() => router.push(`/collections/${collection.id}`)}
+                    accessibilityRole="button"
+                    accessibilityLabel={spoken}
+                    style={styles.shelfMain}
+                  >
+                    {row}
+                  </Pressable>
+                ) : (
+                  <View accessible accessibilityLabel={spoken} style={styles.shelfMain}>
+                    {row}
+                  </View>
+                )}
+                {/* Sibling, never nested: one tap, one meaning. */}
+                <ClassificationBadge
+                  classification={collection.classification}
+                  onPress={() =>
+                    setSheet({ kind: 'classification', value: collection.classification })
+                  }
+                />
+              </View>
+            );
+          })}
+          {opensRoute('/collections') ? (
+            <HardwareButton
+              label="All twelve shelves"
+              variant="ghost"
+              onPress={() => router.push('/collections')}
+              accessibilityHint="Includes the historical archive and your own frequencies."
+            />
+          ) : null}
 
           {/* The catalogue half of the library, and the half that needs no
               hertz to be worth reading. Offered at every level; it is the only

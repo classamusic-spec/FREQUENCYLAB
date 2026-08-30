@@ -60,7 +60,28 @@ export type Capability =
   | 'trials'
   /** The Explore tab and the free-running encoder. */
   | 'explore'
-  /** The frequency library, its collections and the historical archive. */
+  /**
+   * The frequency library: its collections, its preset pages, and the links
+   * into the archive.
+   *
+   * Gates two different things, and the difference is the point. Every *link*
+   * into library material is withheld at Simple, so nothing on screen offers a
+   * tap that will not work. But only two sections put a *door* in front of
+   * themselves — `/collections` and `/preset` — and that is deliberate rather
+   * than half-finished.
+   *
+   * A collection is a column of frequencies by value and a preset page is a
+   * page about a number; neither survives having the number taken out, so a
+   * person who arrives by a shared link is told the level rather than shown a
+   * de-numbered lie. `/library/:id` and `/archive` are the opposite shape:
+   * their subject is the gap between what a source actually showed and what a
+   * frequency is popularly claimed to do. Somebody who followed a link to a
+   * specific claim must reach its rebuttal, whatever level they are at —
+   * hiding those is the one direction the tier rule does not permit.
+   *
+   * So: no dead controls anywhere, doors only where a simplified page would be
+   * dishonest, and never a door in front of a correction.
+   */
   | 'library'
   /** Choosing how a frequency is heard, rather than taking the shipped one. */
   | 'representation'
@@ -113,6 +134,59 @@ export function capabilitiesFor(level: ExperienceLevel): ReadonlySet<Capability>
 
 export function levelCanSee(level: ExperienceLevel, capability: Capability): boolean {
   return capabilitiesFor(level).has(capability);
+}
+
+// ---------------------------------------------------------------------------
+// Doors
+// ---------------------------------------------------------------------------
+
+/**
+ * The sections that render a level door instead of themselves, and what a level
+ * needs to get through.
+ *
+ * Keyed by the first path segment, because a door is a property of a *section*
+ * rather than of one screen: `/collections`, `/collections/:id`, `/preset/:id`
+ * and `/preset/compare` are all the same decision, and listing them one by one
+ * is how the list goes stale.
+ *
+ * ## Why this table exists at all
+ *
+ * It is the answer to a bug. The doors were added to four screens, each one
+ * carrying its own `canSee('library')` check and a comment reasoning that the
+ * screens behind them were "only ever reached by a link or a typed address".
+ * Nothing checked that claim, and it was already untrue: the Library route is
+ * listed in the tab bar at every level — named *Sounds* at Simple — and its
+ * first section drew ten shelf rows and a button straight into those doors.
+ * Simple showed eleven controls that could not work, which is exactly how the
+ * bug arrived: *under the sounds tab when I click a module there are no presets
+ * listed.*
+ *
+ * Two independent notions of the same fact is what allowed it. There is now
+ * one: the screens that draw a door and the screens that draw a link into it
+ * both ask this table.
+ */
+export const DOORED_SECTIONS: Readonly<Record<string, Capability>> = {
+  collections: 'library',
+  preset: 'library',
+};
+
+/**
+ * Whether this level can open a route, rather than meet a door at it.
+ *
+ * Ungated routes answer `true` at every level — the table names the exceptions,
+ * not the permissions. Matching is on the first path segment and never on a
+ * prefix, so a future `/presets` or `/collection-notes` cannot be doored by
+ * accident.
+ *
+ * The call reads the same at both ends: the screen behind the door asks before
+ * rendering itself, and the screen in front of it asks before offering a tap.
+ * A row that answers `false` becomes a listing — it keeps its name, its count
+ * and its classification, and stops claiming to be a way in.
+ */
+export function levelOpensRoute(level: ExperienceLevel, route: string): boolean {
+  const section = route.replace(/^\/+/, '').split(/[/?#]/, 1)[0];
+  const needed = DOORED_SECTIONS[section];
+  return needed === undefined || levelCanSee(level, needed);
 }
 
 // ---------------------------------------------------------------------------

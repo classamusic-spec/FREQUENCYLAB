@@ -7,7 +7,13 @@ import { Label, Text } from './Text';
 
 export interface PresetCardProps {
   preset: FrequencyPreset;
-  onPress: () => void;
+  /**
+   * Where the row leads. Omit for a row that is a *listing* rather than a way
+   * in — which is what the Library does at `simple`, where the preset screen is
+   * behind a level door. A card with an `onPress` that lands on a door is a
+   * control that does not work, and the rule is that every control shown does.
+   */
+  onPress?: () => void;
   /** Why the search matched, shown when the card is a result rather than a listing. */
   matchReason?: string;
   favorite?: boolean;
@@ -26,14 +32,10 @@ export interface PresetCardProps {
  */
 export function PresetCard({ preset, onPress, matchReason, favorite, style }: PresetCardProps) {
   const readout = presetReadout(preset);
+  const label = `${preset.name}, ${readout.spoken}. ${preset.summary}`;
 
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${preset.name}, ${readout.spoken}. ${preset.summary}`}
-      style={[styles.card, style]}
-    >
+  const content = (
+    <>
       <View style={styles.head}>
         <View style={styles.title}>
           <View style={styles.titleRow}>
@@ -90,6 +92,31 @@ export function PresetCard({ preset, onPress, matchReason, favorite, style }: Pr
           {matchReason}
         </Text>
       ) : null}
+    </>
+  );
+
+  /*
+   * A listing row and a way in are the same card and different elements. The
+   * screen reader hears one announcement either way — `accessible` collapses
+   * the children exactly as `Pressable` does — but only the pressable version
+   * claims a role, so nothing offers a tap that has nowhere to land.
+   */
+  if (!onPress) {
+    return (
+      <View accessible accessibilityLabel={label} style={[styles.card, style]}>
+        {content}
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={[styles.card, style]}
+    >
+      {content}
     </Pressable>
   );
 }

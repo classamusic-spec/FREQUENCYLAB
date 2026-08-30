@@ -46,7 +46,7 @@ import { useTier } from '../../src/features/tier';
  * what makes the one it is mean anything.
  */
 export default function CollectionScreen() {
-  const { canSee } = useTier();
+  const { opensRoute } = useTier();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const collection = findCollection(id as CollectionId);
@@ -69,13 +69,21 @@ export default function CollectionScreen() {
   );
 
   /*
-   * The library is off at Simple, and its tab does not exist there — so this
-   * screen is only ever reached by a link or a typed address. The door says
-   * what is behind it rather than rendering a version of the page with the
-   * numbers taken out, which would leave nothing (§80, and the rule in
-   * `features/tier`: a tier hides vocabulary and controls, never honesty).
+   * The library is off at Simple. The door says what is behind it rather than
+   * rendering a version of the page with the numbers taken out, which would
+   * leave nothing (§80, and the rule in `features/tier`: a tier hides
+   * vocabulary and controls, never honesty) — every row on this shelf is a
+   * `PresetCard` whose readout is a frequency, and a shelf of de-numbered
+   * readouts is the same lie the preset screen was doored to avoid.
+   *
+   * This comment used to add "and its tab does not exist there, so this screen
+   * is only ever reached by a link or a typed address". That was wrong when it
+   * was written: the tab is listed at every level, named *Sounds* at Simple,
+   * and it drew ten shelf rows straight into this door. The rows no longer
+   * navigate at that level; the door stands for links and typed addresses,
+   * which is what it was actually for.
    */
-  if (!canSee('library')) {
+  if (!opensRoute('/collections')) {
     return (
       <NotAtThisLevel
         eyebrow="Library"

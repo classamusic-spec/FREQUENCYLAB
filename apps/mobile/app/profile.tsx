@@ -338,8 +338,9 @@ export default function ProfileScreen() {
       </InstrumentPanel>
 
       {/* Shortcuts into the archive and the shelves. At Simple the Sounds tab
-          is already the way to the shelves, and the archive is library
-          material, so the whole block goes rather than being reworded. */}
+          already lists the shelves — as a catalogue, since what is inside one
+          is gated — and the archive is library material, so the whole block
+          goes rather than being reworded. */}
       {canSee('library') ? (
         <>
           <SectionHeader label="Library" />

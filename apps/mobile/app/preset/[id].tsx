@@ -61,7 +61,7 @@ import { useTier } from '../../src/features/tier';
  * gap.
  */
 export default function PresetScreen() {
-  const { canSee } = useTier();
+  const { opensRoute } = useTier();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const preset = factoryPreset(id);
@@ -127,7 +127,7 @@ export default function PresetScreen() {
    * numbers taken out, which would leave nothing (§80, and the rule in
    * `features/tier`: a tier hides vocabulary and controls, never honesty).
    */
-  if (!canSee('library')) {
+  if (!opensRoute('/preset')) {
     return (
       <NotAtThisLevel
         eyebrow="Frequency"

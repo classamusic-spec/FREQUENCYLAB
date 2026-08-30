@@ -1,6 +1,6 @@
 import { type ExperienceLevel } from '@frequencylab/dsp-core';
 import { usePreferences } from '../state/preferences';
-import { type Capability, levelCanSee } from './tierCapabilities';
+import { type Capability, levelCanSee, levelOpensRoute } from './tierCapabilities';
 
 /**
  * The tier, as the app consults it.
@@ -26,12 +26,22 @@ export * from './tierCapabilities';
 export function useTier(): {
   level: ExperienceLevel;
   canSee: (capability: Capability) => boolean;
+  /**
+   * Whether a route opens at this level, or meets a door.
+   *
+   * Asked at both ends of the same link: by the screen behind the door before
+   * it renders itself, and by any screen that would otherwise offer a tap into
+   * it. Those two used to be separate judgements, and the Library tab spent a
+   * release offering Simple eleven links into doors because of it.
+   */
+  opensRoute: (route: string) => boolean;
   isSimple: boolean;
 } {
   const level = usePreferences((state) => state.preferences.experienceLevel);
   return {
     level,
     canSee: (capability) => levelCanSee(level, capability),
+    opensRoute: (route) => levelOpensRoute(level, route),
     isSimple: level === 'simple',
   };
 }

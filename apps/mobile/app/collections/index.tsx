@@ -42,7 +42,7 @@ import { useTier } from '../../src/features/tier';
  * starred, played and built.
  */
 export default function CollectionsScreen() {
-  const { canSee } = useTier();
+  const { opensRoute } = useTier();
   const router = useRouter();
   const hydrate = usePresetShelf((state) => state.hydrate);
   const hydrated = usePresetShelf((state) => state.hydrated);
@@ -67,13 +67,18 @@ export default function CollectionsScreen() {
   );
 
   /*
-   * The library is off at Simple, and its tab does not exist there — so this
-   * screen is only ever reached by a link or a typed address. The door says
-   * what is behind it rather than rendering a version of the page with the
-   * numbers taken out, which would leave nothing (§80, and the rule in
-   * `features/tier`: a tier hides vocabulary and controls, never honesty).
+   * The library is off at Simple. The door says what is behind it rather than
+   * rendering a version of the page with the numbers taken out, which would
+   * leave nothing (§80, and the rule in `features/tier`: a tier hides
+   * vocabulary and controls, never honesty).
+   *
+   * This comment used to add "and its tab does not exist there, so this screen
+   * is only ever reached by a link or a typed address". That was wrong when it
+   * was written: the Sounds tab is the library route under the name Simple
+   * uses, and its "All twelve shelves" button led here. That button is now
+   * shown only where it works.
    */
-  if (!canSee('library')) {
+  if (!opensRoute('/collections')) {
     return (
       <NotAtThisLevel
         eyebrow="Library"
