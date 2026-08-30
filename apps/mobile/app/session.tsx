@@ -38,6 +38,7 @@ import { usePlayer, useScopeCapture } from '../src/state/player';
 import { usePreferences } from '../src/state/preferences';
 import { useTier } from '../src/features/tier';
 import { sessionController } from '../src/audio/sessionController';
+import { playerReadout } from '../src/features/playerReadout';
 import { describeRoute } from '../src/audio/route';
 
 /**
@@ -183,13 +184,33 @@ export default function SessionScreen() {
     else leave();
   }, [lastCompletedSessionId, leave, router, snapshot.state]);
 
-  const beat = useMemo(() => {
-    if (!telemetry) return 0;
-    return telemetry.readouts['tone:beat'] ?? telemetry.readouts['tone:pulse'] ?? 0;
-  }, [telemetry]);
+  /**
+   * What the headphones are producing, read off the running graph.
+   *
+   * This screen used to look up three fixed telemetry keys — `tone:carrier`,
+   * `tone:beat`, `tone:pulse` — which only three of the eight engines publish,
+   * and default a miss to zero. 48 of the 80 factory presets therefore printed
+   * `CARRIER 0.000 Hz` over an audible tone. `playerReadout` resolves it from
+   * the graph instead, and returns null where a number would be a lie rather
+   * than a zero that looks like one.
+   */
+  const readout = useMemo(() => {
+    const protocol = sessionController.currentProtocol;
+    const stage = protocol?.stages[telemetry?.stageIndex ?? 0];
+    return playerReadout(stage?.graph.nodes, telemetry?.readouts, stage?.graph.connections);
+  }, [telemetry?.readouts, telemetry?.stageIndex]);
 
-  const carrier = telemetry?.readouts['tone:carrier'] ?? 0;
-  const band = bandForFrequency(beat);
+  const carrierHz = readout.carrierHz;
+  const beatHz = readout.beatHz;
+  /*
+   * The headline is the rate where there is one and the pitch where there is
+   * not — a Solfeggio session *is* 528 Hz, and printing a beat of zero over it
+   * was the bug. Noise has neither, so it carries null and the ring says why.
+   */
+  const headline = beatHz ?? carrierHz;
+  // A band describes a rate. A steady tone has none, and labelling one would
+  // put a brainwave band on a preset that has nothing to do with rates.
+  const band = beatHz === null ? undefined : bandForFrequency(beatHz);
   // Clamped, because the protocol clock keeps running through the finishing
   // tails: without this the ring and the bar both overshoot their own ends.
   const progress =
@@ -201,26 +222,12 @@ export default function SessionScreen() {
       ? telemetry.stagePositionSec / telemetry.stageDurationSec
       : 0;
 
-  /**
-   * The mode read off the running stage's actual graph, not off a label:
-   * whatever node kind is generating the tone is what the row reports.
-   */
-  const mode = useMemo(() => {
-    const protocol = sessionController.currentProtocol;
-    const stage = protocol?.stages[telemetry?.stageIndex ?? 0];
-    const kinds = new Set(stage?.graph.nodes.map((node) => node.kind) ?? []);
-    if (kinds.has('binaural')) return 'Binaural';
-    if (kinds.has('monaural')) return 'Monaural';
-    if (kinds.has('isochronic')) return 'Isochronic';
-    if (kinds.has('oscillator')) return 'Tone';
-    return '—';
-  }, [telemetry?.stageIndex]);
-
-  const isPulse = telemetry ? telemetry.readouts['tone:pulse'] !== undefined : false;
-  // What each ear receives. Only a binaural pair actually differs between the
-  // ears; every other engine sends the same signal to both.
-  const leftHz = carrier;
-  const rightHz = mode === 'Binaural' ? carrier + beat : carrier;
+  const mode = readout.mode;
+  // What each ear receives. The binaural split comes from the core's own
+  // `binauralFrequencies`, so centered presets are no longer shown the offset
+  // arithmetic — the previous `carrier + beat` was right for one mode of two.
+  const leftHz = readout.leftHz;
+  const rightHz = readout.rightHz;
   const peakL = telemetry?.level.peakL ?? 0;
   const peakR = telemetry?.level.peakR ?? 0;
 
@@ -312,7 +319,9 @@ export default function SessionScreen() {
 
         <View style={styles.stage}>
           <SessionRing
-            beatHz={beat}
+            valueHz={headline}
+            valueLabel={readout.headlineLabel}
+            absence={readout.absence ?? undefined}
             progress={progress}
             stageProgress={stageProgress}
             bandLabel={band ? `${band.label} range` : undefined}
@@ -326,9 +335,11 @@ export default function SessionScreen() {
             <View style={styles.beatChip}>
               <WaveformIcon size={18} color={colors.textSecondary} />
               <View style={styles.beatChipText}>
-                <Label tone="tertiary">{isPulse ? 'Pulse rate' : `${mode} beat`}</Label>
+                <Label tone="tertiary">
+                  {beatHz === null ? readout.noRateLabel : readout.beatLabel}
+                </Label>
                 <Text variant="readout" tone="displaySignal">
-                  {beat.toFixed(3)} Hz
+                  {beatHz === null ? 'No rate' : `${beatHz.toFixed(3)} Hz`}
                 </Text>
               </View>
               <Pressable
@@ -346,10 +357,20 @@ export default function SessionScreen() {
         <InstrumentPanel tone="raised">
           <View style={styles.carrierRow}>
             <View>
-              <Label>Carrier</Label>
-              <Text variant="readoutLg" style={styles.carrierValue}>
-                {carrier.toFixed(3)} <Text variant="readoutSm" tone="tertiary">Hz</Text>
-              </Text>
+              {/* A carrier is a tone something is done to; a steady preset just has
+                  a tone; noise has neither, so the row is its signal. */}
+              <Label>{carrierHz === null ? 'Signal' : beatHz === null ? 'Tone' : 'Carrier'}</Label>
+              {carrierHz === null ? (
+                /* Noise has no single frequency. Saying so is the honest row;
+                   printing 0.000 Hz was the bug. */
+                <Text variant="bodySm" tone="secondary" style={styles.carrierValue}>
+                  {readout.absenceDetail}
+                </Text>
+              ) : (
+                <Text variant="readoutLg" style={styles.carrierValue}>
+                  {carrierHz.toFixed(3)} <Text variant="readoutSm" tone="tertiary">Hz</Text>
+                </Text>
+              )}
             </View>
             <View style={styles.modeCell}>
               <Label>Mode</Label>
@@ -364,9 +385,15 @@ export default function SessionScreen() {
           <View style={styles.earsRow}>
             <View style={styles.earCell}>
               <Label>Left</Label>
-              <Text variant="readout" style={styles.earValue}>
-                {leftHz.toFixed(3)} <Text variant="readoutXs" tone="tertiary">Hz</Text>
-              </Text>
+              {leftHz === null ? (
+                <Text variant="bodySm" tone="tertiary" style={styles.earValue}>
+                  Noise
+                </Text>
+              ) : (
+                <Text variant="readout" style={styles.earValue}>
+                  {leftHz.toFixed(3)} <Text variant="readoutXs" tone="tertiary">Hz</Text>
+                </Text>
+              )}
               <View style={styles.levelTrack}>
                 <View style={[styles.levelFill, { width: `${Math.round(Math.min(1, peakL) * 100)}%` }]} />
               </View>
@@ -376,9 +403,15 @@ export default function SessionScreen() {
             </View>
             <View style={[styles.earCell, styles.earCellRight]}>
               <Label>Right</Label>
-              <Text variant="readout" style={styles.earValue}>
-                {rightHz.toFixed(3)} <Text variant="readoutXs" tone="tertiary">Hz</Text>
-              </Text>
+              {rightHz === null ? (
+                <Text variant="bodySm" tone="tertiary" style={styles.earValue}>
+                  Noise
+                </Text>
+              ) : (
+                <Text variant="readout" style={styles.earValue}>
+                  {rightHz.toFixed(3)} <Text variant="readoutXs" tone="tertiary">Hz</Text>
+                </Text>
+              )}
               <View style={styles.levelTrack}>
                 <View style={[styles.levelFill, { width: `${Math.round(Math.min(1, peakR) * 100)}%` }]} />
               </View>
@@ -578,7 +611,9 @@ export default function SessionScreen() {
               </View>
 
               <SpectrumAnalyzer bins={capture?.spectrum ?? null} sampleRate={capture?.sampleRate} />
-              <ModulationView envelope={modulationEnvelope(beat)} phase={stageProgress % 1} />
+              {/* Zero is the honest rate here: a steady tone has no modulation, and a
+                  flat envelope is exactly what that looks like. */}
+              <ModulationView envelope={modulationEnvelope(beatHz ?? 0)} phase={stageProgress % 1} />
 
               <PanelDivider />
               <PanelRow label="Output route" value={describeRoute(snapshot.route)} />
