@@ -8,7 +8,7 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, MIN_TOUCH_TARGET, motion, radius, space } from '../tokens';
+import { colors, MIN_TOUCH_TARGET, motion, radius, shadows, space } from '../tokens';
 import { LIGHT, SURFACES } from '../materials';
 import * as haptics from '../haptics';
 import { useReducedMotion } from '../useReducedMotion';
@@ -43,8 +43,18 @@ export interface HardwareButtonProps {
  * A physical button.
  *
  * Pressing it depresses the cap: the surface darkens, the top highlight moves
- * to the bottom, and the whole control scales down by a hair. The movement is
- * small on purpose — a button that travels far reads as a toy.
+ * to the bottom, and the whole control travels a point and a half into its
+ * housing. The movement is small on purpose — a button that travels far reads
+ * as a toy.
+ *
+ * ## The same part as everything else on the chassis
+ *
+ * It used to carry a top and bottom border and a tight, dark shadow, which made
+ * it a lit *edge* rather than a whole object — fine beside a panel, wrong beside
+ * a round control that had a rim all the way round. It now uses the shared
+ * treatment: `shadows.float` for the lift, `colors.ring` for the rim, and the
+ * lit top edge kept on top of the ring, since a real cap catches light along
+ * its upper lip and is outlined everywhere.
  */
 export function HardwareButton({
   label,
@@ -68,8 +78,8 @@ export function HardwareButton({
     // A real cap travels into its housing rather than shrinking. The shadow
     // collapses with it, which is what sells the depression.
     transform: [{ translateY: reducedMotion ? 0 : pressed.value * 1.5 }],
-    shadowOpacity: interpolate(pressed.value, [0, 1], [0.20, 0.06]),
-    shadowRadius: interpolate(pressed.value, [0, 1], [6, 2]),
+    shadowOpacity: interpolate(pressed.value, [0, 1], [0.13, 0.04]),
+    shadowRadius: interpolate(pressed.value, [0, 1], [14, 4]),
   }));
 
   const capStyle = useAnimatedStyle(() => ({ opacity: 1 - pressed.value }));
@@ -190,12 +200,12 @@ const styles = StyleSheet.create({
     gap: space.sm,
     borderRadius: radius.pill,
     overflow: 'hidden',
+    // The rim, all the way round, under the lit top edge the variants add.
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.ring,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    shadowColor: '#33486A',
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 8,
-    elevation: 3,
+    ...shadows.float,
   },
   capLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   primaryLabel: { color: '#FFFFFF' },

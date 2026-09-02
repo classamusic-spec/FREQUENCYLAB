@@ -1,10 +1,7 @@
-import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import { LIGHT, SURFACES } from '../materials';
-import { colors, MIN_TOUCH_TARGET, radius } from '../tokens';
+import { colors } from '../tokens';
 import { PersonIcon } from './Icons';
-import * as haptics from '../haptics';
+import { IconButton } from './IconButton';
 
 /**
  * The way to your own settings, from anywhere.
@@ -15,69 +12,22 @@ import * as haptics from '../haptics';
  * screen instead: the place a person already looks for their own account, and a
  * corner rather than a whole sixth of the bottom edge.
  *
- * Machined like every other control here — a raised disc, lit from the same
- * 135° the rest of the instrument is lit from — so it reads as part of the
- * chassis rather than as a web page's avatar.
+ * It used to build its own disc — a gradient, a rim, a `zIndex` workaround for
+ * a web stacking bug, and an opacity fade standing in for a press. All of that
+ * is `IconButton` now, which is the same part every other round control on the
+ * chassis is made from: it presses like a cap rather than dimming like a link,
+ * and its rim and shadow match the switches beside it instead of approximating
+ * them.
  */
 export function ProfileButton() {
   const router = useRouter();
 
   return (
-    <Pressable
-      onPress={() => {
-        haptics.engage();
-        router.push('/profile');
-      }}
-      accessibilityRole="button"
+    <IconButton
       accessibilityLabel="Profile and settings"
       accessibilityHint="Your listening history, safety settings and the library shortcuts."
-      hitSlop={10}
-      style={({ pressed }) => [styles.button, pressed && styles.pressed]}
-    >
-      <LinearGradient
-        colors={SURFACES.panel}
-        start={LIGHT.vertical.start}
-        end={LIGHT.vertical.end}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
-      <View style={styles.rim} pointerEvents="none" />
-      {/*
-       * The glyph needs its own stacking context.
-       *
-       * The gradient and the rim are absolutely positioned, and CSS paints
-       * positioned descendants above non-positioned ones regardless of source
-       * order — so on web the opaque gradient covered the icon completely and
-       * the control rendered as a blank disc. It was correct in the DOM the
-       * whole time, which is why only a rendered pixel showed it.
-       */}
-      <View style={styles.glyph}>
-        <PersonIcon size={20} color={colors.textSecondary} strokeWidth={1.7} />
-      </View>
-    </Pressable>
+      onPress={() => router.push('/profile')}
+      icon={<PersonIcon size={20} color={colors.textSecondary} strokeWidth={1.7} />}
+    />
   );
 }
-
-const SIZE = MIN_TOUCH_TARGET;
-
-const styles = StyleSheet.create({
-  button: {
-    width: SIZE,
-    height: SIZE,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    // The disc reads as raised: a lit top edge against the chassis behind it.
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.edgeLight,
-  },
-  rim: {
-    ...StyleSheet.absoluteFill,
-    borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.edgeDark,
-  },
-  glyph: { zIndex: 1 },
-  pressed: { opacity: 0.72 },
-});

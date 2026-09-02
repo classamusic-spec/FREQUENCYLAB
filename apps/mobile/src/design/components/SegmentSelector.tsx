@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, MIN_TOUCH_TARGET, radius, space } from '../tokens';
+import { colors, fonts, MIN_TOUCH_TARGET, radius, shadows, space } from '../tokens';
 import { LIGHT, SURFACES } from '../materials';
 import * as haptics from '../haptics';
 import { Text } from './Text';
@@ -17,18 +17,44 @@ export interface SegmentSelectorProps<T extends string> {
   onChange: (value: T) => void;
   /** Lets long option sets scroll instead of shrinking below the touch target. */
   scrollable?: boolean;
+  /**
+   * How the switch is built.
+   *
+   * `rail` is a single raised control divided by hairlines — the whole thing is
+   * one part, and choosing a segment lights its label rather than moving a cap
+   * around inside a channel. `channel` is the older milled-housing form, kept
+   * for the places where the switch sits inside an already-recessed panel and a
+   * second recess would read as a hole in a hole.
+   */
+  variant?: 'rail' | 'channel';
   size?: 'sm' | 'md';
   style?: ViewStyle;
   accessibilityLabel?: string;
 }
 
 /**
- * A recessed segmented switch.
+ * A segmented switch.
  *
- * The selected segment is a raised cap inside a milled channel: the housing is
- * darker than the chassis, the cap is lighter, and only the cap carries the
- * illumination colour. Selection is also indicated by weight and position, not
- * by colour alone (§50).
+ * ## `rail`, the default
+ *
+ * One raised part lying on the chassis, divided into segments by hairlines that
+ * run its full height — the same physical language as `IconButton`: a diffuse
+ * shadow for the lift and a ring at the edge for the rim. Nothing moves inside
+ * it. Choosing a segment lights that label and leaves the housing alone, which
+ * is quieter than sliding a cap and reads faster: the eye finds a colour before
+ * it finds a position.
+ *
+ * ## Colour is never the only channel (§50)
+ *
+ * A lit label alone would fail that rule, so the selected segment is *also* set
+ * in the semibold face and keeps its underscore. Three channels — colour,
+ * weight, and a mark under the word — none of which depends on seeing hue.
+ *
+ * ## `channel`
+ *
+ * The older form: a milled housing with a raised cap that travels. Kept for
+ * switches sitting inside an already-recessed panel, where a second recess
+ * would read as a hole cut in a hole.
  */
 export function SegmentSelector<T extends string>({
   options,
@@ -36,10 +62,12 @@ export function SegmentSelector<T extends string>({
   onChange,
   scrollable,
   size = 'md',
+  variant = 'rail',
   style,
   accessibilityLabel,
 }: SegmentSelectorProps<T>) {
-  const content = options.map((option) => {
+  const rail = variant === 'rail';
+  const content = options.map((option, index) => {
     const selected = option.value === value;
     return (
       <Pressable
@@ -56,20 +84,23 @@ export function SegmentSelector<T extends string>({
         style={[
           styles.segment,
           size === 'sm' ? styles.segmentSm : null,
-          selected ? styles.selected : null,
+          !rail && selected ? styles.selected : null,
+          // The divider belongs to the segment on its left, so the rail's own
+          // ends stay clean and no divider doubles up.
+          rail && index > 0 ? styles.divided : null,
           option.disabled ? styles.disabled : null,
           scrollable ? styles.segmentScroll : styles.segmentFlex,
         ]}
       >
         <Text
-          style={styles.segmentLabel}
+          style={[styles.segmentLabel, selected ? styles.segmentLabelSelected : null]}
           variant={size === 'sm' ? 'label' : 'labelLg'}
           uppercase
           tone={option.disabled ? 'disabled' : selected ? 'signal' : 'tertiary'}
         >
           {option.label}
         </Text>
-        {selected ? (
+        {!rail && selected ? (
           <LinearGradient
             colors={SURFACES.buttonCap}
             start={LIGHT.face.start}
@@ -90,7 +121,7 @@ export function SegmentSelector<T extends string>({
         showsHorizontalScrollIndicator={false}
         accessibilityRole="tablist"
         accessibilityLabel={accessibilityLabel}
-        contentContainerStyle={[styles.housing, style]}
+        contentContainerStyle={[styles.housing, rail ? styles.rail : null, style]}
       >
         {content}
       </ScrollView>
@@ -98,7 +129,11 @@ export function SegmentSelector<T extends string>({
   }
 
   return (
-    <View accessibilityRole="tablist" accessibilityLabel={accessibilityLabel} style={[styles.housing, style]}>
+    <View
+      accessibilityRole="tablist"
+      accessibilityLabel={accessibilityLabel}
+      style={[styles.housing, rail ? styles.rail : null, style]}
+    >
       {content}
     </View>
   );
@@ -162,6 +197,33 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(122,136,158,0.22)',
   },
   segmentLabel: { zIndex: 1 },
+  // The second non-colour channel. `labelLg` is medium; the selected segment
+  // steps up a weight so the choice is legible in greyscale.
+  segmentLabelSelected: { fontFamily: fonts.sansSemibold },
+  /**
+   * One raised part rather than a milled channel: the ring draws its rim and
+   * the float lifts it off the chassis, exactly as on `IconButton`. Zero
+   * padding and no gap, because the hairlines have to reach the full height of
+   * the rail — a divider that stops short reads as a tick mark.
+   */
+  rail: {
+    backgroundColor: colors.surfaceRaised,
+    padding: 0,
+    gap: 0,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.ring,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.ring,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.ring,
+    overflow: 'hidden',
+    ...shadows.float,
+  },
+  divided: {
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: colors.ring,
+    borderRadius: 0,
+  },
   disabled: { opacity: 0.4 },
   indicator: {
     position: 'absolute',

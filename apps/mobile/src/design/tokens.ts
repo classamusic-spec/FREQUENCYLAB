@@ -69,6 +69,14 @@ export const colors = {
   /** Underside of a raised form, in its own shadow. */
   edgeDark: 'rgba(116, 130, 152, 0.20)',
   hairline: 'rgba(96, 108, 128, 0.12)',
+  /**
+   * The outline of a floating control.
+   *
+   * Stronger than `hairline`, which separates surfaces that touch. This one
+   * draws the *edge of an object* sitting on the chassis, so it has to survive
+   * being seen against both the ground and its own shadow.
+   */
+  ring: 'rgba(88, 100, 122, 0.20)',
   hairlineStrong: 'rgba(88, 100, 120, 0.22)',
   engraving: 'rgba(70, 80, 99, 0.28)',
 
@@ -223,6 +231,27 @@ export const shadows = {
       shadowOffset: { width: 0, height: 3 },
     },
     default: { elevation: 4 },
+  }) as object,
+  /**
+   * A control resting *on* the chassis rather than cut into it.
+   *
+   * Wider and softer than `control`, and offset further down. A tight, dark
+   * shadow reads as a sticker on the surface; this reads as a machined part
+   * lying on it, which is the whole difference between the two treatments.
+   *
+   * Paired with `colors.ring` on the same element — the diffuse shadow gives
+   * the lift and the hairline gives the edge a real object would catch. Either
+   * one alone looks unfinished: shadow without a ring is a smudge, a ring
+   * without shadow is a sticker.
+   */
+  float: Platform.select({
+    ios: {
+      shadowColor: '#233049',
+      shadowOpacity: 0.13,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 5 },
+    },
+    default: { elevation: 5 },
   }) as object,
   sheet: Platform.select({
     ios: {

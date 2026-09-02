@@ -1,10 +1,16 @@
 import type { ReactElement } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { Tabs, usePathname, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatClock } from '@frequencylab/dsp-core';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, radius, space } from '../../src/design/tokens';
+import { colors, motion, radius, shadows, space } from '../../src/design/tokens';
 import { LIGHT, SURFACES } from '../../src/design/materials';
 import { Label, Text } from '../../src/design/components/Text';
 import {
@@ -17,6 +23,7 @@ import {
   type IconProps,
 } from '../../src/design/components/Icons';
 import * as haptics from '../../src/design/haptics';
+import { useReducedMotion } from '../../src/design/useReducedMotion';
 import { usePlayer } from '../../src/state/player';
 import { paceInPlainWords, useTier, type Capability } from '../../src/features/tier';
 
@@ -210,44 +217,120 @@ function InstrumentTabBar({ activeScreen }: { activeScreen?: string }) {
           const active = item.screen !== null && item.screen === activeScreen;
           const isTab = item.screen !== null;
           return (
-            <Pressable
+            <TabDisc
               key={item.label}
-              testID={`tab-${item.label}`}
-              // Profile is a modal you come back from, not a place in the app
-              // you can be, so it is announced as a button. Calling it a tab
-              // would promise a selected state it can never have.
-              accessibilityRole={isTab ? 'tab' : 'button'}
-              accessibilityState={isTab ? { selected: active } : undefined}
-              /*
-               * `accessibilityState` alone reaches native and is dropped by
-               * React Native Web — measured: the rendered tabs carried
-               * `aria-label`, `role` and nothing else, so on the web build the
-               * current tab was announced exactly like the other four and the
-               * only thing distinguishing it was its colour. That was survivable
-               * while one of five tabs was always lit; it is not now that a
-               * route the bar does not list leaves nothing lit at all.
-               */
-              aria-selected={isTab ? active : undefined}
-              accessibilityLabel={item.label}
+              item={item}
+              active={active}
+              isTab={isTab}
               onPress={() => {
                 if (active) return;
                 haptics.engage();
                 if (isTab) router.replace(item.href);
                 else router.push(item.href);
               }}
-              style={styles.tab}
-            >
-              <View style={active ? styles.tabIconActive : styles.tabIcon}>
-                <item.Icon color={active ? colors.signal : colors.textTertiary} />
-              </View>
-              <Text variant="label" tone={active ? 'signal' : 'tertiary'}>
-                {item.label}
-              </Text>
-            </Pressable>
+            />
           );
         })}
       </View>
     </View>
+  );
+}
+
+/**
+ * One control in the bar: a machined disc with a glyph on it.
+ *
+ * ## Why the words went
+ *
+ * The bar used to caption each icon. Five words along the bottom edge is a
+ * sentence a person reads once and then never again — after the first session
+ * they navigate by shape and position — and it cost the icons the room to be
+ * drawn at a size worth recognising. The labels are gone from the screen and
+ * not from the app: `accessibilityLabel` still carries every one of them, so a
+ * screen reader announces exactly what it announced before. Dropping a visible
+ * word is a design decision; dropping an accessible name would be a defect.
+ *
+ * ## Why the current tab is *raised* and not merely blue
+ *
+ * With the caption gone, colour was the only thing left saying which tab you
+ * are on, and colour alone does not carry state here (§50). So the two states
+ * differ in form as well: the current disc sits proud of the bar with a rim and
+ * a shadow, the others lie flush and cast nothing. That difference survives
+ * greyscale, and it is the same raised/flush distinction every other control on
+ * the chassis uses.
+ *
+ * ## The light
+ *
+ * Pressing floods the disc with signal blue — a lamp coming up behind the
+ * porcelain rather than a fill being painted over it, which is why the glow
+ * sits *under* the glyph and the glyph itself brightens rather than inverting.
+ * It rises fast and falls slowly, the way a real indicator does, so the bar
+ * still reads as lit for a moment after the finger has gone.
+ */
+function TabDisc({
+  item,
+  active,
+  isTab,
+  onPress,
+}: {
+  item: BarItem;
+  active: boolean;
+  isTab: boolean;
+  onPress: () => void;
+}) {
+  const lit = useSharedValue(0);
+  const reducedMotion = useReducedMotion();
+
+  const glow = useAnimatedStyle(() => ({ opacity: lit.value }));
+  const body = useAnimatedStyle(() => ({
+    transform: [{ translateY: reducedMotion ? 0 : lit.value * 1 }],
+  }));
+
+  /* eslint-disable react-hooks/immutability */
+  const pressIn = () => {
+    lit.value = withTiming(1, { duration: motion.instant, easing: Easing.out(Easing.quad) });
+  };
+  const pressOut = () => {
+    lit.value = withTiming(0, { duration: motion.settle, easing: Easing.out(Easing.cubic) });
+  };
+  /* eslint-enable react-hooks/immutability */
+
+  return (
+    <Pressable
+      testID={`tab-${item.label}`}
+      // Profile is a modal you come back from, not a place in the app you can
+      // be, so it is announced as a button. Calling it a tab would promise a
+      // selected state it can never have.
+      accessibilityRole={isTab ? 'tab' : 'button'}
+      accessibilityState={isTab ? { selected: active } : undefined}
+      /*
+       * `accessibilityState` alone reaches native and is dropped by React
+       * Native Web — measured: the rendered tabs carried `aria-label`, `role`
+       * and nothing else, so on the web build the current tab was announced
+       * exactly like the other four and the only thing distinguishing it was
+       * its colour. With the captions gone this matters more, not less.
+       */
+      aria-selected={isTab ? active : undefined}
+      accessibilityLabel={item.label}
+      onPressIn={pressIn}
+      onPressOut={pressOut}
+      onPress={onPress}
+      style={styles.tab}
+    >
+      <Animated.View style={[styles.disc, active ? styles.discActive : null, body]}>
+        <LinearGradient
+          colors={SURFACES.buttonCap}
+          start={LIGHT.face.start}
+          end={LIGHT.face.end}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+        {/* The lamp, under the glyph. */}
+        <Animated.View style={[StyleSheet.absoluteFill, styles.discLight, glow]} pointerEvents="none" />
+        <View style={styles.discGlyph}>
+          <item.Icon color={active ? colors.signal : colors.textTertiary} />
+        </View>
+      </Animated.View>
+    </Pressable>
   );
 }
 
@@ -298,31 +381,42 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: space.xs,
-    gap: 3,
+    // The whole cell stays a full target even though the disc inside it is 44:
+    // a bar is tapped in a hurry, at the very bottom edge of the screen.
     minHeight: 52,
+    paddingVertical: space.xxs,
   },
-  tabIcon: {
+  /**
+   * The flush state. A hairline rim and no shadow — it is part of the bar's
+   * face rather than a part lying on it, which is what leaves room for the
+   * current tab to sit proud without the whole row looking embossed.
+   */
+  disc: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    width: 40,
-    height: 26,
-    borderRadius: radius.pill,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
   },
-  // The active glyph sits in a lit ring, the way the reference bar marks its
-  // engaged control — a glow, not a filled pill, so the bar stays porcelain.
-  tabIconActive: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 40,
-    height: 26,
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(59,139,245,0.10)',
+  /** The current tab: proud of the bar, with a lit rim. */
+  discActive: {
+    borderColor: colors.signal,
+    borderWidth: 1.5,
+    ...shadows.float,
+  },
+  // The lamp behind the porcelain, revealed on press rather than painted over
+  // the face — so the glyph stays legible at full brightness.
+  discLight: {
+    backgroundColor: 'rgba(59,139,245,0.22)',
     shadowColor: colors.signal,
-    shadowOpacity: 0.45,
-    shadowRadius: 8,
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
     shadowOffset: { width: 0, height: 0 },
   },
+  discGlyph: { zIndex: 1 },
   transport: {
     flexDirection: 'row',
     alignItems: 'center',
