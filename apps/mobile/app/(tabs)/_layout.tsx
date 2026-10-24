@@ -14,7 +14,7 @@ import { colors, motion, radius, shadows, space } from '../../src/design/tokens'
 import { LIGHT, SURFACES } from '../../src/design/materials';
 import { Label, Text } from '../../src/design/components/Text';
 import {
-  DialIcon,
+  CrosshairIcon,
   FlaskIcon,
   LibraryIcon,
   PersonIcon,
@@ -62,7 +62,7 @@ function barItems(canSee: (capability: Capability) => boolean, isSimple: boolean
   ];
 
   if (canSee('explore')) {
-    items.push({ screen: 'explore', href: '/explore', label: 'Explore', Icon: DialIcon });
+    items.push({ screen: 'explore', href: '/explore', label: 'Explore', Icon: CrosshairIcon });
   }
 
   /*
@@ -166,14 +166,8 @@ function InstrumentTabBar({ activeScreen }: { activeScreen?: string }) {
       testID="tab-bar"
       style={[styles.container, { paddingBottom: insets.bottom + space.xs }]}
     >
-      <LinearGradient
-        colors={SURFACES.panel}
-        start={LIGHT.vertical.start}
-        end={LIGHT.vertical.end}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
-      <View style={styles.railEdge} pointerEvents="none" />
+      {/* No band and no seam: the controls sit on the same ground as the
+          screen above them, the way the reference draws its bar. */}
       {showTransport ? (
         <Pressable
           onPress={() => {
@@ -354,24 +348,8 @@ function formatBeat(
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.panel,
-    paddingTop: space.xs,
-    shadowColor: '#1D2430',
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: -6 },
-    elevation: 16,
-  },
-  // The seam where the rail meets the case: a dark scribe with a lit lip.
-  railEdge: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: 'rgba(84,96,114,0.22)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: colors.background,
+    paddingTop: space.sm,
   },
   tabs: {
     flexDirection: 'row',
@@ -381,31 +359,44 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    // The whole cell stays a full target even though the disc inside it is 44:
-    // a bar is tapped in a hurry, at the very bottom edge of the screen.
-    minHeight: 52,
+    // The whole cell stays a full target, wider than the puck inside it: a
+    // bar is tapped in a hurry, at the very bottom edge of the screen.
+    minHeight: 64,
     paddingVertical: space.xxs,
   },
   /**
-   * The flush state. A hairline rim and no shadow — it is part of the bar's
-   * face rather than a part lying on it, which is what leaves room for the
-   * current tab to sit proud without the whole row looking embossed.
+   * Every tab is a raised puck — ringed, lit from the top-left, casting a soft
+   * shadow — exactly as the reference draws all of them.
    */
   disc: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
-  },
-  /** The current tab: proud of the bar, with a lit rim. */
-  discActive: {
-    borderColor: colors.signal,
-    borderWidth: 1.5,
+    borderColor: colors.ring,
     ...shadows.float,
+  },
+  /**
+   * The current tab is *larger*, with a lit rim and a blue glow under it.
+   *
+   * Size is the cue that matters: the captions are gone, so colour would
+   * otherwise be the only thing saying which tab you are on, and colour alone
+   * does not carry state here (§50). A bigger puck reads in greyscale, and it
+   * is how the reference marks its current control too.
+   */
+  discActive: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderColor: colors.signal,
+    borderWidth: 1.6,
+    shadowColor: colors.signal,
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
   },
   // The lamp behind the porcelain, revealed on press rather than painted over
   // the face — so the glyph stays legible at full brightness.

@@ -32,22 +32,37 @@ export interface KnobFaceProps {
    * shows position, which is how the reference hardware reads.
    */
   showIndicator?: boolean;
+  /**
+   * Hides the scale pointer. For a dial whose quantity has no single value —
+   * broadband noise — where a pointer would be a claim with nothing under it.
+   */
+  hidePointer?: boolean;
 }
 
 /**
- * A polished steel rotary encoder with an illuminated ring.
+ * A brushed-steel rotary encoder with an illuminated ring.
  *
- * Built as concentric physical parts, outside in — the same order a real one
- * is assembled, which is what makes the shading agree with itself:
+ * Built as concentric physical parts, outside in — the order a real one is
+ * assembled, which is what keeps the shading consistent with itself:
  *
- *   1. a scribed scale ring with ticks, and a glowing pointer at the value
- *   2. a knurled steel collar, its serrations lit on the upper-left flank
- *   3. the illuminated ring: a lit groove between collar and cap, drawn as
- *      three strokes — wide soft bloom, mid glow, bright core
- *   4. the cap: radially brushed steel (a sunburst of hairlines under a
- *      radial gradient) with a tight specular arc top-left
+ *   1. a hairline scale track scribed into the panel, with fine ticks and a
+ *      lit pointer at the value
+ *   2. a bright turned bezel, then a wide knurled collar between two bevels
+ *   3. the illuminated ring: a lit groove between collar and cap, drawn as a
+ *      wide soft bloom under a bright core
+ *   4. the cap: anisotropically brushed steel
  *
- * Everything is drawn in a fixed space scaled by `size`, so one definition
+ * ## Why the cap is drawn as wedges
+ *
+ * Radially brushed metal does not shade like a dome. Its scratches all run
+ * outward from the centre, so the light catches them along one axis and loses
+ * them along the other — a bright bow-tie through the upper-left and
+ * lower-right, darker quarters between. Neither SVG nor React Native has a
+ * conic gradient, so the cap is a fan of thin wedges whose grey follows
+ * `cos 2θ`, with a little per-wedge variation for grain. That variation is
+ * seeded, not random, so a re-render never flickers.
+ *
+ * Everything is drawn in a fixed proportion of `size`, so one definition
  * serves the 300 pt hero encoder and a 64 pt module trim alike.
  */
 export function KnobFace({
@@ -60,116 +75,173 @@ export function KnobFace({
   locked,
   active,
   showIndicator = true,
+  hidePointer,
 }: KnobFaceProps) {
   const c = size / 2;
   const small = size < 120;
-  const R = {
-    scale: c - 1,
-    tickOuter: c - 4,
-    collarOuter: small ? c - 12 : c - 22,
-    collarInner: small ? c - 17 : c - 31,
-    ring: small ? c - 19 : c - 34,
-    cap: small ? c - 22 : c - 38,
-  };
+  const R = small
+    ? {
+        track: c * 0.99,
+        tickOuter: c * 0.97,
+        tickMajor: c * 0.9,
+        tickMinor: c * 0.935,
+        bezelOuter: c * 0.86,
+        collarOuter: c * 0.83,
+        collarInner: c * 0.77,
+        ring: c * 0.755,
+        cap: c * 0.735,
+      }
+    : {
+        track: c * 0.992,
+        tickOuter: c * 0.965,
+        tickMajor: c * 0.905,
+        tickMinor: c * 0.938,
+        bezelOuter: c * 0.868,
+        collarOuter: c * 0.846,
+        collarInner: c * 0.772,
+        ring: c * 0.757,
+        cap: c * 0.738,
+      };
 
   const angle = startAngle + Math.max(0, Math.min(1, normalised)) * sweep;
-  const ringColor = locked ? '#9AA4B2' : accent;
+  const ringColor = locked ? '#9C9C9C' : accent;
 
+  /** Fine ticks along the travel; every fifth is a longer, darker major. */
   const ticks = useMemo(() => {
     const out: { x1: number; y1: number; x2: number; y2: number; major: boolean }[] = [];
-    const count = small ? 21 : 61;
+    const count = small ? 25 : 61;
     for (let i = 0; i < count; i++) {
       const a = startAngle + (i / (count - 1)) * sweep;
       const major = i % 5 === 0;
-      const inner = R.tickOuter - (major ? (small ? 5 : 8) : small ? 3 : 4.5);
       const o = polar(c, R.tickOuter, a);
-      const n = polar(c, inner, a);
+      const n = polar(c, major ? R.tickMajor : R.tickMinor, a);
       out.push({ x1: n.x, y1: n.y, x2: o.x, y2: o.y, major });
     }
     return out;
-  }, [c, R.tickOuter, small, startAngle, sweep]);
+  }, [c, R.tickOuter, R.tickMajor, R.tickMinor, small, startAngle, sweep]);
 
-  /** Radial serrations around the collar, lit on the upper-left flank. */
+  /**
+   * Knurling: alternating ridge and valley, the way a cut knurl actually reads
+   * — light on the crest, dark in the cut — rather than lines on a flat band.
+   */
   const knurls = useMemo(() => {
-    const out: { x1: number; y1: number; x2: number; y2: number; lit: number }[] = [];
-    const count = small ? 48 : 96;
+    const out: { x1: number; y1: number; x2: number; y2: number; crest: boolean }[] = [];
+    const count = small ? 84 : 200;
     for (let i = 0; i < count; i++) {
       const a = (i / count) * 360;
-      const inner = polar(c, R.collarInner + 0.5, a);
-      const outer = polar(c, R.collarOuter - 0.5, a);
-      const lit = Math.max(0, Math.cos(((a - 215) * Math.PI) / 180));
-      out.push({ x1: inner.x, y1: inner.y, x2: outer.x, y2: outer.y, lit });
+      const inner = polar(c, R.collarInner + 0.6, a);
+      const outer = polar(c, R.collarOuter - 0.6, a);
+      out.push({ x1: inner.x, y1: inner.y, x2: outer.x, y2: outer.y, crest: i % 2 === 0 });
     }
     return out;
   }, [c, R.collarInner, R.collarOuter, small]);
 
-  /**
-   * The sunburst brushing on the cap. Real radially-brushed steel is thousands
-   * of hairline scratches from the centre; a hundred faint spokes under the
-   * radial gradient is enough to read as that finish without moiré.
-   */
-  const brushing = useMemo(() => {
-    const out: { x1: number; y1: number; x2: number; y2: number; o: number }[] = [];
-    const count = small ? 60 : 120;
+  /** The brushed cap, as a fan of wedges shaded by `cos 2θ`. */
+  const wedges = useMemo(() => {
+    const out: { d: string; fill: string }[] = [];
+    const count = small ? 96 : 180;
+    const step = 360 / count;
     for (let i = 0; i < count; i++) {
-      const a = (i / count) * 360 + (i % 3) * 1.3;
-      // Converges at the centre: a sunburst that stops short leaves a bright
-      // unbrushed disc, which reads as a blemish rather than a turned boss.
-      const inner = polar(c, R.cap * 0.03, a);
-      const outer = polar(c, R.cap * 0.97, a);
-      // Spokes crossing the light direction catch it; the rest fall dark.
-      const litness = Math.cos(((a - 135) * Math.PI) / 90);
+      const a0 = i * step;
+      // A hair of overlap so antialiasing never opens a seam between wedges.
+      const a1 = a0 + step + 0.6;
+      const rad = ((a0 + step / 2) * Math.PI) / 180;
+      const lobe = Math.cos(2 * (rad - (60 * Math.PI) / 180));
+      const ripple = Math.cos(6 * rad + 0.7);
+      const grain = seeded(i) * 2 - 1;
+      const g = Math.max(160, Math.min(246, Math.round(207 + 30 * lobe + 3 * ripple + 2.5 * grain)));
+      const p0 = polar(c, R.cap + 0.5, a0);
+      const p1 = polar(c, R.cap + 0.5, a1);
       out.push({
-        x1: inner.x,
-        y1: inner.y,
-        x2: outer.x,
-        y2: outer.y,
-        o: 0.05 + Math.abs(litness) * 0.07,
+        d: `M ${c} ${c} L ${p0.x} ${p0.y} A ${R.cap} ${R.cap} 0 0 1 ${p1.x} ${p1.y} Z`,
+        fill: `rgb(${g},${g},${g})`,
       });
     }
     return out;
   }, [c, R.cap, small]);
 
-  const pointer = polar(c, R.scale - 2, angle);
-  const pointerInner = polar(c, R.scale - (small ? 7 : 11), angle);
+  /** Hairline scratches over the wedges: the grain the eye reads as brushing. */
+  const scratches = useMemo(() => {
+    const out: { x1: number; y1: number; x2: number; y2: number; light: boolean; o: number }[] = [];
+    const count = small ? 70 : 160;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * 360 + seeded(i + 1000) * 2;
+      const inner = polar(c, R.cap * (0.05 + seeded(i + 2000) * 0.25), a);
+      const outer = polar(c, R.cap * 0.99, a);
+      out.push({
+        x1: inner.x,
+        y1: inner.y,
+        x2: outer.x,
+        y2: outer.y,
+        light: i % 2 === 0,
+        o: 0.035 + seeded(i + 3000) * 0.07,
+      });
+    }
+    return out;
+  }, [c, R.cap, small]);
+
+  const pointer = polar(c, R.tickOuter + (small ? 0.5 : 1), angle);
+  const pointerInner = polar(c, R.tickMajor - (small ? 1 : 2), angle);
+  const bloomInner = (R.ring / R.bezelOuter) * 0.93;
+  const bloomPeak = R.ring / R.bezelOuter;
+  const bloomOuter = Math.min(0.99, (R.collarInner / R.bezelOuter) * 1.035);
 
   return (
     <Svg width={size} height={size} opacity={disabled ? 0.45 : 1}>
       <Defs>
-        {/* Polished cap: bright top-left falling to a shaded lower-right. */}
-        <RadialGradient id="cap" cx="34%" cy="26%" r="88%">
+        {/* Soft contact shadow the whole knob throws onto the panel. */}
+        <RadialGradient id="kfDrop" cx="50%" cy="50%" r="50%">
+          <Stop offset="0.78" stopColor="#000000" stopOpacity="0.16" />
+          <Stop offset="1" stopColor="#000000" stopOpacity="0" />
+        </RadialGradient>
+        {/* Turned bezel: lit top-left, falling away bottom-right. */}
+        <SvgLinearGradient id="kfBezel" x1="0.15" y1="0" x2="0.85" y2="1">
           <Stop offset="0" stopColor="#FFFFFF" />
-          <Stop offset="0.3" stopColor="#F5F7FA" />
-          <Stop offset="0.6" stopColor="#E3E8EE" />
-          <Stop offset="0.84" stopColor="#CDD5DF" />
-          <Stop offset="1" stopColor="#B7C1CE" />
-        </RadialGradient>
-        {/* Directional shading across the dome, opposing the light source. */}
-        <SvgLinearGradient id="capShade" x1="0.2" y1="0.05" x2="0.8" y2="1">
-          <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.35" />
-          <Stop offset="0.5" stopColor="#9AA6B5" stopOpacity="0" />
-          <Stop offset="1" stopColor="#6C7D93" stopOpacity="0.22" />
+          <Stop offset="0.5" stopColor="#E2E2E2" />
+          <Stop offset="1" stopColor="#B4B4B4" />
         </SvgLinearGradient>
-        {/* Collar metal, darker so the cap reads as standing above it. */}
-        <SvgLinearGradient id="collar" x1="0.15" y1="0" x2="0.85" y2="1">
-          <Stop offset="0" stopColor="#F0F3F7" />
-          <Stop offset="0.45" stopColor="#CDD5DE" />
-          <Stop offset="1" stopColor="#AEB9C7" />
+        {/* The collar band under the knurls, darker than the bezel. */}
+        <SvgLinearGradient id="kfCollar" x1="0.1" y1="0" x2="0.9" y2="1">
+          <Stop offset="0" stopColor="#EDEDED" />
+          <Stop offset="0.5" stopColor="#C4C4C4" />
+          <Stop offset="1" stopColor="#9E9E9E" />
         </SvgLinearGradient>
-        <RadialGradient id="capShadow" cx="50%" cy="50%" r="50%">
-          <Stop offset="0.72" stopColor="#33486A" stopOpacity="0" />
-          <Stop offset="0.94" stopColor="#33486A" stopOpacity="0.10" />
-          <Stop offset="1" stopColor="#2C3E5C" stopOpacity="0.30" />
+        {/* Gentle falloff toward the cap's rim — brushed steel is not flat. */}
+        <RadialGradient id="kfCapShade" cx="50%" cy="46%" r="54%">
+          <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.16" />
+          <Stop offset="0.7" stopColor="#FFFFFF" stopOpacity="0" />
+          <Stop offset="1" stopColor="#000000" stopOpacity="0.14" />
         </RadialGradient>
-        {/* The glow the illuminated ring throws onto surrounding metal. */}
-        <RadialGradient id="ringBloom" cx="50%" cy="50%" r="50%">
-          <Stop offset="0.62" stopColor={ringColor} stopOpacity="0" />
-          <Stop offset="0.8" stopColor={ringColor} stopOpacity={active ? '0.35' : '0.22'} />
-          <Stop offset="0.98" stopColor={ringColor} stopOpacity="0" />
+        {/* The light the ring throws onto the steel either side of it. */}
+        <RadialGradient id="kfBloom" cx="50%" cy="50%" r="50%">
+          <Stop offset={String(bloomInner)} stopColor={ringColor} stopOpacity="0" />
+          <Stop offset={String(bloomPeak)} stopColor={ringColor} stopOpacity={active ? '0.42' : '0.3'} />
+          <Stop offset={String(bloomOuter)} stopColor={ringColor} stopOpacity="0" />
         </RadialGradient>
       </Defs>
 
-      {/* 1 — scale ring scribed into the panel, with the glowing pointer */}
+      {/* 1 — the scale scribed into the panel */}
+      <Path
+        d={arc(c, R.track, startAngle, startAngle + sweep)}
+        stroke="rgba(120,120,120,0.28)"
+        strokeWidth={small ? 0.8 : 1}
+        fill="none"
+      />
+      {[startAngle, startAngle + sweep].map((a) => {
+        const o = polar(c, R.track, a);
+        const n = polar(c, R.tickMajor, a);
+        return (
+          <Line
+            key={a}
+            x1={n.x}
+            y1={n.y}
+            x2={o.x}
+            y2={o.y}
+            stroke="rgba(120,120,120,0.35)"
+            strokeWidth={small ? 0.8 : 1}
+          />
+        );
+      })}
       <G>
         {ticks.map((t, i) => (
           <Line
@@ -178,46 +250,41 @@ export function KnobFace({
             y1={t.y1}
             x2={t.x2}
             y2={t.y2}
-            stroke={t.major ? 'rgba(74,86,104,0.55)' : 'rgba(104,116,136,0.30)'}
-            strokeWidth={t.major ? 1.6 : 1}
+            stroke={t.major ? 'rgba(40,40,40,0.78)' : 'rgba(70,70,70,0.42)'}
+            strokeWidth={t.major ? (small ? 1.2 : 1.8) : small ? 0.8 : 1}
             strokeLinecap="round"
           />
         ))}
       </G>
-      {/* Travelled portion of the scale, faintly lit. */}
-      {normalised > 0.002 ? (
-        <Path
-          d={arc(c, R.tickOuter - (small ? 2.5 : 4), startAngle, angle)}
-          stroke={ringColor}
-          strokeWidth={small ? 2 : 2.5}
-          strokeLinecap="round"
-          fill="none"
-          opacity={0.35}
-        />
-      ) : null}
-      {/* The pointer: a lit tick riding the scale at the current value. */}
-      <Line
-        x1={pointerInner.x}
-        y1={pointerInner.y}
-        x2={pointer.x}
-        y2={pointer.y}
-        stroke={ringColor}
-        strokeWidth={small ? 5 : 7}
-        strokeLinecap="round"
-        opacity={0.28}
-      />
-      <Line
-        x1={pointerInner.x}
-        y1={pointerInner.y}
-        x2={pointer.x}
-        y2={pointer.y}
-        stroke={ringColor}
-        strokeWidth={small ? 2.5 : 3.5}
-        strokeLinecap="round"
-      />
+      {hidePointer ? null : (
+        <>
+          <Line
+            x1={pointerInner.x}
+            y1={pointerInner.y}
+            x2={pointer.x}
+            y2={pointer.y}
+            stroke={ringColor}
+            strokeWidth={small ? 4.5 : 7}
+            strokeLinecap="round"
+            opacity={0.25}
+          />
+          <Line
+            x1={pointerInner.x}
+            y1={pointerInner.y}
+            x2={pointer.x}
+            y2={pointer.y}
+            stroke={ringColor}
+            strokeWidth={small ? 2.2 : 3.2}
+            strokeLinecap="round"
+          />
+        </>
+      )}
 
-      {/* 2 — knurled collar */}
-      <Circle cx={c} cy={c} r={R.collarOuter} fill="url(#collar)" />
+      {/* 2 — bezel, knurled collar and its two bevels */}
+      <Circle cx={c} cy={c + size * 0.022} r={R.bezelOuter * 1.06} fill="url(#kfDrop)" />
+      <Circle cx={c} cy={c} r={R.bezelOuter} fill="url(#kfBezel)" />
+      <Circle cx={c} cy={c} r={R.bezelOuter - 0.5} fill="none" stroke="rgba(110,110,110,0.35)" strokeWidth={0.8} />
+      <Circle cx={c} cy={c} r={R.collarOuter} fill="url(#kfCollar)" />
       <G>
         {knurls.map((k, i) => (
           <Line
@@ -226,151 +293,78 @@ export function KnobFace({
             y1={k.y1}
             x2={k.x2}
             y2={k.y2}
-            stroke={k.lit > 0.35 ? 'rgba(255,255,255,0.7)' : 'rgba(88,102,122,0.28)'}
-            strokeWidth={small ? 0.8 : 1}
+            stroke={k.crest ? 'rgba(255,255,255,0.75)' : 'rgba(70,70,70,0.2)'}
+            strokeWidth={small ? 0.7 : 0.9}
           />
         ))}
       </G>
-      <Circle
-        cx={c}
-        cy={c}
-        r={R.collarOuter}
-        fill="none"
-        stroke="rgba(88,102,122,0.30)"
-        strokeWidth={1}
-      />
+      <Circle cx={c} cy={c} r={R.collarOuter} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth={small ? 0.8 : 1.1} />
+      <Circle cx={c} cy={c} r={R.collarInner} fill="none" stroke="rgba(80,80,80,0.32)" strokeWidth={small ? 0.8 : 1} />
 
-      {/* 3 — the illuminated ring: bloom, glow, core */}
-      <Circle cx={c} cy={c} r={R.collarOuter + 2} fill="url(#ringBloom)" />
-      <Circle
-        cx={c}
-        cy={c}
-        r={R.ring}
-        fill="none"
-        stroke={ringColor}
-        strokeWidth={small ? 4 : 6}
-        opacity={active ? 0.4 : 0.26}
-      />
-      <Circle
-        cx={c}
-        cy={c}
-        r={R.ring}
-        fill="none"
-        stroke={ringColor}
-        strokeWidth={small ? 2 : 2.8}
-        opacity={active ? 1 : 0.9}
-      />
-      <Circle
-        cx={c}
-        cy={c}
-        r={R.ring}
-        fill="none"
-        stroke="#FFFFFF"
-        strokeWidth={small ? 0.7 : 1}
-        opacity={0.5}
-      />
+      {/* 3 — the illuminated ring */}
+      <Circle cx={c} cy={c} r={R.bezelOuter} fill="url(#kfBloom)" />
+      <Circle cx={c} cy={c} r={R.ring} fill="none" stroke={ringColor} strokeWidth={small ? 5 : 9} opacity={active ? 0.3 : 0.18} />
+      <Circle cx={c} cy={c} r={R.ring} fill="none" stroke={ringColor} strokeWidth={small ? 2 : 3} opacity={active ? 1 : 0.95} />
+      <Circle cx={c} cy={c} r={R.ring} fill="none" stroke="#FFFFFF" strokeWidth={small ? 0.6 : 0.9} opacity={0.55} />
 
-      {/* 4 — the cap: radial-brushed steel */}
-      <Circle cx={c} cy={c} r={R.cap} fill="url(#cap)" />
+      {/* 4 — the brushed cap */}
       <G>
-        {brushing.map((b, i) => (
+        {wedges.map((w, i) => (
+          <Path key={i} d={w.d} fill={w.fill} />
+        ))}
+      </G>
+      <G>
+        {scratches.map((s, i) => (
           <Line
             key={i}
-            x1={b.x1}
-            y1={b.y1}
-            x2={b.x2}
-            y2={b.y2}
-            stroke="#6E7E92"
+            x1={s.x1}
+            y1={s.y1}
+            x2={s.x2}
+            y2={s.y2}
+            stroke={s.light ? '#FFFFFF' : '#5A5A5A'}
             strokeWidth={0.5}
-            opacity={b.o}
+            opacity={s.o}
           />
         ))}
       </G>
-      <Circle cx={c} cy={c} r={R.cap} fill="url(#capShade)" />
-      <Circle cx={c} cy={c} r={R.cap} fill="url(#capShadow)" />
-      {/* Turned rings — a polished cap still shows faint concentric passes. */}
-      <G opacity={0.16}>
-        {[0.82, 0.62, 0.42].map((f) => (
-          <Circle
-            key={f}
-            cx={c}
-            cy={c}
-            r={R.cap * f}
-            fill="none"
-            stroke="rgba(120,132,150,0.5)"
-            strokeWidth={0.5}
-          />
-        ))}
-      </G>
-      {/* Specular arcs: polished metal reflects the light as a band, not a blob. */}
-      <Path
-        d={arc(c, R.cap * 0.88, 195, 305)}
-        fill="none"
-        stroke="#FFFFFF"
-        strokeWidth={R.cap * 0.1}
-        strokeLinecap="round"
-        opacity={0.5}
-      />
-      <Path
-        d={arc(c, R.cap * 0.88, 20, 120)}
-        fill="none"
-        stroke="#FFFFFF"
-        strokeWidth={R.cap * 0.07}
-        strokeLinecap="round"
-        opacity={0.22}
-      />
-      {/* Lit on the upper rim, occluded on the lower — the cap's own edge. */}
-      <Path
-        d={arc(c, R.cap, 190, 350)}
-        fill="none"
-        stroke="rgba(255,255,255,0.95)"
-        strokeWidth={1.4}
-        strokeLinecap="round"
-      />
-      <Path
-        d={arc(c, R.cap, 10, 170)}
-        fill="none"
-        stroke="rgba(96,110,132,0.30)"
-        strokeWidth={1.4}
-        strokeLinecap="round"
-      />
-
-      {/* The turned centre pivot the brushing radiates from. */}
-      <Circle cx={c} cy={c} r={Math.max(2, R.cap * 0.045)} fill="url(#cap)" />
-      <Circle
-        cx={c}
-        cy={c}
-        r={Math.max(2, R.cap * 0.045)}
-        fill="none"
-        stroke="rgba(96,110,132,0.28)"
-        strokeWidth={0.7}
-      />
+      <Circle cx={c} cy={c} r={R.cap} fill="url(#kfCapShade)" />
+      {/*
+       * No lit edge on the cap. A white rim arc reads as a scratch where it
+       * crosses the darker quarters of the brushing, and the ring already
+       * draws this edge — two outlines on one boundary is one too many.
+       */}
 
       {/* Optional milled indicator, for caps that do not carry a readout. */}
       {showIndicator ? (
         <>
           <Line
-            x1={polar(c, R.cap - (small ? 9 : 16), angle).x}
-            y1={polar(c, R.cap - (small ? 9 : 16), angle).y}
-            x2={polar(c, R.cap - 3, angle).x}
-            y2={polar(c, R.cap - 3, angle).y}
-            stroke="rgba(62,74,92,0.35)"
-            strokeWidth={small ? 3.5 : 5}
+            x1={polar(c, R.cap * 0.55, angle).x}
+            y1={polar(c, R.cap * 0.55, angle).y}
+            x2={polar(c, R.cap * 0.9, angle).x}
+            y2={polar(c, R.cap * 0.9, angle).y}
+            stroke="rgba(40,40,40,0.35)"
+            strokeWidth={small ? 3.2 : 5}
             strokeLinecap="round"
           />
           <Line
-            x1={polar(c, R.cap - (small ? 9 : 16), angle).x}
-            y1={polar(c, R.cap - (small ? 9 : 16), angle).y}
-            x2={polar(c, R.cap - 3, angle).x}
-            y2={polar(c, R.cap - 3, angle).y}
+            x1={polar(c, R.cap * 0.55, angle).x}
+            y1={polar(c, R.cap * 0.55, angle).y}
+            x2={polar(c, R.cap * 0.9, angle).x}
+            y2={polar(c, R.cap * 0.9, angle).y}
             stroke={ringColor}
-            strokeWidth={small ? 2 : 2.6}
+            strokeWidth={small ? 1.8 : 2.6}
             strokeLinecap="round"
           />
         </>
       ) : null}
     </Svg>
   );
+}
+
+/** A deterministic 0..1 value per index, so the grain never shifts between renders. */
+function seeded(i: number): number {
+  const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
+  return x - Math.floor(x);
 }
 
 function polar(centre: number, r: number, degrees: number): { x: number; y: number } {

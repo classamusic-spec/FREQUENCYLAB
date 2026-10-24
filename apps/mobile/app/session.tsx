@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { formatClock } from '@frequencylab/dsp-core';
+import { MAX_BEAT_HZ, MIN_BEAT_HZ, formatClock } from '@frequencylab/dsp-core';
 import { InstrumentPanel, PanelDivider, PanelRow } from '../src/design/components/InstrumentPanel';
 import { SessionRing } from '../src/design/components/SessionRing';
 import { HardwareButton } from '../src/design/components/HardwareButton';
@@ -23,16 +24,22 @@ import {
 } from '../src/design/components/BreathRing';
 import { Label, Text } from '../src/design/components/Text';
 import { DisplayGlass } from '../src/design/components/Surface';
+import { TitleBar } from '../src/design/components/TitleBar';
 import {
+  BarsIcon,
   ChevronIcon,
+  DottedRingIcon,
+  EllipsisIcon,
   InfoIcon,
+  ListIcon,
   PauseIcon,
   PlayIcon,
+  SpeakerIcon,
   StereoRingsIcon,
   StopIcon,
   WaveformIcon,
 } from '../src/design/components/Icons';
-import { bandForFrequency, colors, radius, space } from '../src/design/tokens';
+import { bandForFrequency, colors, radius, shadows, space } from '../src/design/tokens';
 import * as haptics from '../src/design/haptics';
 import { usePlayer, useScopeCapture } from '../src/state/player';
 import { usePreferences } from '../src/state/preferences';
@@ -52,6 +59,7 @@ import { describeRoute } from '../src/audio/route';
  */
 export default function SessionScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const snapshot = usePlayer((state) => state.snapshot);
   const pause = usePlayer((state) => state.pause);
   const play = usePlayer((state) => state.play);
@@ -247,32 +255,26 @@ export default function SessionScreen() {
 
   return (
     <View style={styles.root}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Pressable
-            onPress={leave}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            style={styles.headerButton}
-          >
-            <ChevronIcon direction="down" color={colors.textSecondary} />
-          </Pressable>
-          <View style={styles.headerCentre}>
-            <Text variant="labelLg" uppercase style={styles.headerTitle}>
-              Frequency Lab
-            </Text>
-            <Label tone="tertiary">Player</Label>
-          </View>
-          <Pressable
-            onPress={() => setShowDetails((current) => !current)}
-            accessibilityRole="button"
-            accessibilityLabel="Session details"
-            accessibilityState={{ expanded: showDetails }}
-            style={styles.headerButton}
-          >
-            <InfoIcon color={showDetails ? colors.signal : colors.textSecondary} />
-          </Pressable>
-        </View>
+      <ScrollView
+        // The notch, not a guess at it: this screen has no tab bar or header
+        // of its own to keep the title clear of the status bar.
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + space.sm }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <TitleBar
+          section="Player"
+          left={{
+            icon: <ChevronIcon direction="down" color={colors.textSecondary} />,
+            onPress: leave,
+            accessibilityLabel: 'Back',
+          }}
+          right={{
+            icon: <EllipsisIcon color={showDetails ? colors.signal : colors.textSecondary} />,
+            onPress: () => setShowDetails((current) => !current),
+            accessibilityLabel: 'Session details',
+            selected: showDetails,
+          }}
+        />
 
         {/*
             Two different things used to read as one. `audible` is false when the
@@ -325,38 +327,50 @@ export default function SessionScreen() {
             progress={progress}
             stageProgress={stageProgress}
             bandLabel={band ? `${band.label} range` : undefined}
+            // The Explorer's own scale, so a beat reads the same here as where
+            // it was set. Only for a rate: a tone's pitch is not on it.
+            scale={beatHz === null ? undefined : { min: MIN_BEAT_HZ, max: MAX_BEAT_HZ }}
+            size={beatHz === null ? 300 : 262}
             paused={paused}
           />
         </View>
 
         {/* What the number above actually is — a beat or a pulse rate. */}
         <View style={styles.beatChipRow}>
-          <DisplayGlass cornerRadius={radius.control}>
+          <View style={styles.beatPlate}>
             <View style={styles.beatChip}>
               <WaveformIcon size={18} color={colors.textSecondary} />
               <View style={styles.beatChipText}>
                 <Label tone="tertiary">
                   {beatHz === null ? readout.noRateLabel : readout.beatLabel}
                 </Label>
-                <Text variant="readout" tone="displaySignal">
-                  {beatHz === null ? 'No rate' : `${beatHz.toFixed(3)} Hz`}
+                <Text variant="readout">
+                  {beatHz === null ? (
+                    'No rate'
+                  ) : (
+                    <>
+                      {beatHz.toFixed(3)} <Text variant="readoutXs" tone="tertiary">Hz</Text>
+                    </>
+                  )}
                 </Text>
               </View>
               <Pressable
                 onPress={() => setShowDetails((current) => !current)}
                 accessibilityRole="button"
                 accessibilityLabel="What am I hearing?"
-                hitSlop={8}
+                style={styles.infoTarget}
               >
-                <InfoIcon size={18} color={colors.textTertiary} />
+                <View style={styles.infoRing}>
+                  <InfoIcon size={18} color={colors.textSecondary} />
+                </View>
               </Pressable>
             </View>
-          </DisplayGlass>
+          </View>
         </View>
 
         <InstrumentPanel tone="raised">
           <View style={styles.carrierRow}>
-            <View>
+            <View style={styles.carrierCell}>
               {/* A carrier is a tone something is done to; a steady preset just has
                   a tone; noise has neither, so the row is its signal. */}
               <Label>{carrierHz === null ? 'Signal' : beatHz === null ? 'Tone' : 'Carrier'}</Label>
@@ -367,14 +381,14 @@ export default function SessionScreen() {
                   {readout.absenceDetail}
                 </Text>
               ) : (
-                <Text variant="readoutLg" style={styles.carrierValue}>
-                  {carrierHz.toFixed(3)} <Text variant="readoutSm" tone="tertiary">Hz</Text>
+                <Text variant="readout" style={styles.carrierValue}>
+                  {carrierHz.toFixed(3)} <Text variant="readoutXs" tone="tertiary">Hz</Text>
                 </Text>
               )}
             </View>
             <View style={styles.modeCell}>
               <Label>Mode</Label>
-              <Text variant="readout" tone="secondary" style={styles.carrierValue}>
+              <Text variant="body" style={styles.carrierValue}>
                 {mode}
               </Text>
             </View>
@@ -421,8 +435,8 @@ export default function SessionScreen() {
 
         <InstrumentPanel tone="raised">
           <View style={styles.timeHeader}>
-            <Label>{finishing ? 'Finishing' : 'Time remaining'}</Label>
-            <Label tone="tertiary">{telemetry?.stageName ?? ''}</Label>
+            <Label tone="secondary">{finishing ? 'Finishing' : 'Time remaining'}</Label>
+            {telemetry?.stageName ? <Label tone="tertiary">{telemetry.stageName}</Label> : null}
           </View>
           <View style={styles.timeRow}>
             <Text variant="readoutLg" tone="signal">
@@ -440,7 +454,9 @@ export default function SessionScreen() {
             accessibilityValue={{ min: 0, max: 100, now: Math.round(progress * 100) }}
           >
             <View style={[styles.progressFill, { width: `${Math.max(1, progress * 100)}%` }]} />
-            <View style={[styles.progressThumb, { left: `${Math.max(1, progress * 100)}%` }]} />
+            {/* A playhead, not a handle: the engine has no click-free seek, so
+                nothing here may look as if it can be dragged. */}
+            <View style={[styles.progressHead, { left: `${Math.max(1, progress * 100)}%` }]} />
           </View>
 
           {finishing ? (
@@ -460,7 +476,7 @@ export default function SessionScreen() {
               accessibilityLabel="Stop the session"
               style={styles.transportSmall}
             >
-              <StopIcon size={20} color={colors.limit} />
+              <StopIcon size={22} color={colors.text} />
             </Pressable>
 
             <Pressable
@@ -475,9 +491,9 @@ export default function SessionScreen() {
             >
               <View style={styles.transportMainRing} pointerEvents="none" />
               {paused ? (
-                <PlayIcon size={26} color={colors.signal} />
+                <PlayIcon size={30} color={colors.text} />
               ) : (
-                <PauseIcon size={26} color={colors.signal} />
+                <PauseIcon size={30} color={colors.text} />
               )}
             </Pressable>
 
@@ -488,7 +504,7 @@ export default function SessionScreen() {
               accessibilityState={{ selected: gain <= 0.001 }}
               style={styles.transportSmall}
             >
-              <WaveformIcon size={20} color={gain > 0.001 ? colors.textSecondary : colors.warning} />
+              <SpeakerIcon size={22} muted={gain <= 0.001} color={gain > 0.001 ? colors.text : colors.warning} />
             </Pressable>
           </View>
         </InstrumentPanel>
@@ -635,10 +651,12 @@ export default function SessionScreen() {
         ) : null}
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + space.lg }]}>
         <HardwareButton
           label="Intensity"
           size="sm"
+          uppercase={false}
+          icon={<DottedRingIcon size={18} color={showIntensity ? colors.signal : colors.textSecondary} />}
           style={styles.footerButton}
           selected={showIntensity}
           onPress={() => setShowIntensity((current) => !current)}
@@ -646,6 +664,8 @@ export default function SessionScreen() {
         <HardwareButton
           label="Details"
           size="sm"
+          uppercase={false}
+          icon={<ListIcon size={18} color={showDetails ? colors.signal : colors.textSecondary} />}
           style={styles.footerButton}
           selected={showDetails}
           onPress={() => setShowDetails((current) => !current)}
@@ -653,6 +673,8 @@ export default function SessionScreen() {
         <HardwareButton
           label="Visualizer"
           size="sm"
+          uppercase={false}
+          icon={<BarsIcon size={18} color={showScopes ? colors.signal : colors.textSecondary} />}
           style={styles.footerButton}
           selected={showScopes}
           onPress={() => setShowScopes((current) => !current)}
@@ -683,40 +705,46 @@ const styles = StyleSheet.create({
   finishingNote: { marginTop: space.sm },
   transportMainIdle: { opacity: 0.4 },
   root: { flex: 1, backgroundColor: colors.background },
-  content: { padding: space.xl, paddingTop: space.vast, paddingBottom: 140, gap: space.lg },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceRaised,
-    shadowColor: '#33486A',
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
-  },
-  headerCentre: { flex: 1, alignItems: 'center', gap: 2 },
-  headerTitle: { letterSpacing: 3 },
+  content: { paddingHorizontal: space.xl, paddingBottom: 140, gap: space.md },
   banner: { marginTop: space.sm },
-  stage: { alignItems: 'center', marginTop: space.xs },
+  stage: { alignItems: 'center', marginTop: -space.md },
 
-  beatChipRow: { alignItems: 'center', marginTop: -space.xs },
+  beatChipRow: { alignItems: 'center', marginTop: -space.sm },
+  beatPlate: {
+    borderRadius: radius.control,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.ring,
+    ...shadows.float,
+  },
   beatChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
-    paddingHorizontal: space.lg,
-    paddingVertical: space.sm,
+    paddingLeft: space.lg,
+    paddingRight: space.xs,
+    paddingVertical: space.xxs,
     minWidth: 230,
   },
   beatChipText: { flex: 1, alignItems: 'center', gap: 1 },
+  infoTarget: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  infoRing: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.ring,
+    backgroundColor: colors.surfaceRaised,
+  },
 
-  carrierRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  carrierRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md },
+  // The left cell gives way, so a sentence in place of a number wraps inside
+  // the panel instead of pushing Mode off its edge.
+  carrierCell: { flex: 1, minWidth: 0 },
   carrierValue: { marginTop: space.xxs },
-  modeCell: { alignItems: 'flex-end' },
+  modeCell: { alignItems: 'flex-end', flexShrink: 0 },
 
   earsRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   earCell: { flex: 1, gap: space.xxs },
@@ -740,25 +768,25 @@ const styles = StyleSheet.create({
   levelTrack: {
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: 'rgba(96,110,132,0.18)',
+    backgroundColor: 'rgba(109,109,109,0.18)',
     overflow: 'hidden',
     alignSelf: 'stretch',
     marginTop: space.xs,
   },
   levelFill: { height: 3, borderRadius: 1.5, backgroundColor: colors.signal },
 
-  timeHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  timeHeader: { alignItems: 'center', gap: space.xxs },
   timeRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'center',
-    marginTop: space.sm,
+    marginTop: space.xs,
   },
   progressTrack: {
     marginTop: space.md,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(96,110,132,0.18)',
+    backgroundColor: 'rgba(109,109,109,0.18)',
   },
   progressFill: {
     position: 'absolute',
@@ -768,73 +796,72 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: colors.signal,
   },
-  progressThumb: {
+  progressHead: {
     position: 'absolute',
-    top: -5,
-    width: 14,
-    height: 14,
-    marginLeft: -7,
-    borderRadius: 7,
-    backgroundColor: colors.surfaceHigh,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairlineStrong,
-    shadowColor: '#33486A',
-    shadowOpacity: 0.25,
+    top: -3,
+    width: 10,
+    height: 10,
+    marginLeft: -5,
+    borderRadius: 5,
+    backgroundColor: colors.signal,
+    borderWidth: 2,
+    borderColor: colors.surfaceHigh,
+    shadowColor: colors.signal,
+    shadowOpacity: 0.45,
     shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    shadowOffset: { width: 0, height: 0 },
   },
 
   transportRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: space.xxl,
+    gap: space.xxxl,
     marginTop: space.lg,
   },
   transportSmall: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surfaceRaised,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.ring,
     borderTopWidth: 1,
     borderTopColor: colors.edgeLight,
-    shadowColor: '#33486A',
-    shadowOpacity: 0.16,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 4,
+    ...shadows.float,
   },
   transportMain: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surfaceHigh,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.ring,
     borderTopWidth: 1,
     borderTopColor: colors.edgeLight,
-    shadowColor: '#33486A',
-    shadowOpacity: 0.2,
-    shadowRadius: 14,
+    shadowColor: '#232323',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
     shadowOffset: { width: 0, height: 7 },
     elevation: 6,
   },
   // The engaged transport wears the illumination as a ring, like the dial.
   transportMainRing: {
     position: 'absolute',
-    top: 3,
-    left: 3,
-    right: 3,
-    bottom: 3,
-    borderRadius: 35,
-    borderWidth: 2,
+    top: -4,
+    left: -4,
+    right: -4,
+    bottom: -4,
+    borderRadius: 44,
+    borderWidth: 2.5,
     borderColor: colors.signal,
     shadowColor: colors.signal,
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
+    shadowOpacity: 0.55,
+    shadowRadius: 10,
     shadowOffset: { width: 0, height: 0 },
   },
 
@@ -864,11 +891,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     flexDirection: 'row',
     gap: space.sm,
-    padding: space.lg,
-    paddingBottom: space.xxxl,
-    backgroundColor: colors.chassis,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairlineStrong,
+    paddingHorizontal: space.xl,
+    paddingTop: space.md,
+    backgroundColor: colors.background,
   },
   footerButton: { flex: 1 },
 });

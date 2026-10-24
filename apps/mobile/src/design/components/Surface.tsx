@@ -67,7 +67,7 @@ export function Recessed({ children, style, cornerRadius = radius.control, ramp 
       >
         {/* The shadow the rim casts down into the well. */}
         <LinearGradient
-          colors={['rgba(58,68,84,0.16)', 'rgba(58,68,84,0.03)', 'rgba(58,68,84,0)'] as const}
+          colors={['rgba(67,67,67,0.16)', 'rgba(67,67,67,0.03)', 'rgba(67,67,67,0)'] as const}
           start={LIGHT.well.start}
           end={{ x: 0.5, y: 0.42 }}
           style={[StyleSheet.absoluteFill, { borderRadius: cornerRadius }]}
@@ -113,7 +113,7 @@ export function DisplayGlass({
           >
             {/* The rim's shadow falling into the top of the well. */}
             <LinearGradient
-              colors={['rgba(76,90,112,0.14)', 'rgba(76,90,112,0.03)', 'rgba(76,90,112,0)'] as const}
+              colors={['rgba(89,89,89,0.14)', 'rgba(89,89,89,0.03)', 'rgba(89,89,89,0)'] as const}
               start={LIGHT.well.start}
               end={{ x: 0.5, y: 0.5 }}
               style={[StyleSheet.absoluteFill, { borderRadius: cornerRadius }]}
@@ -152,7 +152,7 @@ export function BrushedGrain({ opacity = 0.5 }: { opacity?: number }) {
           <RadialGradient id="grain" cx="30%" cy="0%" r="90%">
             <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.7" />
             <Stop offset="0.55" stopColor="#FFFFFF" stopOpacity="0.08" />
-            <Stop offset="1" stopColor="#6B7C96" stopOpacity="0.06" />
+            <Stop offset="1" stopColor="#7A7A7A" stopOpacity="0.06" />
           </RadialGradient>
         </Defs>
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#grain)" />
@@ -175,14 +175,14 @@ export function Screw({ size = 10, style }: { size?: number; style?: StyleProp<V
       <Svg width={size} height={size}>
         <Defs>
           <RadialGradient id="screwHead" cx="35%" cy="30%" r="75%">
-            <Stop offset="0" stopColor="#F2F5F9" />
-            <Stop offset="0.6" stopColor="#C4CBD6" />
-            <Stop offset="1" stopColor="#98A2B1" />
+            <Stop offset="0" stopColor="#F5F5F5" />
+            <Stop offset="0.6" stopColor="#CACACA" />
+            <Stop offset="1" stopColor="#A1A1A1" />
           </RadialGradient>
         </Defs>
-        <Circle cx={r} cy={r} r={r - 0.5} fill="url(#screwHead)" stroke="rgba(70,80,96,0.45)" strokeWidth={0.6} />
+        <Circle cx={r} cy={r} r={r - 0.5} fill="url(#screwHead)" stroke="rgba(79,79,79,0.45)" strokeWidth={0.6} />
         {/* Slot, lit on its lower edge like any cut into metal. */}
-        <Rect x={r * 0.42} y={r - 0.55} width={size * 0.58} height={1.1} rx={0.5} fill="rgba(64,74,90,0.55)" />
+        <Rect x={r * 0.42} y={r - 0.55} width={size * 0.58} height={1.1} rx={0.5} fill="rgba(73,73,73,0.55)" />
         <Rect x={r * 0.42} y={r + 0.4} width={size * 0.58} height={0.6} rx={0.3} fill="rgba(255,255,255,0.6)" />
       </Svg>
     </View>
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   fill: { flex: 1, overflow: 'hidden' },
   contact: {
     overflow: 'hidden',
-    shadowColor: '#1D2430',
+    shadowColor: '#232323',
     shadowOpacity: 0.18,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: StyleSheet.hairlineWidth,
     borderLeftColor: 'rgba(255,255,255,0.55)',
     borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: 'rgba(83,95,112,0.16)',
+    borderRightColor: 'rgba(94,94,94,0.16)',
   },
   recessOuter: { overflow: 'hidden', backgroundColor: colors.panelRecessed },
   bevelWell: {

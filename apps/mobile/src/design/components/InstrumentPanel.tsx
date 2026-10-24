@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(84,96,114,0.20)',
+    backgroundColor: 'rgba(95,95,95,0.20)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.75)',
     marginVertical: space.md,

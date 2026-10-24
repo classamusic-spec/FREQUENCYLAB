@@ -109,7 +109,7 @@ export function SegmentSelector<T extends string>({
             pointerEvents="none"
           />
         ) : null}
-        {selected ? <View style={styles.indicator} /> : null}
+        {selected ? <View style={[styles.indicator, !rail ? styles.indicatorWide : null]} /> : null}
       </Pressable>
     );
   });
@@ -146,10 +146,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     padding: 4,
     gap: 4,
+    // A ring round the channel's lip, so the housing reads as a machined
+    // recess rather than a grey stain on the panel.
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: colors.ring,
+    borderRightColor: colors.ring,
     // A channel milled into the panel: shaded at the top by its own rim,
     // catching bounced light along the bottom lip.
     borderTopWidth: 1,
-    borderTopColor: 'rgba(96,110,132,0.20)',
+    borderTopColor: 'rgba(109,109,109,0.20)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.9)',
   },
@@ -176,9 +182,9 @@ const styles = StyleSheet.create({
    * as it was. What still distinguishes the variant is the type size and the
    * horizontal padding, which is most of what it was ever for.
    */
-  segmentSm: { minHeight: MIN_TOUCH_TARGET, paddingHorizontal: space.md },
+  segmentSm: { minHeight: MIN_TOUCH_TARGET, paddingHorizontal: space.sm },
   selected: {
-    shadowColor: '#33486A',
+    shadowColor: '#232323',
     shadowOpacity: 0.16,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 3 },
@@ -194,7 +200,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.95)',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(122,136,158,0.22)',
+    borderBottomColor: 'rgba(135,135,135,0.22)',
   },
   segmentLabel: { zIndex: 1 },
   // The second non-colour channel. `labelLg` is medium; the selected segment
@@ -233,4 +239,7 @@ const styles = StyleSheet.create({
     borderRadius: 1.5,
     backgroundColor: colors.signal,
   },
+  // In the channel the cap is wide, and a short tick under a long label looks
+  // like a typo; the underline spans the word instead.
+  indicatorWide: { width: '72%', height: 2.5, bottom: 5 },
 });

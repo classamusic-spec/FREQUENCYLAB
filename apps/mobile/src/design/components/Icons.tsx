@@ -15,7 +15,7 @@ export interface IconProps {
   strokeWidth?: number;
 }
 
-const defaults = { size: 22, color: '#5C6675', strokeWidth: 1.8 };
+const defaults = { size: 22, color: '#656565', strokeWidth: 1.8 };
 
 /** A waveform — the Player. */
 export function WaveformIcon({ size = defaults.size, color = defaults.color, strokeWidth = defaults.strokeWidth }: IconProps) {
@@ -239,6 +239,97 @@ export function StereoRingsIcon({ size = defaults.size, color = defaults.color, 
       <Circle cx={8} cy={12} r={5} stroke={color} strokeWidth={strokeWidth} fill="none" />
       <Circle cx={12} cy={12} r={5} stroke={color} strokeWidth={strokeWidth} fill="none" opacity={0.75} />
       <Circle cx={16} cy={12} r={5} stroke={color} strokeWidth={strokeWidth} fill="none" />
+    </Svg>
+  );
+}
+
+/** A magnifier, for search fields. */
+export function SearchIcon({ size = defaults.size, color = defaults.color, strokeWidth = defaults.strokeWidth }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Circle cx={10.5} cy={10.5} r={6} stroke={color} strokeWidth={strokeWidth} fill="none" />
+      <Line x1={15} y1={15} x2={19.5} y2={19.5} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+/** A crosshair — the Explorer: aiming at one value. */
+export function CrosshairIcon({ size = defaults.size, color = defaults.color, strokeWidth = defaults.strokeWidth }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Circle cx={12} cy={12} r={6.5} stroke={color} strokeWidth={strokeWidth} fill="none" />
+      <Circle cx={12} cy={12} r={1.6} fill={color} />
+      {[
+        [12, 2.5, 12, 6],
+        [12, 18, 12, 21.5],
+        [2.5, 12, 6, 12],
+        [18, 12, 21.5, 12],
+      ].map(([x1, y1, x2, y2], i) => (
+        <Line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+      ))}
+    </Svg>
+  );
+}
+
+/** Three slider rails with their caps — adjustment, filters. */
+export function SlidersIcon({ size = defaults.size, color = defaults.color, strokeWidth = defaults.strokeWidth }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      {[
+        [6.5, 15],
+        [12, 8],
+        [17.5, 13],
+      ].map(([y, x], i) => (
+        <Line key={`l${i}`} x1={4} y1={y} x2={20} y2={y} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+      ))}
+      {[
+        [15, 6.5],
+        [8, 12],
+        [13, 17.5],
+      ].map(([x, y], i) => (
+        <Circle key={`c${i}`} cx={x} cy={y} r={2.2} fill="#FFFFFF" stroke={color} strokeWidth={strokeWidth} />
+      ))}
+    </Svg>
+  );
+}
+
+/** A bulleted list — details. */
+export function ListIcon({ size = defaults.size, color = defaults.color, strokeWidth = defaults.strokeWidth }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      {[7, 12, 17].map((y) => (
+        <Line key={`l${y}`} x1={9} y1={y} x2={20} y2={y} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+      ))}
+      {[7, 12, 17].map((y) => (
+        <Circle key={`c${y}`} cx={4.8} cy={y} r={1.3} fill={color} />
+      ))}
+    </Svg>
+  );
+}
+
+/** Level bars — a visualiser. */
+export function BarsIcon({ size = defaults.size, color = defaults.color, strokeWidth = 2.2 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      {[
+        [6, 11],
+        [12, 5],
+        [18, 14],
+      ].map(([x, top]) => (
+        <Line key={x} x1={x} y1={20} x2={x} y2={top} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+      ))}
+    </Svg>
+  );
+}
+
+/** A dotted ring — intensity, a level that is set rather than read. */
+export function DottedRingIcon({ size = defaults.size, color = defaults.color }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      {Array.from({ length: 12 }, (_, i) => {
+        const a = (i / 12) * Math.PI * 2;
+        return <Circle key={i} cx={12 + 8 * Math.cos(a)} cy={12 + 8 * Math.sin(a)} r={i % 3 === 0 ? 1.5 : 1.1} fill={color} />;
+      })}
     </Svg>
   );
 }

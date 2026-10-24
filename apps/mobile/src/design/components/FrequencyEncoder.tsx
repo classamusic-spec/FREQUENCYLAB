@@ -41,6 +41,12 @@ import { Label, Text } from './Text';
 export type EncoderTaper = 'linear' | 'log';
 
 export interface FrequencyEncoderProps {
+  /**
+   * Hides the engraved label under the dial, for a screen where the control
+   * beside it already says which number this is. Still announced: the label
+   * remains the control's accessible name.
+   */
+  hideLabel?: boolean;
   value: number;
   min: number;
   max: number;
@@ -79,8 +85,9 @@ export interface FrequencyEncoderProps {
   testID?: string;
 }
 
-const START_ANGLE = -225;
-const SWEEP = 270;
+/** Where a dial's travel starts, and how far it turns. Shared with the session dial. */
+export const START_ANGLE = -225;
+export const SWEEP = 270;
 
 export function FrequencyEncoder({
   value,
@@ -89,6 +96,7 @@ export function FrequencyEncoder({
   onChange,
   onCommit,
   label,
+  hideLabel,
   unit = 'Hz',
   precision = 3,
   integerDigits = 3,
@@ -452,7 +460,7 @@ export function FrequencyEncoder({
         </View>
       </View>
 
-      <Label style={styles.label}>{label}</Label>
+      {hideLabel ? null : <Label style={styles.label}>{label}</Label>}
 
       {/* The way out of the detent, sitting on the panel next to the lock:
           snapping is right for playing a note and wrong for hunting a beat, so
@@ -570,7 +578,7 @@ function defaultStep(min: number, max: number, precision: number): number {
 }
 
 /** Margin around the dial reserved for the engraved scale figures. */
-const LABEL_PAD = 26;
+export const LABEL_PAD = 26;
 
 /**
  * The figures engraved around a dial.
@@ -580,7 +588,7 @@ const LABEL_PAD = 26;
  * dial carries a 50 between its 10 and its 100. A linear dial gets ends and
  * middle.
  */
-function labelStops(
+export function labelStops(
   min: number,
   max: number,
   taper: EncoderTaper,

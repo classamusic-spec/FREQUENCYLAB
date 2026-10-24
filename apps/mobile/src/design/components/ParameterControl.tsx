@@ -5,6 +5,7 @@ import { runOnJS } from 'react-native-reanimated';
 import { clamp, type ParamDescriptor } from '@frequencylab/dsp-core';
 import { colors, MIN_TOUCH_TARGET, space } from '../tokens';
 import * as haptics from '../haptics';
+import { KnobFace } from './KnobFace';
 import { NumericEntrySheet } from './NumericEntrySheet';
 import { Label, Text } from './Text';
 
@@ -170,6 +171,125 @@ export function ParameterControl({
   );
 }
 
+/**
+ * A single parameter as a small rotary knob, for the rack's module faces.
+ *
+ * The same value, the same snapping and the same exact-entry sheet as the
+ * horizontal control above, so a module's face and its expanded editor can
+ * never disagree about what a drag does. The knob turns on a drag in either
+ * direction — up or right is more — because a phone has no mouse wheel and a
+ * circular gesture on a 56 pt part is a gesture nobody hits. Tapping the
+ * readout types a value. Screen readers get it as an adjustable with
+ * increment and decrement, exactly like the slider.
+ */
+export function RackKnob({
+  descriptor,
+  value,
+  onChange,
+  onCommit,
+  automated,
+  disabled,
+  size = 56,
+}: Omit<ParameterControlProps, 'onToggleAutomation'> & { size?: number }) {
+  const [entryOpen, setEntryOpen] = useState(false);
+  const [startValue, setStartValue] = useState(value);
+  const normalised = toNormalised(value, descriptor);
+  const step = stepFor(descriptor);
+  const locked = disabled || automated;
+  // The figure and its unit set apart, as engraved on the reference rack.
+  const shown = format(value, descriptor);
+  const split = shown.lastIndexOf(' ');
+  const figure = split > 0 ? shown.slice(0, split) : shown;
+  const unit = split > 0 ? shown.slice(split + 1) : '';
+
+  const applyDelta = useCallback(
+    (delta: number) => {
+      const next = fromNormalised(clamp(toNormalised(startValue, descriptor) + delta, 0, 1), descriptor);
+      const snapped = snap(next, step, descriptor);
+      if (snapped !== value) {
+        haptics.detent();
+        onChange(snapped);
+      }
+    },
+    [descriptor, onChange, startValue, step, value],
+  );
+
+  const commit = useCallback(() => onCommit?.(value), [onCommit, value]);
+
+  const gesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(!locked)
+        .minDistance(2)
+        .onBegin(() => {
+          runOnJS(haptics.beginGesture)();
+          runOnJS(setStartValue)(value);
+        })
+        .onUpdate((event) => {
+          runOnJS(applyDelta)((event.translationX - event.translationY) / 220);
+        })
+        .onFinalize(() => {
+          runOnJS(commit)();
+        }),
+    [applyDelta, commit, locked, value],
+  );
+
+  return (
+    <View style={styles.knobCell}>
+      <Label tone={automated ? 'signal' : 'tertiary'} numberOfLines={1} style={styles.knobLabel}>
+        {automated ? `${descriptor.label} · Auto` : descriptor.label}
+      </Label>
+      <Pressable
+        onPress={() => setEntryOpen(true)}
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={`${descriptor.label}, ${format(value, descriptor)}. Double tap to type a value.`}
+        style={styles.knobReadout}
+      >
+        <Text variant="readout" tone={disabled ? 'disabled' : 'primary'} numberOfLines={1} style={styles.knobFigure}>
+          {figure}
+          {unit ? <Text variant="readoutXs" tone="tertiary">{` ${unit}`}</Text> : null}
+        </Text>
+      </Pressable>
+      <GestureDetector gesture={gesture}>
+        <View
+          accessible
+          accessibilityRole="adjustable"
+          accessibilityLabel={descriptor.label}
+          accessibilityHint={descriptor.help}
+          accessibilityValue={{ min: descriptor.min, max: descriptor.max, now: value, text: format(value, descriptor) }}
+          accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+          onAccessibilityAction={(event) => {
+            if (locked) return;
+            const delta = event.nativeEvent.actionName === 'increment' ? step : -step;
+            onChange(snap(value + delta, step, descriptor));
+          }}
+          style={{ width: size + 16, height: size + 16, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <KnobFace size={size + 16} normalised={normalised} locked={locked} disabled={disabled} />
+        </View>
+      </GestureDetector>
+
+      {entryOpen ? (
+        <NumericEntrySheet
+          title={descriptor.label}
+          unit={unitLabel(descriptor)}
+          value={value}
+          min={descriptor.min}
+          max={descriptor.max}
+          precision={descriptor.precision}
+          onCancel={() => setEntryOpen(false)}
+          onSubmit={(next) => {
+            onChange(next);
+            onCommit?.(next);
+            setEntryOpen(false);
+          }}
+        />
+      ) : null}
+    </View>
+  );
+}
+
 export function format(value: number, descriptor: ParamDescriptor): string {
   switch (descriptor.unit) {
     case 'percent':
@@ -223,6 +343,10 @@ function snap(value: number, step: number, descriptor: ParamDescriptor): number 
 }
 
 const styles = StyleSheet.create({
+  knobCell: { alignItems: 'center', flex: 1, minWidth: 0 },
+  knobLabel: { textAlign: 'center' },
+  knobFigure: { fontSize: 15, lineHeight: 20 },
+  knobReadout: { minHeight: 30, justifyContent: 'center', paddingHorizontal: space.xxs },
   readoutTouch: { minHeight: MIN_TOUCH_TARGET, justifyContent: 'center', paddingHorizontal: space.xs },
   row: { gap: space.xs, paddingVertical: space.xs },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

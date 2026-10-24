@@ -45,31 +45,31 @@ export const LIGHT = {
  */
 export const SURFACES = {
   /** The instrument's outer case — porcelain white, faint cool grain. */
-  chassis: ['#F8FAFC', '#F4F6F9', '#EFF2F6', '#F5F7FA'] as Ramp,
+  chassis: ['#FAFAFA', '#F6F6F6', '#F2F2F2', '#F7F7F7'] as Ramp,
   /** A raised module face sitting proud of the chassis. */
-  panel: ['#FFFFFF', '#FDFDFE', '#F7F9FB'] as Ramp,
+  panel: ['#FFFFFF', '#FDFDFD', '#F9F9F9'] as Ramp,
   /** A panel that is currently engaged or selected. */
-  panelActive: ['#FFFFFF', '#FEFEFF', '#F9FBFD'] as Ramp,
+  panelActive: ['#FFFFFF', '#FEFEFE', '#FBFBFB'] as Ramp,
   /** The floor of a milled recess — darker at the top where the rim shades it. */
-  well: ['#E4E8EE', '#ECEFF4', '#F2F4F8'] as Ramp,
+  well: ['#E8E8E8', '#EFEFEF', '#F4F4F4'] as Ramp,
   /** A deeper well, for display cutouts. */
-  wellDeep: ['#DDE2EA', '#E7EBF1', '#EFF2F6'] as Ramp,
+  wellDeep: ['#E2E2E2', '#EBEBEB', '#F2F2F2'] as Ramp,
   /** Polished steel knob cap, lit from the top-left. */
-  knobCap: ['#FFFFFF', '#F6F8FA', '#E9EDF2', '#D9DFE7'] as Ramp,
+  knobCap: ['#FFFFFF', '#F8F8F8', '#EDEDED', '#DEDEDE'] as Ramp,
   /** The knurled outer ring of a knob. */
-  knobRing: ['#E4E8EE', '#CFD6DE', '#BCC4CF', '#D8DDE5'] as Ramp,
+  knobRing: ['#E8E8E8', '#D5D5D5', '#C3C3C3', '#DDDDDD'] as Ramp,
   /** A tactile button cap at rest. */
-  buttonCap: ['#FFFFFF', '#FBFCFD', '#F2F5F8'] as Ramp,
+  buttonCap: ['#FFFFFF', '#FCFCFC', '#F5F5F5'] as Ramp,
   /** The same cap depressed — the highlight collapses and the face darkens. */
-  buttonCapPressed: ['#E7EBF1', '#EEF1F5', '#F5F7FA'] as Ramp,
+  buttonCapPressed: ['#EBEBEB', '#F1F1F1', '#F7F7F7'] as Ramp,
   /** A primary/engaged button, tinted with the accent. */
   buttonPrimary: ['#63A7FF', '#3B8BF5', '#2C79E0'] as Ramp,
   /** A display well — recessed porcelain, no longer dark glass. */
-  display: ['#EDF0F5', '#F2F5F8', '#F7F9FB'] as Ramp,
+  display: ['#F0F0F0', '#F5F5F5', '#F9F9F9'] as Ramp,
   /** The reflection sheen laid over a display well. */
   glass: ['rgba(255,255,255,0.65)', 'rgba(255,255,255,0.12)', 'rgba(255,255,255,0)'] as Ramp,
   /** Bright bezel ring framing a display well. */
-  bezel: ['#FFFFFF', '#F0F3F7', '#E2E7ED', '#EDF0F5'] as Ramp,
+  bezel: ['#FFFFFF', '#F3F3F3', '#E6E6E6', '#F0F0F0'] as Ramp,
 } as const;
 
 /**
@@ -82,17 +82,17 @@ export const EDGES = {
   /** Top edge of a raised form, catching the light. */
   raisedTop: 'rgba(255,255,255,0.95)',
   /** Bottom edge of a raised form, in its own shadow. */
-  raisedBottom: 'rgba(122,136,158,0.20)',
+  raisedBottom: 'rgba(135,135,135,0.20)',
   /** Top of a recess — shaded by the rim above it. */
-  wellTop: 'rgba(96,110,132,0.22)',
+  wellTop: 'rgba(109,109,109,0.22)',
   /** Bottom lip of a recess, catching bounced light. */
   wellBottom: 'rgba(255,255,255,0.9)',
   /** The seam where two surfaces meet. */
-  seam: 'rgba(116,128,148,0.16)',
+  seam: 'rgba(127,127,127,0.16)',
   /** A hairline scribed into the metal. */
-  scribe: 'rgba(104,116,136,0.14)',
+  scribe: 'rgba(115,115,115,0.14)',
   /** Inside a display bezel. */
-  bezelInner: 'rgba(112,126,148,0.22)',
+  bezelInner: 'rgba(125,125,125,0.22)',
 } as const;
 
 /**
@@ -114,7 +114,7 @@ export const SHADOW = {
   },
   /** Tight and dark, immediately under the form. Sells the contact point. */
   contact: {
-    shadowColor: '#2B3C55',
+    shadowColor: '#3A3A3A',
     shadowOpacity: 0.10,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
@@ -130,7 +130,7 @@ export const SHADOW = {
   },
   /** A pressed control — shadow collapses as the cap sinks. */
   pressed: {
-    shadowColor: '#2B3C55',
+    shadowColor: '#3A3A3A',
     shadowOpacity: 0.08,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 },
@@ -138,7 +138,7 @@ export const SHADOW = {
   },
   /** A sheet lifted over the whole instrument. */
   sheet: {
-    shadowColor: '#243248',
+    shadowColor: '#313131',
     shadowOpacity: 0.24,
     shadowRadius: 44,
     shadowOffset: { width: 0, height: -12 },
@@ -162,7 +162,7 @@ export const ENGRAVE = {
   },
   /** Embossed: standing off the panel. */
   raised: {
-    textShadowColor: 'rgba(38,46,58,0.35)',
+    textShadowColor: 'rgba(45,45,45,0.35)',
     textShadowOffset: { width: 0, height: -1 },
     textShadowRadius: 0,
   },

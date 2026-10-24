@@ -57,7 +57,7 @@ export function Oscilloscope({
           y1={height / 2}
           x2={width}
           y2={height / 2}
-          stroke="rgba(233,246,243,0.14)"
+          stroke="rgba(243,243,243,0.14)"
           strokeWidth={StyleSheet.hairlineWidth * 2}
         />
         {paths?.right ? (
@@ -114,7 +114,7 @@ export function SpectrumAnalyzer({
               y1={0}
               x2={x}
               y2={height}
-              stroke="rgba(233,246,243,0.10)"
+              stroke="rgba(243,243,243,0.10)"
               strokeWidth={StyleSheet.hairlineWidth}
             />
           );
@@ -183,7 +183,7 @@ export function StereoVectorScope({
           cx={size / 2}
           cy={size / 2}
           r={size / 2 - 1}
-          stroke="rgba(233,246,243,0.14)"
+          stroke="rgba(243,243,243,0.14)"
           strokeWidth={StyleSheet.hairlineWidth * 2}
           fill={colors.surfaceRecessed}
         />

@@ -230,13 +230,16 @@ export function playerReadout(
         mode: 'Binaural',
         absence: null,
         absenceDetail: null,
-        beatLabel: 'Beat',
+        // Named by the method, as the reference plate is: a binaural beat is
+        // made in the listener's head and a monaural one in the air, and the
+        // chip is where someone looks to find out which they are hearing.
+        beatLabel: 'Binaural beat',
         noRateLabel: 'Steady tone',
-        headlineLabel: 'Beat',
+        headlineLabel: 'Binaural beat',
       };
     }
     case 'monaural':
-      return both(at('carrier') ?? 0, at('beat') ?? 0, 'Beat');
+      return both(at('carrier') ?? 0, at('beat') ?? 0, 'Monaural beat');
     case 'isochronic':
       return both(at('carrier') ?? 0, at('pulse') ?? 0, 'Pulse');
     case 'harmonic':

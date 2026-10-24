@@ -18,19 +18,19 @@ import { Platform, type TextStyle } from 'react-native';
 const palette = {
   // The instrument's case. Porcelain white with a cool undertone, stepped by
   // real luminance so raised and recessed forms separate without any hue shift.
-  void: '#EEF1F5',
-  chassis: '#F4F6F9',
-  panelRecessed: '#E6EAF0',
-  panel: '#FDFDFE',
+  void: '#F1F1F1',
+  chassis: '#F6F6F6',
+  panelRecessed: '#EAEAEA',
+  panel: '#FDFDFD',
   panelRaised: '#FFFFFF',
   panelHigh: '#FFFFFF',
-  bezel: '#DCE1E8',
+  bezel: '#E0E0E0',
 
   // Ink is printed onto porcelain, so it is near-black rather than pure black.
-  inkPrimary: '#171B21',
-  inkSecondary: '#5C6675',
-  inkTertiary: '#8B95A2',
-  inkDisabled: '#B9C1CC',
+  inkPrimary: '#1B1B1B',
+  inkSecondary: '#656565',
+  inkTertiary: '#949494',
+  inkDisabled: '#C0C0C0',
 
   /** The single illumination colour: instrument blue. */
   signal: '#3B8BF5',
@@ -39,11 +39,11 @@ const palette = {
 
   // Display wells. The readout areas are recessed porcelain now, not dark
   // glass: values are printed in ink and lit in signal blue.
-  display: '#F1F4F8',
-  displayDeep: '#EAEEF3',
-  displayInk: '#171B21',
+  display: '#F4F4F4',
+  displayDeep: '#EEEEEE',
+  displayInk: '#1B1B1B',
   displaySignal: '#2E7FE8',
-  displayDim: 'rgba(23, 27, 33, 0.38)',
+  displayDim: 'rgba(27,27,27,0.38)',
 
   warning: '#D98600',
   limit: '#E5484D',
@@ -67,8 +67,8 @@ export const colors = {
   /** Top edge of a raised form, catching the light. */
   edgeLight: 'rgba(255, 255, 255, 0.95)',
   /** Underside of a raised form, in its own shadow. */
-  edgeDark: 'rgba(116, 130, 152, 0.20)',
-  hairline: 'rgba(96, 108, 128, 0.12)',
+  edgeDark: 'rgba(129,129,129,0.20)',
+  hairline: 'rgba(107,107,107,0.12)',
   /**
    * The outline of a floating control.
    *
@@ -76,11 +76,11 @@ export const colors = {
    * draws the *edge of an object* sitting on the chassis, so it has to survive
    * being seen against both the ground and its own shadow.
    */
-  ring: 'rgba(88, 100, 122, 0.20)',
-  hairlineStrong: 'rgba(88, 100, 120, 0.22)',
-  engraving: 'rgba(70, 80, 99, 0.28)',
+  ring: 'rgba(99,99,99,0.20)',
+  hairlineStrong: 'rgba(99,99,99,0.22)',
+  engraving: 'rgba(79,79,79,0.28)',
 
-  scrim: 'rgba(30, 38, 50, 0.38)',
+  scrim: 'rgba(37,37,37,0.38)',
 
   text: palette.inkPrimary,
   textSecondary: palette.inkSecondary,
@@ -216,7 +216,7 @@ export const shadows = {
   /** A panel sitting proud of the chassis. */
   raised: Platform.select({
     ios: {
-      shadowColor: '#2A3140',
+      shadowColor: '#313131',
       shadowOpacity: 0.16,
       shadowRadius: 20,
       shadowOffset: { width: 0, height: 10 },
@@ -225,7 +225,7 @@ export const shadows = {
   }) as object,
   control: Platform.select({
     ios: {
-      shadowColor: '#1D2430',
+      shadowColor: '#232323',
       shadowOpacity: 0.2,
       shadowRadius: 6,
       shadowOffset: { width: 0, height: 3 },
@@ -246,7 +246,7 @@ export const shadows = {
    */
   float: Platform.select({
     ios: {
-      shadowColor: '#233049',
+      shadowColor: '#2F2F2F',
       shadowOpacity: 0.13,
       shadowRadius: 14,
       shadowOffset: { width: 0, height: 5 },
@@ -255,7 +255,7 @@ export const shadows = {
   }) as object,
   sheet: Platform.select({
     ios: {
-      shadowColor: '#161C26',
+      shadowColor: '#1B1B1B',
       shadowOpacity: 0.34,
       shadowRadius: 40,
       shadowOffset: { width: 0, height: -12 },

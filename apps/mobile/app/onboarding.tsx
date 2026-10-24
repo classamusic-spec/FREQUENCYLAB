@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceRecessed,
     overflow: 'hidden',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(96,110,132,0.22)',
+    borderTopColor: 'rgba(109,109,109,0.22)',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(255,255,255,0.9)',
   },

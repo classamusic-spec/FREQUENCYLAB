@@ -47,6 +47,7 @@ function BadgeShell({
   label,
   accessibilityLabel,
   onPress,
+  chip,
   style,
 }: {
   color: string;
@@ -54,19 +55,32 @@ function BadgeShell({
   accessibilityLabel: string;
   /** Opens the sheet that explains this rating. Omit for a static badge. */
   onPress?: () => void;
+  /** Sentence case and no chevron, for a list row that is already a door. */
+  chip?: boolean;
   style?: ViewStyle;
 }) {
   const pill = (
     <View
-      style={[styles.badge, { borderColor: withAlpha(color, 0.4) }, onPress ? undefined : style]}
+      style={[
+        styles.badge,
+        chip ? { backgroundColor: withAlpha(color, 0.08) } : null,
+        { borderColor: withAlpha(color, 0.4) },
+        onPress ? undefined : style,
+      ]}
       accessible={!onPress}
       accessibilityLabel={onPress ? undefined : accessibilityLabel}
     >
       <View style={[styles.dot, { backgroundColor: color }]} />
-      <Text variant="label" uppercase tone="secondary">
-        {label}
-      </Text>
-      {onPress ? (
+      {chip ? (
+        <Text style={styles.chipLabel} numberOfLines={1}>
+          {label}
+        </Text>
+      ) : (
+        <Text variant="label" uppercase tone="secondary">
+          {label}
+        </Text>
+      )}
+      {onPress && !chip ? (
         <Text variant="label" tone="tertiary" style={styles.chevron}>
           {'›'}
         </Text>
@@ -95,6 +109,8 @@ function BadgeShell({
 export interface EvidenceBadgeProps {
   level: EvidenceLevel;
   compact?: boolean;
+  /** The short rating in sentence case, sized for a list row. */
+  chip?: boolean;
   /** Opens the ratings sheet. The rating itself is shown either way. */
   onPress?: () => void;
   style?: ViewStyle;
@@ -107,11 +123,12 @@ export interface EvidenceBadgeProps {
  * could only be read as a colour would be unreadable to a colour-blind user and
  * meaningless to a screen reader (§50).
  */
-export function EvidenceBadge({ level, compact, onPress, style }: EvidenceBadgeProps) {
+export function EvidenceBadge({ level, compact, chip, onPress, style }: EvidenceBadgeProps) {
   return (
     <BadgeShell
       color={evidenceColors[level]}
-      label={compact ? SHORT_LABELS[level] : EVIDENCE_LABELS[level]}
+      chip={chip}
+      label={compact || chip ? SHORT_LABELS[level] : EVIDENCE_LABELS[level]}
       accessibilityLabel={`Evidence rating: ${EVIDENCE_LABELS[level]}`}
       onPress={onPress}
       style={style}
@@ -330,6 +347,7 @@ const styles = StyleSheet.create({
     paddingRight: space.sm,
   },
   chevron: { marginLeft: space.hair },
+  chipLabel: { fontFamily: 'Inter_500Medium', fontSize: 12, lineHeight: 16, color: colors.textSecondary },
   dot: { width: 6, height: 6, borderRadius: 3 },
   dna: {
     flexDirection: 'row',

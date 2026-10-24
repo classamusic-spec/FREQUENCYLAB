@@ -4,24 +4,27 @@ import { useRouter } from 'expo-router';
 import {
   NODE_DESCRIPTORS,
   NODE_KINDS,
+  binauralFrequencies,
   formatClock,
   getDescriptor,
   parseParamAddress,
+  type GraphNode,
   type NodeKind,
 } from '@frequencylab/dsp-core';
-import { EmptyState, Screen, ScreenHeader, SectionHeader } from '../../src/design/components/Screen';
-import { ProfileButton } from '../../src/design/components/ProfileButton';
+import { EmptyState, Screen, SectionHeader } from '../../src/design/components/Screen';
+import { TitleBar } from '../../src/design/components/TitleBar';
+import { ChevronIcon, EllipsisIcon } from '../../src/design/components/Icons';
 import { InstrumentPanel, PanelDivider } from '../../src/design/components/InstrumentPanel';
 import { HardwareButton } from '../../src/design/components/HardwareButton';
 import { SegmentSelector } from '../../src/design/components/SegmentSelector';
-import { ParameterControl } from '../../src/design/components/ParameterControl';
+import { ParameterControl, RackKnob } from '../../src/design/components/ParameterControl';
 import { SignalFlowView } from '../../src/design/components/SignalFlowView';
 import { ProtocolCard } from '../../src/design/components/Cards';
 import { NameEntrySheet, RENAME_FOOTNOTE } from '../../src/design/components/NameEntrySheet';
 import { DnaChip, Tag } from '../../src/design/components/Badges';
 import { Oscilloscope, SpectrumAnalyzer } from '../../src/design/components/Visualizers';
 import { Label, Text } from '../../src/design/components/Text';
-import { colors, layout, MIN_TOUCH_TARGET, radius, space } from '../../src/design/tokens';
+import { colors, layout, MIN_TOUCH_TARGET, radius, shadows, space } from '../../src/design/tokens';
 import * as haptics from '../../src/design/haptics';
 import { useLab } from '../../src/state/lab';
 import { useProtocolLibrary, summariseLibrary } from '../../src/state/library';
@@ -47,12 +50,17 @@ export default function LabScreen() {
   if (!draft) {
     return (
       <Screen bottomInset={layout.transportHeight}>
-        <ScreenHeader
-          eyebrow="Lab"
-          title="Workspace"
-          subtitle="Open a protocol to take it apart, or start from a blank rack."
-          right={<ProfileButton />}
+        <TitleBar
+          section="Lab"
+          right={{
+            icon: <EllipsisIcon color={colors.textSecondary} />,
+            onPress: () => router.push('/profile'),
+            accessibilityLabel: 'More: profile and settings',
+          }}
         />
+        <Text variant="bodySm" tone="secondary" style={styles.intro}>
+          Open a protocol to take it apart, or start from a blank rack.
+        </Text>
         <View style={styles.actionRow}>
           <HardwareButton
             label="New protocol"
@@ -159,35 +167,29 @@ function LabWorkspace() {
 
   return (
     <Screen bottomInset={layout.transportHeight}>
-      <ScreenHeader
-        eyebrow="Lab"
-        title={draft.name}
-        subtitle={`${draft.stages.length} stage${draft.stages.length === 1 ? '' : 's'} · ${formatClock(
-          draft.stages.reduce((sum, entry) => sum + entry.durationSec, 0),
-        )}`}
-        right={
-          <View style={styles.headerActions}>
-            <Pressable
-              onPress={() => setRenaming(true)}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel={`Rename ${draft.name}`}
-              style={styles.headerAction}
-            >
-              <Label tone="signal">Rename</Label>
-            </Pressable>
-            <Pressable
-              onPress={close}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="Close workspace"
-              style={styles.headerAction}
-            >
-              <Label>Close</Label>
-            </Pressable>
-          </View>
-        }
+      <TitleBar
+        section="Lab"
+        left={{
+          icon: <ChevronIcon direction="down" color={colors.textSecondary} />,
+          onPress: close,
+          accessibilityLabel: 'Close workspace',
+        }}
+        right={{
+          icon: <EllipsisIcon color={colors.textSecondary} />,
+          onPress: () => setRenaming(true),
+          accessibilityLabel: `Rename ${draft.name}`,
+        }}
       />
+      <View style={styles.draftHeading}>
+        <Text variant="heading" numberOfLines={1}>
+          {draft.name}
+        </Text>
+        <Label tone="tertiary">
+          {`${draft.stages.length} stage${draft.stages.length === 1 ? '' : 's'} · ${formatClock(
+            draft.stages.reduce((sum, entry) => sum + entry.durationSec, 0),
+          )}`}
+        </Label>
+      </View>
 
       {/* The draft is not in the library yet, so this renames the working copy;
           Save protocol at the foot of the screen is what commits it. */}
@@ -307,30 +309,31 @@ function LabWorkspace() {
           const descriptor = getDescriptor(node.kind);
           const expanded = selectedNodeId === node.id;
           return (
-            <InstrumentPanel
-              key={node.id}
-              tone={expanded ? 'raised' : 'flat'}
-              label={descriptor.shortLabel}
-              headerRight={
-                <View style={styles.moduleHeaderActions}>
-                  {node.bypass ? <Tag label="Bypassed" /> : null}
-                  <Pressable
+            <View key={node.id} style={[styles.module, expanded ? styles.moduleOpen : null]}>
+              <View style={styles.moduleHead}>
+                {/* The lamp is lit while the module is in the signal path. It
+                    is never the only sign: a bypassed module also says so. */}
+                <View style={[styles.lamp, node.bypass ? styles.lampOff : null]} />
+                <Text style={styles.moduleTitle} numberOfLines={1}>
+                  {(node.label ?? descriptor.label).toUpperCase()}
+                </Text>
+                {node.bypass ? <Tag label="Bypassed" /> : null}
+                <Pressable
                   accessibilityRole="button"
                   accessibilityState={{ expanded }}
-                  accessibilityLabel={expanded ? "Collapse this module" : "Edit this module"}
-                  onPress={() => selectNode(expanded ? null : node.id)} hitSlop={8}>
-                    <Label tone={expanded ? 'signal' : 'tertiary'}>{expanded ? 'Collapse' : 'Edit'}</Label>
-                  </Pressable>
-                </View>
-              }
-            >
-              <Text variant="heading">{node.label ?? descriptor.label}</Text>
-              <Text variant="caption" tone="tertiary" style={styles.moduleDescription}>
-                {descriptor.description}
-              </Text>
+                  accessibilityLabel={expanded ? 'Collapse this module' : 'Edit this module'}
+                  onPress={() => selectNode(expanded ? null : node.id)}
+                  style={styles.moduleEdit}
+                >
+                  <Label tone={expanded ? 'signal' : 'tertiary'}>{expanded ? 'Collapse' : 'Edit'}</Label>
+                </Pressable>
+              </View>
 
               {expanded ? (
                 <>
+                  <Text variant="caption" tone="tertiary" style={styles.moduleDescription}>
+                    {descriptor.description}
+                  </Text>
                   <PanelDivider />
                   {descriptor.options.map((option) => (
                     <View key={option.key} style={styles.optionRow}>
@@ -373,8 +376,35 @@ function LabWorkspace() {
                     />
                   </View>
                 </>
-              ) : null}
-            </InstrumentPanel>
+              ) : (
+                <>
+                  {/* The face: the module's leading parameters as knobs that
+                      turn, so the rack can be played without opening anything.
+                      Every parameter, with its help text, is under Edit. */}
+                  <View style={styles.knobRow}>
+                    {faceParams(node).map((param) => (
+                      <RackKnob
+                        key={param.key}
+                        descriptor={param}
+                        value={node.params[param.key] ?? param.default}
+                        automated={automatedParams.has(`${node.id}:${param.key}`)}
+                        onChange={(value) => setParam(node.id, param.key, value)}
+                      />
+                    ))}
+                    {node.kind === 'binaural' ? <EarReadout node={node} /> : null}
+                  </View>
+                  <View style={styles.moduleFace}>
+                    <HardwareButton
+                      label={node.bypass ? 'Bypassed' : 'Bypass'}
+                      size="sm"
+                      selected={node.bypass}
+                      accessibilityLabel={node.bypass ? 'Bypassed. Put this module back in the signal path' : 'Bypass this module'}
+                      onPress={() => toggleBypass(node.id)}
+                    />
+                  </View>
+                </>
+              )}
+            </View>
           );
         })}
 
@@ -497,9 +527,46 @@ function LabWorkspace() {
   );
 }
 
+/**
+ * The parameters a module shows on its face: the ones that define it. Two for
+ * a binaural engine, whose third column is what each ear receives; three for
+ * everything else.
+ */
+function faceParams(node: GraphNode) {
+  const descriptor = getDescriptor(node.kind);
+  return descriptor.params.slice(0, node.kind === 'binaural' ? 2 : 3);
+}
+
+/**
+ * What each ear receives from a binaural engine, from the core's own split —
+ * so a centered pair is shown its centered arithmetic, and the two figures
+ * always differ by exactly the beat.
+ */
+function EarReadout({ node }: { node: GraphNode }) {
+  const carrier = node.params.carrier ?? getDescriptor('binaural').params[0].default;
+  const beat = node.params.beat ?? getDescriptor('binaural').params[1].default;
+  const ears = binauralFrequencies(carrier, beat, (node.options.mode as 'offset' | 'centered') ?? 'offset');
+  return (
+    <View style={styles.ears} accessible accessibilityLabel={`Left ear ${ears.left.toFixed(3)} hertz, right ear ${ears.right.toFixed(3)} hertz`}>
+      <View style={styles.ear}>
+        <Label tone="tertiary">Left</Label>
+        <Text variant="readoutSm">
+          {ears.left.toFixed(3)} <Text variant="readoutXs" tone="tertiary">Hz</Text>
+        </Text>
+      </View>
+      <View style={[styles.ear, styles.earDivided]}>
+        <Label tone="tertiary">Right</Label>
+        <Text variant="readoutSm">
+          {ears.right.toFixed(3)} <Text variant="readoutXs" tone="tertiary">Hz</Text>
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  headerAction: { minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' },
+  intro: { textAlign: 'center', marginTop: -space.xs },
+  draftHeading: { alignItems: 'center', gap: space.xxs, marginTop: -space.xs },
   actionRow: { flexDirection: 'row', gap: space.sm },
   actionButton: { flex: 1 },
   flow: { paddingHorizontal: space.lg, paddingBottom: space.md },
@@ -514,8 +581,50 @@ const styles = StyleSheet.create({
     minWidth: 96,
   },
   moduleHint: { marginTop: space.md },
-  moduleHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  module: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.ring,
+    paddingHorizontal: space.lg,
+    paddingBottom: space.md,
+    ...shadows.float,
+  },
+  moduleOpen: { borderColor: colors.signalDim },
+  moduleHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: MIN_TOUCH_TARGET },
+  lamp: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: colors.signal,
+    shadowColor: colors.signal,
+    shadowOpacity: 0.7,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  lampOff: { backgroundColor: colors.textDisabled, shadowOpacity: 0 },
+  moduleTitle: {
+    flex: 1,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12.5,
+    letterSpacing: 2.4,
+    color: colors.text,
+  },
+  moduleEdit: { minHeight: MIN_TOUCH_TARGET, minWidth: MIN_TOUCH_TARGET, alignItems: 'flex-end', justifyContent: 'center' },
   moduleDescription: { marginTop: space.xxs },
+  knobRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.xs },
+  moduleFace: { flexDirection: 'row', marginTop: space.xxs },
+  ears: {
+    flex: 1,
+    alignSelf: 'center',
+    borderRadius: radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.ring,
+    backgroundColor: colors.surfaceRaised,
+    paddingHorizontal: space.md,
+  },
+  ear: { paddingVertical: space.sm, gap: 2 },
+  earDivided: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.hairlineStrong },
   optionRow: { gap: space.xs, paddingVertical: space.xs },
   optionSegment: { marginTop: space.xxs },
   moduleFooter: { flexDirection: 'row', gap: space.sm },

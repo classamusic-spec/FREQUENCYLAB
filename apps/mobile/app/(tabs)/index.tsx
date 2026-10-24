@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.control,
     backgroundColor: colors.surfaceRecessed,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(96,110,132,0.20)',
+    borderTopColor: 'rgba(109,109,109,0.20)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.9)',
   },

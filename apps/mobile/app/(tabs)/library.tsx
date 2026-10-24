@@ -11,20 +11,22 @@ import {
   type EvidenceLevel,
   type FrequencyPreset,
   type LibraryCategory,
+  type LibraryEntry,
   type PresetClassification,
 } from '@frequencylab/dsp-core';
-import { Screen, ScreenHeader, SectionHeader } from '../../src/design/components/Screen';
-import { ProfileButton } from '../../src/design/components/ProfileButton';
-import { InstrumentPanel } from '../../src/design/components/InstrumentPanel';
+import { Screen, SectionHeader } from '../../src/design/components/Screen';
+import { TitleBar } from '../../src/design/components/TitleBar';
 import { HardwareButton } from '../../src/design/components/HardwareButton';
-import { SegmentSelector } from '../../src/design/components/SegmentSelector';
+import { FilterChips } from '../../src/design/components/FilterChips';
+import { MetalDisc } from '../../src/design/components/MetalDisc';
+import { ChevronIcon, EllipsisIcon, SearchIcon, WaveformIcon } from '../../src/design/components/Icons';
 import { ClassificationBadge, EvidenceBadge } from '../../src/design/components/Badges';
 import { ClassificationSheet, EvidenceSheet } from '../../src/design/components/ClassificationSheet';
 import { SoundBathSheet } from '../../src/design/components/SoundBathSheet';
 import { PresetCard } from '../../src/design/components/PresetCard';
 import { PlayRow } from '../../src/design/components/PlayRow';
 import { Label, Text } from '../../src/design/components/Text';
-import { colors, MIN_TOUCH_TARGET, radius, space } from '../../src/design/tokens';
+import { colors, MIN_TOUCH_TARGET, radius, shadows, space } from '../../src/design/tokens';
 import { plainWord, useTier } from '../../src/features/tier';
 import { usePresetShelf } from '../../src/state/presets';
 import { useSessionStart } from '../../src/state/sessionStart';
@@ -187,28 +189,63 @@ export default function LibraryScreen() {
 
   return (
     <Screen>
-      <ScreenHeader
-        eyebrow="Library"
-        title={explained ? 'Frequency library' : 'Sounds and shelves'}
-        subtitle="Tap any badge for what it means."
-        right={<ProfileButton />}
+      <TitleBar
+        section={explained ? 'Frequency Library' : 'Sounds and shelves'}
+        right={{
+          icon: <EllipsisIcon color={colors.textSecondary} />,
+          onPress: () => router.push('/profile'),
+          accessibilityLabel: 'More: profile and settings',
+        }}
       />
 
-      <InstrumentPanel tone="recessed" bare>
+      <View style={styles.searchField}>
+        <SearchIcon size={20} color={colors.textSecondary} />
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Search a frequency, a name, or a band"
-          placeholderTextColor={colors.textDisabled}
+          placeholder="Search frequencies, names, or bands…"
+          placeholderTextColor={colors.textTertiary}
           autoCorrect={false}
           accessibilityLabel="Search the library and the preset collections"
           testID="library-search"
           style={styles.search}
         />
-      </InstrumentPanel>
+      </View>
+
+      {explained ? (
+        <FilterChips
+          accessibilityLabel="Category"
+          options={CATEGORIES}
+          value={category}
+          onChange={setCategory}
+        />
+      ) : null}
+
       <Text variant="caption" tone="tertiary">
-        Every result carries its classification — findable is not endorsed.
+        Every result carries its classification — findable is not endorsed. Tap any badge for what
+        it means.
       </Text>
+
+      {/* The explained entries lead: they are what this tab is named for, and
+          the shelves follow them. */}
+      {explained ? (
+        <>
+          {searching ? <SectionHeader label={`Explained · ${entries.length} matching`} /> : null}
+          {entries.length > 0 ? (
+            <View style={styles.list}>
+              {entries.map((entry, index) => (
+                <EntryRow
+                  key={entry.id}
+                  entry={entry}
+                  first={index === 0}
+                  onOpen={() => router.push(`/library/${entry.id}`)}
+                  onBadge={() => setSheet({ kind: 'evidence', level: entry.evidence })}
+                />
+              ))}
+            </View>
+          ) : null}
+        </>
+      ) : null}
 
       {searching ? (
         <>
@@ -344,48 +381,7 @@ export default function LibraryScreen() {
         </>
       )}
 
-      {explained ? (
-        <>
-          <SectionHeader
-            label={searching ? `Explained · ${entries.length} matching` : 'Explained'}
-          />
-          <SegmentSelector
-            scrollable
-            accessibilityLabel="Category"
-            options={CATEGORIES.map((entry) => ({ value: entry.value, label: entry.label }))}
-            value={category}
-            onChange={(value) => setCategory(value as LibraryCategory | 'all')}
-          />
-
-          {entries.map((entry) => (
-            <View key={entry.id} style={styles.card}>
-              <Pressable
-                onPress={() => router.push(`/library/${entry.id}`)}
-                accessibilityRole="button"
-                accessibilityLabel={`${entry.title}. ${entry.subtitle}`}
-                style={styles.cardHeader}
-              >
-                <Text variant="heading" style={styles.cardTitle}>
-                  {entry.title}
-                </Text>
-                {entry.frequencyHz !== undefined ? (
-                  <View style={styles.frequency}>
-                    <Text variant="readout" tone="secondary">
-                      {entry.frequencyHz}
-                    </Text>
-                    <Label>{entry.frequencyKind === 'carrier' ? 'Hz carrier' : 'Hz rate'}</Label>
-                  </View>
-                ) : null}
-              </Pressable>
-              <EvidenceBadge
-                level={entry.evidence}
-                compact
-                onPress={() => setSheet({ kind: 'evidence', level: entry.evidence })}
-              />
-            </View>
-          ))}
-        </>
-      ) : (
+      {explained ? null : (
         <Text variant="caption" tone="tertiary">
           The entries explaining each frequency one by one are written for
           Explorer, where the app shows its numbers. Profile changes the level.
@@ -413,6 +409,79 @@ export default function LibraryScreen() {
   );
 }
 
+/**
+ * One explained entry: the number on a steel disc, what the entry is, where it
+ * comes from, and its evidence rating.
+ *
+ * The rating is a sibling of the row rather than inside it — one tap, one
+ * meaning — and the chevron is a second, smaller way into the same page,
+ * hidden from screen readers so the row is announced once.
+ */
+function EntryRow({
+  entry,
+  first,
+  onOpen,
+  onBadge,
+}: {
+  entry: LibraryEntry;
+  first: boolean;
+  onOpen: () => void;
+  onBadge: () => void;
+}) {
+  const source = entry.sources[0];
+  const kind =
+    entry.frequencyKind === 'carrier' ? 'Tone' : entry.frequencyKind === 'modulation' ? 'Rate' : null;
+  const more = entry.sources.length > 1 ? ` + ${entry.sources.length - 1}` : '';
+  return (
+    <View style={[styles.entry, first ? null : styles.entryDivided]}>
+      <Pressable
+        onPress={onOpen}
+        accessibilityRole="button"
+        accessibilityLabel={`${entry.title}. ${entry.subtitle}`}
+        style={styles.entryMain}
+      >
+        <MetalDisc value={entry.frequencyHz} size={56}>
+          {/* No single number: an entry about noise or a practice gets a mark,
+              never a figure made up to fill the disc. */}
+          <WaveformIcon size={20} color={colors.textSecondary} />
+        </MetalDisc>
+        <View style={styles.entryText}>
+          <Text style={styles.entryTitle} numberOfLines={2}>
+            {entry.title}
+          </Text>
+          <Text style={styles.entrySubtitle} numberOfLines={2}>
+            {entry.subtitle}
+          </Text>
+          {source ? (
+            <Text style={styles.entrySource} numberOfLines={1}>
+              {kind ? `${kind} · ` : ''}Source: {citeShort(source.authors, source.year)}
+              {more}
+            </Text>
+          ) : null}
+        </View>
+      </Pressable>
+      <EvidenceBadge level={entry.evidence} chip onPress={onBadge} style={styles.entryBadge} />
+      <Pressable
+        onPress={onOpen}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        aria-hidden
+        tabIndex={-1}
+        style={styles.entryChevron}
+      >
+        <ChevronIcon direction="right" size={16} color={colors.textTertiary} />
+      </Pressable>
+    </View>
+  );
+}
+
+/** `Oster 1973`, `Liu et al. 2026`: the first author's surname and the year. */
+function citeShort(authors: string, year: number): string {
+  const first = authors.split(/,|&/)[0].trim();
+  const several = /et al/.test(authors) || /&/.test(authors) || (authors.match(/,/g) ?? []).length > 1;
+  return `${first}${several ? ' et al.' : ''} ${year}`;
+}
+
 const styles = StyleSheet.create({
   /*
    * No vertical padding and no gap: the navigating row supplies 44 pt of its
@@ -434,14 +503,43 @@ const styles = StyleSheet.create({
     minHeight: MIN_TOUCH_TARGET,
   },
   shelfName: { flex: 1 },
+  searchField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    paddingLeft: space.lg,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceRaised,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.ring,
+    ...shadows.float,
+  },
   search: {
-    paddingHorizontal: space.lg,
+    flex: 1,
+    paddingRight: space.lg,
     paddingVertical: space.md,
     color: colors.text,
-    fontFamily: 'IBMPlexMono_400Regular',
+    fontFamily: 'Inter_400Regular',
     fontSize: 15,
     minHeight: 48,
   },
+  list: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.ring,
+    paddingHorizontal: space.sm + 2,
+    ...shadows.float,
+  },
+  entry: { flexDirection: 'row', alignItems: 'center', paddingVertical: space.md },
+  entryDivided: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.hairlineStrong },
+  entryMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.md - 2, minHeight: MIN_TOUCH_TARGET },
+  entryText: { flex: 1, gap: 2 },
+  entryTitle: { fontFamily: 'Inter_500Medium', fontSize: 15, lineHeight: 19, color: colors.text },
+  entrySubtitle: { fontFamily: 'Inter_400Regular', fontSize: 12.5, lineHeight: 16, color: colors.textSecondary },
+  entrySource: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 15, color: colors.textTertiary, marginTop: 2 },
+  entryBadge: { marginLeft: space.xs, paddingRight: 0 },
+  entryChevron: { width: 20, minHeight: MIN_TOUCH_TARGET, alignItems: 'flex-end', justifyContent: 'center' },
   disclosure: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -456,19 +554,4 @@ const styles = StyleSheet.create({
     borderTopColor: colors.edgeLight,
   },
   disclosureValue: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.card,
-    paddingHorizontal: space.lg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    gap: space.md,
-    alignItems: 'center',
-    minHeight: MIN_TOUCH_TARGET,
-  },
-  cardTitle: { flex: 1 },
-  frequency: { alignItems: 'flex-end' },
 });

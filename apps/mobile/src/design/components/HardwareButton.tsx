@@ -27,6 +27,11 @@ export interface HardwareButtonProps {
   /** Renders in a persistent "engaged" state, e.g. a latched transport button. */
   selected?: boolean;
   icon?: ReactNode;
+  /**
+   * Engraved capitals by default. Off for a row of icon buttons whose words
+   * are names rather than legends, which read better in sentence case.
+   */
+  uppercase?: boolean;
   style?: ViewStyle;
   /**
    * What a screen reader says instead of `label`.
@@ -65,6 +70,7 @@ export function HardwareButton({
   loading,
   selected,
   icon,
+  uppercase = true,
   style,
   accessibilityLabel,
   accessibilityHint,
@@ -148,7 +154,7 @@ export function HardwareButton({
         {icon ? <View style={styles.icon}>{icon}</View> : null}
         <Text
           variant={size === 'sm' ? 'label' : 'labelLg'}
-          uppercase
+          uppercase={uppercase}
           tone={
             inactive
               ? 'disabled'
@@ -158,7 +164,10 @@ export function HardwareButton({
                   ? 'signal'
                   : 'secondary'
           }
-          style={variant === 'primary' && !inactive ? styles.primaryLabel : undefined}
+          style={[
+            uppercase ? null : styles.sentence,
+            variant === 'primary' && !inactive ? styles.primaryLabel : null,
+          ]}
         >
           {loading ? 'Working' : label}
         </Text>
@@ -180,11 +189,11 @@ const VARIANT_STYLE: Record<ButtonVariant, ViewStyle> = {
   },
   secondary: {
     borderTopColor: 'rgba(255,255,255,0.95)',
-    borderBottomColor: 'rgba(122,136,158,0.26)',
+    borderBottomColor: 'rgba(135,135,135,0.26)',
   },
   ghost: {
     borderTopColor: 'rgba(255,255,255,0.7)',
-    borderBottomColor: 'rgba(122,136,158,0.16)',
+    borderBottomColor: 'rgba(135,135,135,0.16)',
   },
   danger: {
     borderTopColor: 'rgba(255,255,255,0.85)',
@@ -216,6 +225,7 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.45,
   },
+  sentence: { fontSize: 14, letterSpacing: 0.1, lineHeight: 18 },
   icon: {
     alignItems: 'center',
     justifyContent: 'center',

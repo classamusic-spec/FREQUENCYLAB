@@ -15,8 +15,10 @@ import {
   type ParamDescriptor,
   type StimulationEngine,
 } from '@frequencylab/dsp-core';
-import { Screen, ScreenHeader, SectionHeader } from '../../src/design/components/Screen';
-import { ProfileButton } from '../../src/design/components/ProfileButton';
+import { Screen, SectionHeader } from '../../src/design/components/Screen';
+import { TitleBar } from '../../src/design/components/TitleBar';
+import { SuggestedRanges } from '../../src/design/components/SuggestedRanges';
+import { EllipsisIcon } from '../../src/design/components/Icons';
 import { InstrumentPanel, PanelDivider } from '../../src/design/components/InstrumentPanel';
 import { FrequencyEncoder } from '../../src/design/components/FrequencyEncoder';
 import { SegmentSelector } from '../../src/design/components/SegmentSelector';
@@ -27,7 +29,7 @@ import { NumericEntrySheet } from '../../src/design/components/NumericEntrySheet
 import { ParameterControl } from '../../src/design/components/ParameterControl';
 import { DnaChip } from '../../src/design/components/Badges';
 import { Label, Text } from '../../src/design/components/Text';
-import { BANDS, bandForFrequency, colors, layout, space } from '../../src/design/tokens';
+import { bandForFrequency, colors, layout, space } from '../../src/design/tokens';
 import { useExplorer, requiresRebuild } from '../../src/state/explorer';
 import { usePlayer, useScopeCapture } from '../../src/state/player';
 import { useSessionStart } from '../../src/state/sessionStart';
@@ -116,21 +118,13 @@ export default function ExploreScreen() {
 
   return (
     <Screen bottomInset={layout.transportHeight}>
-      <ScreenHeader
-        eyebrow="Explorer"
-        title="Frequency Explorer"
-        subtitle="Turn the encoder. The sound follows without a click."
-        right={<ProfileButton />}
-      />
-
-      <SegmentSelector
-        accessibilityLabel="Encoder target"
-        options={[
-          { value: 'beat', label: 'Beat / Modulation' },
-          { value: 'carrier', label: 'Carrier' },
-        ]}
-        value={target}
-        onChange={setTarget}
+      <TitleBar
+        section="Frequency Explorer"
+        right={{
+          icon: <EllipsisIcon color={colors.textSecondary} />,
+          onPress: () => router.push('/profile'),
+          accessibilityLabel: 'More: profile and settings',
+        }}
       />
 
       <View style={styles.encoderStage}>
@@ -138,6 +132,8 @@ export default function ExploreScreen() {
           <FrequencyEncoder
             key="beat"
             label="Beat frequency"
+            hideLabel
+            size={272}
             value={recipe.beatHz}
             min={MIN_BEAT_HZ}
             max={MAX_BEAT_HZ}
@@ -153,6 +149,8 @@ export default function ExploreScreen() {
           <FrequencyEncoder
             key="carrier"
             label="Carrier"
+            hideLabel
+            size={272}
             value={recipe.carrierHz}
             min={MIN_CARRIER_HZ}
             max={MAX_CARRIER_HZ}
@@ -174,6 +172,33 @@ export default function ExploreScreen() {
           />
         )}
       </View>
+
+
+      {/* Which number the encoder turns. Under the dial, where the reference
+          puts it: you look at the value first and at what it is second. */}
+      <SegmentSelector
+        accessibilityLabel="Encoder target"
+        variant="channel"
+        size="sm"
+        style={styles.target}
+        options={[
+          { value: 'beat', label: 'Modulation / Beat' },
+          { value: 'carrier', label: 'Carrier' },
+        ]}
+        value={target}
+        onChange={setTarget}
+      />
+
+
+      {target === 'beat' ? (
+        <>
+          <SuggestedRanges value={recipe.beatHz} onSelect={(hz) => apply({ beatHz: hz })} />
+          <Text variant="caption" tone="tertiary">
+            These are conventional descriptions of measured brain activity, not switches. A beat
+            inside a band does not put you in that state.
+          </Text>
+        </>
+      ) : null}
 
       {/* What is actually being generated depends on the engine. The binaural
           reading — two detuned tones, one per ear — is false for monaural and
@@ -374,27 +399,6 @@ export default function ExploreScreen() {
         </Text>
       </View>
 
-      <SectionHeader label="Bands" />
-      <View style={styles.bandStrip}>
-        {BANDS.map((entryBand) => {
-          const active = band?.key === entryBand.key;
-          return (
-            <View key={entryBand.key} style={[styles.bandChip, active ? styles.bandChipActive : null]}>
-              <Text variant="label" uppercase tone={active ? 'signal' : 'tertiary'}>
-                {entryBand.label}
-              </Text>
-              <Text variant="readoutXs" tone={active ? 'secondary' : 'tertiary'}>
-                {entryBand.low}–{entryBand.high}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-      <Text variant="caption" tone="tertiary">
-        These are conventional descriptions of measured brain activity, not switches. A beat inside a
-        band does not put you in that state.
-      </Text>
-
       {entry ? (
         <NumericEntrySheet
           title={entry === 'beat' ? 'Beat frequency' : 'Carrier frequency'}
@@ -483,7 +487,8 @@ const MOTION_RATE_PARAM: ParamDescriptor = {
 };
 
 const styles = StyleSheet.create({
-  encoderStage: { alignItems: 'center', paddingVertical: space.md },
+  target: { alignSelf: 'center', width: '90%', maxWidth: 340 },
+  encoderStage: { alignItems: 'center', marginTop: -space.lg, marginBottom: -space.lg },
   channelRow: { flexDirection: 'row', justifyContent: 'space-between', gap: space.xs },
   sliderPanel: { padding: space.lg, gap: space.lg },
   inlineRow: {
