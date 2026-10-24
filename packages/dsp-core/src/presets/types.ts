@@ -1,3 +1,4 @@
+import type { SoundscapeScene } from './soundscapes.js';
 import type { NoiseColor } from '../dsp/noise.js';
 import type { SignalRole } from '../archive/types.js';
 
@@ -138,7 +139,9 @@ export type RepresentationKind =
   | 'subharmonic'
   | 'sweep'
   | 'noise-modulation'
-  | 'multi-layer';
+  | 'multi-layer'
+  /** A scene synthesised from the engine's noise sources, with the rate woven through it. */
+  | 'soundscape';
 
 export interface PresetRepresentation {
   kind: RepresentationKind;
@@ -155,6 +158,8 @@ export interface PresetRepresentation {
   octaveShift?: number;
   /** End value for `sweep`, in the same unit as the source frequency. */
   sweepToHz?: number;
+  /** Which scene a `soundscape` builds. Required for that kind, ignored by every other. */
+  scene?: SoundscapeScene;
 }
 
 export interface PresetSourceFrequency {

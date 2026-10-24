@@ -47,6 +47,7 @@ const RATE_KINDS = new Set<RepresentationKind>([
   'isochronic',
   'fm',
   'noise-modulation',
+  'soundscape',
 ]);
 
 const TONE_KINDS = new Set<RepresentationKind>([
@@ -188,7 +189,13 @@ describe('representation matches what the number is', () => {
       if (role !== 'modulation' && role !== 'electromagnetic') continue;
       const { kind, carrierHz, modulationDepth, noiseColor } = row.representation;
 
-      if (kind === 'noise-modulation') {
+      if (kind === 'soundscape') {
+        // A soundscape rides on the scene it builds — rain, wind, thunder —
+        // and names that scene rather than a carrier or a single noise colour.
+        expect(carrierHz, row.id).toBeUndefined();
+        expect(row.representation.scene, row.id).toBeDefined();
+        expect(modulationDepth, row.id).toBeGreaterThan(0);
+      } else if (kind === 'noise-modulation') {
         // Modulated noise has no carrier: the noise itself is the thing moving.
         expect(carrierHz, row.id).toBeUndefined();
         expect(noiseColor, row.id).toBeDefined();
@@ -552,10 +559,12 @@ describe('search finds what people type', () => {
     { query: 'chakra', mustInclude: ['ht-256', 'ht-480'] },
     { query: 'pink noise', mustInclude: ['noise-pink'] },
     // What someone arriving with the 2026 ultrashort-wave paper types.
-    { query: 'glymphatic', mustInclude: ['noise-uswave-study'] },
-    { query: '40.68', mustInclude: ['noise-uswave-study'] },
-    { query: '40.68 MHz', mustInclude: ['noise-uswave-study'] },
-    { query: 'ultrashort wave', mustInclude: ['noise-uswave-study'] },
+    { query: 'glymphatic', mustInclude: ['noise-storm-40'] },
+    { query: '40.68', mustInclude: ['noise-storm-40'] },
+    { query: '40.68 MHz', mustInclude: ['noise-storm-40'] },
+    { query: 'ultrashort wave', mustInclude: ['noise-storm-40'] },
+    { query: 'thunderstorm', mustInclude: ['noise-storm-40'] },
+    { query: 'rain', mustInclude: ['noise-storm-40'] },
   ];
 
   for (const { query, mustInclude } of cases) {

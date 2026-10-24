@@ -284,6 +284,14 @@ describe('share codes across the whole engine', () => {
     const compiled = FACTORY_PRESETS.map((preset) => ({ preset, built: presetToProtocol(preset) }));
     for (const { preset, built } of compiled) {
       if (!built.ok) continue;
+      if (preset.representation.kind === 'soundscape') {
+        // A soundscape is a custom routing graph — several noise sources, a
+        // bus, an insert, automated thunder — which is exactly what the grammar
+        // says it cannot write. It must refuse rather than emit something
+        // lossy, and the card's "custom routing" fallback is then the truth.
+        expect(encodeShareCode(built.protocol), preset.id).toBeNull();
+        continue;
+      }
       const code = encodeShareCode(built.protocol);
       expect(code, `${preset.id} (${preset.representation.kind}) has no share code`).not.toBeNull();
 

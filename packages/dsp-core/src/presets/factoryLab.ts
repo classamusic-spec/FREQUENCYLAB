@@ -947,48 +947,49 @@ const NOISE_LAB: FrequencyPreset[] = [
   }),
 
   /*
-   * A listening program filed against a radio-frequency study, and honest
-   * about the gap between them.
+   * A thunderstorm with 40 Hz woven through it, filed against the 40.68 MHz
+   * ultrashort-wave study.
    *
-   * The study's stimulus is a 40.68 MHz electromagnetic field, which no
-   * speaker can produce. What it reported in the brain was stronger delta-band
-   * synchronisation and faster glymphatic flow, and glymphatic flow is known
-   * to run highest during natural sleep. So this is built as what the app can
-   * truthfully offer next to that finding — a slow, dark, low-level noise for
-   * winding down toward sleep — and every line of it says that the study is
-   * not being reproduced.
+   * Two numbers that look related and are not. 40.68 MHz is the radio
+   * frequency the study's field ran at — about a million times higher than
+   * 40 Hz, and not a sound. 40 Hz is the rate this storm flutters at, chosen
+   * because it is the one rate with published sound-and-light glymphatic work
+   * behind it, in mice. Borrowing "40.68" as a rate in hertz would be taking the
+   * digits of a radio frequency and nothing else, so it is not done, and the
+   * summary says so rather than leaving the coincidence to do the persuading.
    *
-   * The 1 Hz is a choice inside the delta band, sitting near the slow
-   * oscillation of deep sleep. The paper does not specify a rate, and its
-   * delta was an outcome, not an input, so the number is not borrowed from it.
+   * The storm is synthesised — the app ships no storm recordings — and the 40 Hz
+   * is an amplitude insert on the rain and the thunder, so it lives inside the
+   * weather instead of sitting on top of it. See `soundscapes.ts`.
+   *
+   * It lives on Noise Lab beside `noise-pink-gamma-40`, the ambient 40 Hz noise
+   * row, and is classified the same way — experimental. Gamma 40 is the shelf
+   * of the stimuli the 40 Hz literature actually used, each classified as
+   * research; a synthesised storm filed against a radio-frequency study is not
+   * one of those, and putting it there would lend it a badge it has not earned.
    */
   preset({
-    id: 'noise-uswave-study',
-    name: 'After the 40.68 MHz study — 1 Hz swell',
+    id: 'noise-storm-40',
+    name: 'Thunderstorm — 40 Hz woven through',
     collection: 'noise-lab',
     summary:
-      'Brown noise with a slow 1 Hz swell at 25% depth, for 30 minutes, filed against a 2026 mouse study of 40.68 MHz radio-frequency stimulation and glymphatic clearance. That stimulus was an electromagnetic field, not sound; this does not reproduce it. It is a wind-down toward sleep — when the brain’s own clearance is known to run highest.',
-    sourceFrequency: { value: 1, unit: 'Hz', role: 'modulation' },
-    representation: { kind: 'noise-modulation', modulationDepth: 0.25, noiseColor: 'brown', noiseLevel: 0.28 },
+      'Rain, wind and rolling thunder synthesised from the engine’s own noise, with a 40 Hz flutter woven through the rain and the thunder at 35% depth, for 30 minutes. Filed against a 2026 mouse study of 40.68 MHz ultrashort-wave stimulation — a radio field, not sound, which this does not reproduce. The 40 here is a rate in hertz, unrelated to the study’s megahertz.',
+    sourceFrequency: { value: 40, unit: 'Hz', role: 'modulation' },
+    representation: { kind: 'soundscape', scene: 'thunderstorm', modulationDepth: 0.35 },
     durationSec: 1800,
-    intent: ['sleep preparation', 'winding down', 'background listening'],
+    intent: ['listening', 'background listening', 'experimentation'],
     classification: 'experimental',
-    libraryEntryIds: ['ultrashort-wave-glymphatic', 'delta-range', 'white-brown-noise'],
-    archiveEntryIds: [],
+    libraryEntryIds: ['ultrashort-wave-glymphatic', 'gamma-40hz', 'assr', 'white-brown-noise'],
+    archiveEntryIds: ['assr-40', 'genus-40', 'overture-40'],
     associations: [
       {
         claim:
           'That listening to this clears waste from the brain, or helps with brain injury or Alzheimer’s disease, as the 40.68 MHz study reported in mice.',
         medical: true,
         currentEvidence:
-          'No. The study used a 40.68 MHz electromagnetic field, which headphones cannot produce, and every result in it is in mice. Its delta-band activity was the brain’s response to that field, not a rate it was pulsed at, so a 1 Hz sound is not a version of the experiment. No evidence shows any audio increases glymphatic clearance at a delta rate; the one acoustic result in mice used 40 Hz light and sound together. If you are worried about memory or a head injury, see a doctor.',
+          'No. That study used a 40.68 MHz electromagnetic field, which headphones cannot produce, and every result in it is in mice. The 40 Hz here is a different number for a different stimulus: 40 Hz light and sound together was reported to promote glymphatic clearance in Alzheimer’s-model mice, but sound alone through headphones has not been shown to, in mice or people. If you are worried about memory or a head injury, see a doctor.',
       },
-      {
-        claim: 'That a slow swell played before bed deepens sleep.',
-        medical: true,
-        currentEvidence:
-          'Not established. Sound that enhanced deep sleep in studies was timed to slow waves the sleeper was already producing, during sleep. The honest reasons this can help are masking intermittent noise and a regular wind-down routine. Keep the level low: a long session at a comfortable-seeming volume still accumulates exposure.',
-      },
+      GAMMA_CLAIM,
     ],
     safety: {
       headphonesRecommended: false,
@@ -996,16 +997,19 @@ const NOISE_LAB: FrequencyPreset[] = [
       output: 'headphones-or-speakers',
     },
     aliases: [
+      'thunderstorm',
+      'storm',
+      'rain',
+      'thunder',
       'glymphatic',
       'ultrashort wave',
       'usw',
       '40.68',
       '40.68 MHz',
-      'brain clearance',
-      'brain cleaning',
-      'sleep clearance',
+      'gamma storm',
+      '40 Hz',
     ],
-    tags: ['noise', 'brown', 'delta', 'sleep', 'glymphatic', 'research-linked'],
+    tags: ['gamma', '40hz', 'soundscape', 'storm', 'rain', 'noise', 'research-linked'],
   }),
 
   preset({

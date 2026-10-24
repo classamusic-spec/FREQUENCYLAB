@@ -11,6 +11,7 @@ import type { Protocol, ProtocolIntent } from '../protocol/schema.js';
 import { validateProtocol } from '../protocol/validate.js';
 import { validatePreset, type PresetIssue } from './validate.js';
 import type { FrequencyPreset } from './types.js';
+import { buildSoundscapeStage, type SoundscapeScene } from './soundscapes.js';
 
 /**
  * Compiling a preset into a protocol (§43, §80).
@@ -115,6 +116,12 @@ type ChainSpec = Omit<StageOptions, 'id' | 'name' | 'durationSec' | 'crossfadeSe
 interface ChainPlan {
   spec: ChainSpec;
   statement: PresetStatement;
+  /**
+   * A scene that builds its own stage. The standard chain has one tone slot and
+   * one noise bed, which a soundscape — several noise sources, a shared insert,
+   * automated thunder — does not fit, so it bypasses `buildStage` entirely.
+   */
+  scene?: SoundscapeScene;
 }
 
 type PlanResult = { ok: true; plan: ChainPlan } | { ok: false; failure: PresetCompileFailure };
@@ -144,7 +151,18 @@ export function presetToProtocol(
   if (!planned.ok) return planned;
 
   const durationSec = options.durationSec ?? preset.durationSec;
-  const stage = buildStage({
+  const stage = planned.plan.scene
+    ? buildSoundscapeStage({
+        scene: planned.plan.scene,
+        rateHz: preset.sourceFrequency.value,
+        depth: preset.representation.modulationDepth ?? 0.35,
+        durationSec,
+        amplitude: options.amplitude ?? INTENSITY_AMPLITUDE.balanced,
+        id: 'stage-1',
+        name: preset.name,
+        notes: planned.plan.statement.summary,
+      })
+    : buildStage({
     ...planned.plan.spec,
     id: 'stage-1',
     name: preset.name,
@@ -395,6 +413,32 @@ function planFor(preset: FrequencyPreset, options: PresetCompileOptions): PlanRe
               `A binaural difference gliding from ${value} Hz to ${target} Hz across the session.`,
               fromBeat.description,
               fromBeat.equivalenceNote,
+            ]),
+          },
+        },
+      };
+    }
+
+    case 'soundscape': {
+      if (!rep.scene) {
+        return refuse(
+          'representation-not-compilable',
+          'A soundscape has to name its scene; without one there is nothing to build that would be what this preset says it is.',
+        );
+      }
+      const transform = translate('noise-modulation-rate');
+      if (!transform.available) return refuse('representation-unavailable', transform.unavailableReason!);
+      return {
+        ok: true,
+        plan: {
+          spec: { ...common, engine: 'none', carrierHz, beatHz: 0 },
+          scene: rep.scene,
+          statement: {
+            transform,
+            summary: summarise([
+              `A ${rep.scene} synthesised from the engine's own noise sources — rain, wind and rolling thunder — with ${value} Hz amplitude modulation woven through the rain and the thunder.`,
+              transform.description,
+              'Nothing here is a recording, and broadband noise has no single frequency: the number is the rate the storm flutters at.',
             ]),
           },
         },

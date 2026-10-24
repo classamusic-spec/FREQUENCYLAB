@@ -237,6 +237,7 @@ const STRUCTURAL_LABELS: Record<RepresentationKind, string> = {
   'noise-modulation': 'Noise modulation',
   sweep: 'Sweep between two values',
   'multi-layer': 'Several layers at once',
+  soundscape: 'Soundscape with a woven rate',
 };
 
 function explanationFor(issues: PresetIssue[]): PresetIssue | undefined {

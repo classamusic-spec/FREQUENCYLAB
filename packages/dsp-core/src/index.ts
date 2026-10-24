@@ -72,6 +72,7 @@ export * from './archive/protocol.js';
 export * from './presets/types.js';
 export * from './presets/validate.js';
 export * from './presets/compile.js';
+export * from './presets/soundscapes.js';
 export * from './presets/factory.js';
 export * from './presets/search.js';
 
