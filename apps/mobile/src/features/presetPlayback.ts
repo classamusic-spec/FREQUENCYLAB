@@ -1,4 +1,5 @@
 import {
+  FACTORY_PRESETS,
   presetToProtocol,
   transformsFor,
   validatePreset,
@@ -261,4 +262,17 @@ function explanationFor(issues: PresetIssue[]): PresetIssue | undefined {
  */
 export function protocolIdFor(preset: FrequencyPreset, kind: RepresentationKind): string {
   return `preset-${preset.id}-v${preset.version}-${kind}`;
+}
+
+/**
+ * The factory presets filed against a library entry.
+ *
+ * The link has always run one way — a preset page lists the entries it rests
+ * on — and an entry listed nothing back. So the 40.68 MHz study page, the
+ * first place anyone looks for the program built on it, had no way to it. The
+ * filing is the preset's own `libraryEntryIds`, read in reverse, so the two
+ * directions cannot disagree.
+ */
+export function presetsFiledUnder(entryId: string): FrequencyPreset[] {
+  return FACTORY_PRESETS.filter((preset) => preset.libraryEntryIds.includes(entryId));
 }

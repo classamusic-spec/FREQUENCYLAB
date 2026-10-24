@@ -1,17 +1,32 @@
+import { useCallback, useMemo, useState } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import {
   DEFAULT_EXPLORER_RECIPE,
   EVIDENCE_DESCRIPTIONS,
   libraryEntry,
+  type FrequencyPreset,
 } from '@frequencylab/dsp-core';
 import { Screen, ScreenHeader, SectionHeader } from '../../src/design/components/Screen';
 import { InstrumentPanel } from '../../src/design/components/InstrumentPanel';
 import { HardwareButton } from '../../src/design/components/HardwareButton';
 import { EvidenceBadge } from '../../src/design/components/Badges';
+import { PresetCard } from '../../src/design/components/PresetCard';
+import { PlayRow } from '../../src/design/components/PlayRow';
 import { Label, Text } from '../../src/design/components/Text';
 import { colors, space } from '../../src/design/tokens';
 import { useExplorer } from '../../src/state/explorer';
+import { usePresetShelf } from '../../src/state/presets';
+import { useSessionStart } from '../../src/state/sessionStart';
+import { useTier } from '../../src/features/tier';
+import {
+  compileRepresentation,
+  presetsFiledUnder,
+  protocolIdFor,
+} from '../../src/features/presetPlayback';
+
+/** Filed presets shown before the list asks to be opened. */
+const FILED_PREVIEW = 5;
 
 const SECTION_LABELS = [
   ['whatItIs', 'What it is'],
@@ -33,6 +48,24 @@ export default function LibraryEntryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const entry = libraryEntry(id);
   const setRecipe = useExplorer((state) => state.set);
+  const { opensRoute } = useTier();
+  const request = useSessionStart((state) => state.request);
+  const recordPlay = usePresetShelf((state) => state.recordPlay);
+  const favorites = usePresetShelf((state) => state.favorites);
+  const [showAllFiled, setShowAllFiled] = useState(false);
+  const filed = useMemo(() => (entry ? presetsFiledUnder(entry.id) : []), [entry]);
+
+  /** The same start the Library's search results use, preflight included. */
+  const play = useCallback(
+    (preset: FrequencyPreset) => {
+      const kind = preset.representation.kind;
+      const compiled = compileRepresentation(preset, kind, { id: protocolIdFor(preset, kind) });
+      if (!compiled.ok) return;
+      void recordPlay(preset, kind);
+      void request(compiled.protocol, { onStarted: () => router.push('/session') });
+    },
+    [recordPlay, request, router],
+  );
 
   if (!entry) {
     return (
@@ -71,6 +104,34 @@ export default function LibraryEntryScreen() {
           </Text>
         </View>
       ))}
+
+      {/* The presets that rest on this entry, after the four sections rather
+          than before them: what has not been established is read first, and
+          each preset still carries its own classification. */}
+      {filed.length > 0 ? (
+        <>
+          <SectionHeader label={`Presets filed against this · ${filed.length}`} />
+          {(showAllFiled ? filed : filed.slice(0, FILED_PREVIEW)).map((preset) =>
+            opensRoute(`/preset/${preset.id}`) ? (
+              <PresetCard
+                key={preset.id}
+                preset={preset}
+                favorite={favorites.includes(preset.id)}
+                onPress={() => router.push(`/preset/${preset.id}`)}
+              />
+            ) : (
+              <PlayRow key={preset.id} preset={preset} onPress={() => play(preset)} />
+            ),
+          )}
+          {filed.length > FILED_PREVIEW ? (
+            <HardwareButton
+              label={showAllFiled ? 'Show fewer' : `Show all ${filed.length}`}
+              variant="ghost"
+              onPress={() => setShowAllFiled((current) => !current)}
+            />
+          ) : null}
+        </>
+      ) : null}
 
       <SectionHeader label="Sources" />
       {entry.sources.map((source, index) => (
