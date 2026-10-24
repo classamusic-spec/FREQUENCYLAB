@@ -285,6 +285,61 @@ export const LIBRARY_ENTRIES: LibraryEntry[] = [
   },
 
   {
+    /*
+     * A radio-frequency finding, recorded as one.
+     *
+     * The study's stimulus is 40.68 MHz — an industrial radio band, delivered
+     * as an electromagnetic field. That is roughly two thousand times higher
+     * than the top of human hearing, and it is not sound at all, so there is no
+     * `frequencyHz` here and no `recipe`: either would offer the number as
+     * something this app could play. The delta activity the paper reports is a
+     * brain *response* the field produced, not a rate the stimulus carried, and
+     * the entry says so rather than letting a reader make that leap for it.
+     */
+    id: 'ultrashort-wave-glymphatic',
+    category: 'research',
+    title: 'Ultrashort wave and glymphatic clearance (40.68 MHz)',
+    subtitle: 'A radio-frequency result in mice — not a sound, and not something headphones can play',
+    whatItIs:
+      'A 2026 mouse study that applied 40.68 MHz ultrashort-wave radio energy to the head and measured the glymphatic system — the network that moves cerebrospinal fluid through brain tissue and carries waste out with it. The authors report that flow increased within ten minutes, together with stronger delta-band neuronal synchronisation.',
+    howGenerated:
+      'Not by this app. Ultrashort wave is an electromagnetic field from a radio-frequency applicator; headphones and speakers produce sound, and the highest frequency they reproduce is around 20 kHz. Nothing here generates, approximates or substitutes for the stimulus in the study. The delta synchronisation the paper describes was the brain’s response to the field, not a rate the field was pulsed at — so a delta-rate beat is not a version of this experiment either.',
+    whatHasBeenStudied:
+      'In healthy mice, the authors report faster glymphatic influx and efflux, abolished when neuronal firing or aquaporin-4 water channels were blocked. In mouse models they report less oedema after traumatic brain injury and, in Alzheimer’s-model mice, lower amyloid burden and better cognitive scores. Separately and earlier, glymphatic clearance in mice was shown to rise sharply during natural sleep, and 40 Hz combined light and sound was reported to promote it in an Alzheimer’s mouse model — that is the only acoustic route to glymphatic flow with published data, and it is a 40 Hz one, not delta.',
+    whatHasNotBeenEstablished:
+      'Any result in humans: every finding above is in mice. The study is newly published and not yet independently replicated, and the stimulation power, session length and applicator are not given in the abstract. Above all, nothing establishes that any audio — at a delta rate or otherwise — reproduces this effect. Nothing in this app treats, prevents or slows brain injury or Alzheimer’s disease.',
+    evidence: 'promising',
+    sources: [
+      {
+        authors: 'Liu, J., Xu, C., Ruan, H., et al.',
+        year: 2026,
+        title:
+          'Noninvasive ultrashort wave neuromodulation enhances glymphatic clearance to alleviate traumatic brain edema and Alzheimer’s pathology',
+        publication: 'Science Advances, 12(42), eaeh8870',
+        kind: 'peer-reviewed',
+        note: 'Mouse study. The stimulus is a 40.68 MHz radio-frequency field, not sound; delta synchronisation is reported as an outcome. No human data.',
+      },
+      {
+        authors: 'Xie, L., Kang, H., Xu, Q., et al.',
+        year: 2013,
+        title: 'Sleep drives metabolite clearance from the adult brain',
+        publication: 'Science, 342(6156), 373–377',
+        kind: 'peer-reviewed',
+        note: 'Mouse study showing glymphatic clearance is markedly higher during natural sleep than wakefulness.',
+      },
+      {
+        authors: 'Murdock, M. H., et al.',
+        year: 2024,
+        title: 'Multisensory gamma stimulation promotes glymphatic clearance of amyloid',
+        publication: 'Nature, 627(8002), 149–156',
+        kind: 'peer-reviewed',
+        note: '40 Hz light and sound together, in Alzheimer’s-model mice. The acoustic result here is at 40 Hz; it does not support a delta-rate effect.',
+      },
+    ],
+    tags: ['glymphatic', 'ultrashort wave', 'radio frequency', '40.68 MHz', 'research', 'sleep'],
+  },
+
+  {
     id: 'beta-range',
     category: 'research',
     title: 'Beta range (13–30 Hz)',

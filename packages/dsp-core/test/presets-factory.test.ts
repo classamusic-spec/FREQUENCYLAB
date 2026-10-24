@@ -80,7 +80,7 @@ describe('factory preset library', () => {
       'gamma-40': 5,
       'harmonic-traditional': 7,
       'cosmic-octave': 4,
-      'noise-lab': 10,
+      'noise-lab': 11,
       // Six rows of arithmetic in factoryTones.ts, eight demonstrations in
       // factoryPsychoacoustics.ts.
       'acoustic-fundamentals': 14,
@@ -551,6 +551,11 @@ describe('search finds what people type', () => {
     { query: 'brainwave', mustInclude: ['bw-2', 'bw-40'] },
     { query: 'chakra', mustInclude: ['ht-256', 'ht-480'] },
     { query: 'pink noise', mustInclude: ['noise-pink'] },
+    // What someone arriving with the 2026 ultrashort-wave paper types.
+    { query: 'glymphatic', mustInclude: ['noise-uswave-study'] },
+    { query: '40.68', mustInclude: ['noise-uswave-study'] },
+    { query: '40.68 MHz', mustInclude: ['noise-uswave-study'] },
+    { query: 'ultrashort wave', mustInclude: ['noise-uswave-study'] },
   ];
 
   for (const { query, mustInclude } of cases) {

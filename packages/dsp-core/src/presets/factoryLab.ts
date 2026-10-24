@@ -946,6 +946,68 @@ const NOISE_LAB: FrequencyPreset[] = [
     tags: ['noise', 'brown', 'sleep', 'delta', 'masking'],
   }),
 
+  /*
+   * A listening program filed against a radio-frequency study, and honest
+   * about the gap between them.
+   *
+   * The study's stimulus is a 40.68 MHz electromagnetic field, which no
+   * speaker can produce. What it reported in the brain was stronger delta-band
+   * synchronisation and faster glymphatic flow, and glymphatic flow is known
+   * to run highest during natural sleep. So this is built as what the app can
+   * truthfully offer next to that finding — a slow, dark, low-level noise for
+   * winding down toward sleep — and every line of it says that the study is
+   * not being reproduced.
+   *
+   * The 1 Hz is a choice inside the delta band, sitting near the slow
+   * oscillation of deep sleep. The paper does not specify a rate, and its
+   * delta was an outcome, not an input, so the number is not borrowed from it.
+   */
+  preset({
+    id: 'noise-uswave-study',
+    name: 'After the 40.68 MHz study — 1 Hz swell',
+    collection: 'noise-lab',
+    summary:
+      'Brown noise with a slow 1 Hz swell at 25% depth, for 30 minutes, filed against a 2026 mouse study of 40.68 MHz radio-frequency stimulation and glymphatic clearance. That stimulus was an electromagnetic field, not sound; this does not reproduce it. It is a wind-down toward sleep — when the brain’s own clearance is known to run highest.',
+    sourceFrequency: { value: 1, unit: 'Hz', role: 'modulation' },
+    representation: { kind: 'noise-modulation', modulationDepth: 0.25, noiseColor: 'brown', noiseLevel: 0.28 },
+    durationSec: 1800,
+    intent: ['sleep preparation', 'winding down', 'background listening'],
+    classification: 'experimental',
+    libraryEntryIds: ['ultrashort-wave-glymphatic', 'delta-range', 'white-brown-noise'],
+    archiveEntryIds: [],
+    associations: [
+      {
+        claim:
+          'That listening to this clears waste from the brain, or helps with brain injury or Alzheimer’s disease, as the 40.68 MHz study reported in mice.',
+        medical: true,
+        currentEvidence:
+          'No. The study used a 40.68 MHz electromagnetic field, which headphones cannot produce, and every result in it is in mice. Its delta-band activity was the brain’s response to that field, not a rate it was pulsed at, so a 1 Hz sound is not a version of the experiment. No evidence shows any audio increases glymphatic clearance at a delta rate; the one acoustic result in mice used 40 Hz light and sound together. If you are worried about memory or a head injury, see a doctor.',
+      },
+      {
+        claim: 'That a slow swell played before bed deepens sleep.',
+        medical: true,
+        currentEvidence:
+          'Not established. Sound that enhanced deep sleep in studies was timed to slow waves the sleeper was already producing, during sleep. The honest reasons this can help are masking intermittent noise and a regular wind-down routine. Keep the level low: a long session at a comfortable-seeming volume still accumulates exposure.',
+      },
+    ],
+    safety: {
+      headphonesRecommended: false,
+      directToneAllowed: false,
+      output: 'headphones-or-speakers',
+    },
+    aliases: [
+      'glymphatic',
+      'ultrashort wave',
+      'usw',
+      '40.68',
+      '40.68 MHz',
+      'brain clearance',
+      'brain cleaning',
+      'sleep clearance',
+    ],
+    tags: ['noise', 'brown', 'delta', 'sleep', 'glymphatic', 'research-linked'],
+  }),
+
   preset({
     id: 'noise-focus',
     name: 'Focus — pink, 15 Hz',
